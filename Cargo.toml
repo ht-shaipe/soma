@@ -1,0 +1,49 @@
+[workspace]
+members = [
+    "crates/soma-core",
+    "crates/soma-tts",
+    "crates/soma-stock",
+    "crates/soma-video",
+    "crates/soma-server",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["shaipe <shaipe@live.com>"]
+license = "MIT"
+
+[workspace.dependencies]
+soma-core = { path = "crates/soma-core" }
+soma-tts = { path = "crates/soma-tts" }
+soma-stock = { path = "crates/soma-stock" }
+soma-video = { path = "crates/soma-video" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+tracing = "0.1"
+rand = "0.9"
+base64 = "0.22"
+lazy_static = "1.5"
+
+reqwest = { version = "0.12", features = ["json"] }
+actix-web = "4.13"
+actix-cors = "0.7"
+actix-rt = "2.11"
+actix-files = "0.6"
+actix-multipart = "0.7"
+clap = { version = "4", features = ["derive"] }
+
+tube = { path = "/Users/shaipe/workspace/rust/kit/tube", features = ["derive", "utils", "fs", "cmd"] }
+tube_web = { path = "/Users/shaipe/workspace/rust/kit/tube/web" }
+tube_net = { path = "/Users/shaipe/workspace/rust/kit/tube/net" }
+tube_value = { path = "/Users/shaipe/workspace/rust/kit/tube/value" }
+ai-llm-kit = { path = "/Users/shaipe/workspace/rust/kit/ai/llm" }

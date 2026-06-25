@@ -1,0 +1,16 @@
+[package]
+name = "soma-video"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Soma video composition via FFmpeg"
+
+[dependencies]
+soma-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+rand = { workspace = true }
+tube = { workspace = true }
+tokio = { workspace = true }

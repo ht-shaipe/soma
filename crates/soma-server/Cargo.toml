@@ -1,0 +1,38 @@
+[package]
+name = "soma-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Soma HTTP server and pipeline orchestrator"
+
+[[bin]]
+name = "soma"
+path = "src/main.rs"
+
+[dependencies]
+soma-core = { workspace = true }
+soma-tts = { workspace = true }
+soma-stock = { workspace = true }
+soma-video = { workspace = true }
+
+ai-llm-kit = { workspace = true }
+
+actix-web = { workspace = true }
+actix-cors = { workspace = true }
+actix-files = { workspace = true }
+actix-multipart = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true }
+futures = { workspace = true }
+lazy_static = { workspace = true }
+tokio = { workspace = true }
+rand = { workspace = true }
+
+tube = { workspace = true }
+tube_web = { workspace = true }
+tube_net = { workspace = true }
+tube_value = { workspace = true }

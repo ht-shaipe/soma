@@ -1,0 +1,36 @@
+[app]
+name = "soma"
+version = "0.1.0"
+host = "0.0.0.0"
+port = 8080
+storage_path = "./storage"
+concurrent_tasks = 2
+
+[llm]
+provider = "deepseek"
+model = "deepseek-chat"
+api_key = ""
+base_url = "https://api.deepseek.com"
+api_version = ""
+
+[tts]
+provider = "edge"
+voice_name = "zh-CN-XiaoxiaoNeural"
+azure_speech_key = ""
+azure_speech_region = ""
+siliconflow_key = ""
+elevenlabs_key = ""
+
+[stock]
+pexels_api_key = ""
+pixabay_api_key = ""
+coverr_api_key = ""
+
+[ffmpeg]
+path = "ffmpeg"
+threads = 4
+
+[whisper]
+provider = "edge"
+model = ""
+endpoint = ""
