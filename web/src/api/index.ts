@@ -1,5 +1,4 @@
 import axios from 'axios'
-import type { ApiResponse } from '@/types'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -9,9 +8,11 @@ const api = axios.create({
 
 api.interceptors.response.use(
   (response) => {
-    const data = response.data as ApiResponse
-    if (data.code !== undefined && data.code !== 0) {
-      return Promise.reject(new Error(data.msg || 'Request failed'))
+    const data = response.data
+    if (data && typeof data === 'object' && 'code' in data) {
+      if (data.code !== 200) {
+        return Promise.reject(new Error(data.message || data.msg || 'Request failed'))
+      }
     }
     return response
   },
@@ -20,10 +21,10 @@ api.interceptors.response.use(
   }
 )
 
-export function extractData<T>(response: { data: ApiResponse<T> | T }): T {
+export function extractData<T>(response: { data: unknown }): T {
   const d = response.data
-  if (d && typeof d === 'object' && 'code' in d && 'data' in d) {
-    return (d as ApiResponse<T>).data
+  if (d && typeof d === 'object' && 'code' in d && 'result' in d) {
+    return (d as { code: number; result: T; message: string }).result
   }
   return d as T
 }

@@ -1,7 +1,24 @@
+//! 字幕生成与处理模块
+//!
+//! 提供 SRT 字幕格式转换、文件读写、解析、文本修正以及
+//! 基于 Whisper 的语音识别字幕生成功能。
+
 use soma_core::error::SomaError;
 use soma_core::models::SubtitleCue;
 use soma_core::utils;
 
+/// 将字幕时间轴列表转换为 SRT 格式字符串
+///
+/// SRT 格式示例：
+/// ```text
+/// 1
+/// 00:00:01,000 --> 00:00:03,000
+/// 第一句字幕
+/// ```
+///
+/// - `cues` - 字幕时间轴列表
+///
+/// 返回 SRT 格式的字符串内容。
 pub fn cues_to_srt(cues: &[SubtitleCue]) -> String {
     let mut srt = String::new();
     for cue in cues {
@@ -12,11 +29,20 @@ pub fn cues_to_srt(cues: &[SubtitleCue]) -> String {
     srt
 }
 
+/// 将字幕时间轴列表写入 SRT 文件
+///
+/// - `cues` - 字幕时间轴列表
+/// - `output_path` - SRT 文件输出路径
 pub fn create_subtitle_file(cues: &[SubtitleCue], output_path: &str) -> Result<(), SomaError> {
     let content = cues_to_srt(cues);
     std::fs::write(output_path, content).map_err(SomaError::Io)
 }
 
+/// 从 SRT 文件读取并解析字幕
+///
+/// 如果文件读取失败，返回空列表。
+///
+/// - `srt_path` - SRT 文件路径
 pub fn file_to_subtitles(srt_path: &str) -> Vec<SubtitleCue> {
     let content = match std::fs::read_to_string(srt_path) {
         Ok(c) => c,
@@ -25,21 +51,34 @@ pub fn file_to_subtitles(srt_path: &str) -> Vec<SubtitleCue> {
     parse_srt(&content)
 }
 
+/// 解析 SRT 格式字符串为字幕时间轴列表
+///
+/// SRT 格式以空行分隔每个字幕块，每个块包含：
+/// - 序号
+/// - 时间轴（`HH:MM:SS,mmm --> HH:MM:SS,mmm`）
+/// - 字幕文本（可多行）
+///
+/// - `content` - SRT 格式字符串
 pub fn parse_srt(content: &str) -> Vec<SubtitleCue> {
     let mut cues = Vec::new();
+    // 按空行分割为字幕块
     let blocks: Vec<&str> = content.split("\n\n").collect();
     let mut index = 1u32;
 
     for block in blocks {
         let lines: Vec<&str> = block.lines().collect();
+        // 至少需要 3 行：序号、时间轴、文本
         if lines.len() < 3 {
             continue;
         }
+        // 第二行为时间轴
         let time_line = lines.get(1).unwrap_or(&"");
+        // 第三行起为字幕文本（支持多行）
         let text = lines[2..].join("\n").trim().to_string();
         if text.is_empty() {
             continue;
         }
+        // 解析时间轴中的起止时间
         let parts: Vec<&str> = time_line.split(" --> ").collect();
         if parts.len() != 2 {
             continue;
@@ -58,7 +97,15 @@ pub fn parse_srt(content: &str) -> Vec<SubtitleCue> {
     cues
 }
 
+/// 解析 SRT 时间戳为毫秒
+///
+/// SRT 时间戳格式为 `HH:MM:SS,mmm`，例如 `00:01:23,456` 表示 1 分 23 秒 456 毫秒。
+///
+/// - `ts` - SRT 时间戳字符串
+///
+/// 返回对应的毫秒数，解析失败返回 0。
 fn parse_srt_timestamp(ts: &str) -> u64 {
+    // 以逗号分隔 "HH:MM:SS" 和 "mmm"
     let parts: Vec<&str> = ts.split(',').collect();
     if parts.len() != 2 {
         return 0;
@@ -66,18 +113,28 @@ fn parse_srt_timestamp(ts: &str) -> u64 {
     let hms: Vec<u64> = parts[0].split(':').filter_map(|s| s.parse().ok()).collect();
     let ms: u64 = parts[1].parse().unwrap_or(0);
     if hms.len() == 3 {
+        // 时 * 3600000 + 分 * 60000 + 秒 * 1000 + 毫秒
         (hms[0] * 3600000) + (hms[1] * 60000) + (hms[2] * 1000) + ms
     } else {
         0
     }
 }
 
+/// 使用视频脚本文本修正字幕内容
+///
+/// 将字幕的时间轴保持不变，仅用脚本按标点分句后的文本替换原始字幕文本。
+/// 适用于 Whisper 生成的字幕文本不准确但时间轴正确的情况。
+///
+/// - `cues` - 待修正的字幕列表（就地修改）
+/// - `video_script` - 视频脚本文本
 pub fn correct_subtitle(cues: &mut [SubtitleCue], video_script: &str) {
+    // 将脚本文本按标点分句
     let script_lines = utils::split_string_by_punctuations(video_script);
     if script_lines.is_empty() || cues.is_empty() {
         return;
     }
 
+    // 逐条替换字幕文本，保留原有时间轴
     for (i, cue) in cues.iter_mut().enumerate() {
         if i < script_lines.len() {
             cue.text = script_lines[i].clone();
@@ -85,11 +142,19 @@ pub fn correct_subtitle(cues: &mut [SubtitleCue], video_script: &str) {
     }
 }
 
+/// 使用 Whisper 语音识别模型生成字幕文件
+///
+/// 调用系统安装的 `whisper` 命令行工具对音频文件进行语音识别，
+/// 输出 SRT 格式字幕到指定目录。
+///
+/// - `audio_file` - 输入音频文件路径
+/// - `subtitle_file` - 字幕文件输出路径（用于确定输出目录）
 pub fn generate_whisper_subtitle(audio_file: &str, subtitle_file: &str) -> Result<(), SomaError> {
     let status = std::process::Command::new("whisper")
         .args(&[
             audio_file,
             "--output_format", "srt",
+            // 字幕文件输出到 subtitle_file 所在目录
             "--output_dir", std::path::Path::new(subtitle_file).parent().unwrap_or(std::path::Path::new(".")).to_string_lossy().as_ref(),
         ])
         .status()

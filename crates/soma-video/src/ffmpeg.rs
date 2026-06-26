@@ -1,26 +1,66 @@
+/// FFmpeg 命令行封装模块
+///
+/// 封装了 FFmpeg/ffprobe 的常用命令调用，包括：
+/// - 视频片段裁剪与缩放（clip_and_resize）
+/// - 视频片段拼接（concat_clips）
+/// - 转场特效添加（add_transition）
+/// - 最终视频生成（generate_video）：合并视频、音频、字幕和背景音乐
+/// - 图片转视频（image_to_video）
+/// - 媒体信息查询（时长、分辨率）
 use soma_core::error::SomaError;
 use std::path::Path;
 
+/// FFmpeg 命令行封装结构体
+///
+/// 封装了 FFmpeg 可执行文件路径、编码线程数和视频编码器配置，
+/// 提供视频处理的各种便捷方法。
 pub struct Ffmpeg {
+    /// FFmpeg 可执行文件路径
     path: String,
+    /// 编码使用的线程数
     threads: u32,
+    /// 视频编码器名称（如 libx264、h264_nvenc 等）
     codec: String,
 }
 
+/// 默认视频编码器：H.264 软编码
 const DEFAULT_CODEC: &str = "libx264";
+/// 支持的视频编码器列表，涵盖软编码和各平台硬编码
 const SUPPORTED_CODECS: &[&str] = &[
     "libx264", "h264_nvenc", "h264_amf", "h264_qsv", "h264_mf", "h264_videotoolbox",
 ];
+/// 默认输出帧率
 const FPS: u32 = 30;
 
 impl Ffmpeg {
+    /// 创建 Ffmpeg 实例
+    ///
+    /// # 参数
+    /// - `path`: FFmpeg 可执行文件路径
+    /// - `threads`: 编码线程数
+    /// - `codec`: 视频编码器名称，若不在支持列表中则回退为默认编码器 libx264
+    ///
+    /// # 返回
+    /// 配置好的 Ffmpeg 实例
     pub fn new(path: &str, threads: u32, codec: &str) -> Self {
         let effective_codec = if SUPPORTED_CODECS.contains(&codec) { codec } else { DEFAULT_CODEC };
         Self { path: path.to_string(), threads, codec: effective_codec.to_string() }
     }
 
+    /// 获取音频文件时长（秒）
+    ///
+    /// 使用 ffprobe 查询音频文件的 format duration 信息。
+    ///
+    /// # 参数
+    /// - `audio_path`: 音频文件路径
+    ///
+    /// # 返回
+    /// 成功返回时长（f64 秒），失败返回 SomaError
     pub fn get_audio_duration(&self, audio_path: &str) -> Result<f64, SomaError> {
         let output = std::process::Command::new("ffprobe")
+            // -v error: 只输出错误信息
+            // -show_entries format=duration: 只显示 format 中的 duration 字段
+            // -of default=noprint_wrappers=1:nokey=1: 不打印包裹行和键名，仅输出数值
             .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
@@ -28,34 +68,54 @@ impl Ffmpeg {
             .map_err(|e| SomaError::Ffmpeg(format!("parse duration failed: {}", e)))
     }
 
+    /// 拼接多个视频片段为一个完整视频
+    ///
+    /// 使用 FFmpeg 的 concat 分离器，先将所有片段路径写入临时文件列表，
+    /// 再通过 concat 协议拼接。若指定编码器失败，自动回退为默认编码器重试。
+    ///
+    /// # 参数
+    /// - `clip_files`: 待拼接的视频片段路径列表
+    /// - `output_file`: 输出视频文件路径
+    ///
+    /// # 返回
+    /// 成功返回 Ok(())，失败返回 SomaError
     pub fn concat_clips(&self, clip_files: &[String], output_file: &str) -> Result<(), SomaError> {
         let output_dir = Path::new(output_file).parent().unwrap_or(Path::new("."));
+        // 临时拼接列表文件路径
         let concat_list = output_dir.join("ffmpeg-concat-list.txt");
 
+        // 构建 concat 列表文件内容，每行格式为：file '绝对路径'
         let mut content = String::new();
         for clip in clip_files {
+            // 转换为绝对路径以确保 concat 分离器能正确解析
             let abs = std::fs::canonicalize(clip).unwrap_or_else(|_| PathBuf::from(clip));
+            // 转义路径中的反斜杠和单引号，避免 concat 列表解析错误
             let escaped = abs.to_string_lossy().replace('\\', "/").replace("'", "'\\''");
             content.push_str(&format!("file '{}'\n", escaped));
         }
         std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
 
+        // 调用 FFmpeg concat 分离器拼接视频
         let result = std::process::Command::new(&self.path)
             .args(&[
-                "-y", "-f", "concat", "-safe", "0",
-                "-i", concat_list.to_string_lossy().as_ref(),
-                "-c:v", &self.codec,
-                "-threads", &self.threads.to_string(),
-                "-pix_fmt", "yuv420p",
+                "-y",                    // 覆盖已存在的输出文件
+                "-f", "concat",          // 使用 concat 分离器
+                "-safe", "0",            // 允许使用绝对路径（默认只允许相对路径）
+                "-i", concat_list.to_string_lossy().as_ref(), // 输入拼接列表文件
+                "-c:v", &self.codec,     // 指定视频编码器
+                "-threads", &self.threads.to_string(), // 编码线程数
+                "-pix_fmt", "yuv420p",   // 像素格式设为 yuv420p，确保最大兼容性
                 output_file,
             ])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", e)))?;
 
+        // 拼接完成后删除临时列表文件
         let _ = std::fs::remove_file(&concat_list);
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
+            // 若当前编码器不是默认编码器，尝试回退到默认编码器重新拼接
             if self.codec != DEFAULT_CODEC {
                 return self.concat_clips_fallback(clip_files, output_file, &concat_list);
             }
@@ -64,18 +124,22 @@ impl Ffmpeg {
         Ok(())
     }
 
+    /// 拼接回退方法：使用默认编码器 libx264 重新拼接
+    ///
+    /// 当指定编码器拼接失败时，回退到 libx264 软编码重新尝试。
     fn concat_clips_fallback(&self, clip_files: &[String], output_file: &str, concat_list: &Path) -> Result<(), SomaError> {
         let result = std::process::Command::new(&self.path)
             .args(&[
                 "-y", "-f", "concat", "-safe", "0",
                 "-i", concat_list.to_string_lossy().as_ref(),
-                "-c:v", DEFAULT_CODEC,
+                "-c:v", DEFAULT_CODEC,    // 回退为默认编码器 libx264
                 "-threads", &self.threads.to_string(),
                 "-pix_fmt", "yuv420p",
                 output_file,
             ])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg concat fallback failed: {}", e)))?;
+        // 清理临时列表文件
         let _ = std::fs::remove_file(concat_list);
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
@@ -84,6 +148,21 @@ impl Ffmpeg {
         Ok(())
     }
 
+    /// 裁剪视频片段并缩放到指定分辨率
+    ///
+    /// 从源视频中截取指定时间段，同时缩放到目标分辨率。
+    /// 缩放时保持原始宽高比，不足部分用黑边填充（letterbox/pillarbox）。
+    ///
+    /// # 参数
+    /// - `input_path`: 输入视频路径
+    /// - `output_path`: 输出视频路径
+    /// - `width`: 目标宽度（像素）
+    /// - `height`: 目标高度（像素）
+    /// - `start`: 截取起始时间（秒）
+    /// - `duration`: 截取时长（秒）
+    ///
+    /// # 返回
+    /// 成功返回 Ok(())，失败返回 SomaError
     pub fn clip_and_resize(
         &self,
         input_path: &str,
@@ -96,14 +175,16 @@ impl Ffmpeg {
         let result = std::process::Command::new(&self.path)
             .args(&[
                 "-y",
-                "-ss", &start.to_string(),
+                "-ss", &start.to_string(),  // 定位到起始时间（放在 -i 前以加速定位）
                 "-i", input_path,
-                "-t", &duration.to_string(),
+                "-t", &duration.to_string(), // 截取指定时长
+                // scale: 等比缩放，force_original_aspect_ratio=decrease 确保不放大
+                // pad: 用黑边填充到目标尺寸，(ow-iw)/2 和 (oh-ih)/2 使画面居中
                 "-vf", &format!("scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:(ow-iw)/2:(oh-ih)/2:black", width, height, width, height),
                 "-c:v", &self.codec,
-                "-an",
+                "-an",                      // 移除音频（裁剪阶段只保留视频）
                 "-pix_fmt", "yuv420p",
-                "-r", &FPS.to_string(),
+                "-r", &FPS.to_string(),     // 设置输出帧率
                 output_path,
             ])
             .output()
@@ -116,13 +197,30 @@ impl Ffmpeg {
         Ok(())
     }
 
+    /// 为视频添加转场特效（淡入/淡出）
+    ///
+    /// 使用 FFmpeg 的 fade 滤镜为视频添加淡入或淡出效果。
+    ///
+    /// # 参数
+    /// - `input_path`: 输入视频路径
+    /// - `output_path`: 输出视频路径
+    /// - `transition`: 转场类型，"FadeIn" 为淡入，"FadeOut" 为淡出，其他值不做处理
+    /// - `duration`: 转场持续时间（秒）
+    ///
+    /// # 返回
+    /// 成功返回 Ok(())，无法识别的转场类型也返回 Ok(())（跳过），失败返回 SomaError
     pub fn add_transition(&self, input_path: &str, output_path: &str, transition: &str, duration: f64) -> Result<(), SomaError> {
+        // 根据转场类型构建不同的 fade 滤镜参数
         let vf = match transition {
+            // fade=t=in:st=0:d=N → 从第0秒开始淡入，持续N秒
             "FadeIn" => format!("fade=t=in:st=0:d={}", duration),
             "FadeOut" => {
+                // 淡出需要计算起始时间 = 视频总时长 - 淡出持续时间
                 let dur = self.get_video_duration(input_path)?;
+                // fade=t=out:st=START:d=N → 从START秒开始淡出，持续N秒
                 format!("fade=t=out:st={}:d={}", dur - duration, duration)
             }
+            // 未识别的转场类型，跳过不做处理
             _ => return Ok(()),
         };
         let result = std::process::Command::new(&self.path)
@@ -136,6 +234,20 @@ impl Ffmpeg {
         Ok(())
     }
 
+    /// 生成最终视频（合并视频流、音频流、字幕和背景音乐）
+    ///
+    /// 这是视频生成的核心方法，将无声视频、配音音频、可选字幕和可选背景音乐
+    /// 合成为最终的视频文件。
+    ///
+    /// # 参数
+    /// - `video_path`: 无声视频文件路径
+    /// - `audio_path`: 配音音频文件路径
+    /// - `subtitle_path`: 字幕文件路径（当前通过 drawtext 滤镜实时渲染，此参数暂未直接使用）
+    /// - `output_path`: 输出视频文件路径
+    /// - `params`: 视频参数，包含分辨率、字幕样式、音量等配置
+    ///
+    /// # 返回
+    /// 成功返回 Ok(())，失败返回 SomaError
     pub fn generate_video(
         &self,
         video_path: &str,
@@ -147,6 +259,7 @@ impl Ffmpeg {
         let aspect = params.get_video_aspect();
         let (w, _h) = aspect.to_resolution();
 
+        // 字幕参数，带默认值
         let subtitle_enabled = params.get_subtitle_enabled();
         let font_name = params.font_name.as_deref().unwrap_or("STHeitiMedium.ttc");
         let font_size = params.font_size.unwrap_or(60);
@@ -154,6 +267,7 @@ impl Ffmpeg {
         let stroke_color = params.stroke_color.as_deref().unwrap_or("#000000");
         let stroke_width = params.stroke_width.unwrap_or(1.5);
 
+        // 字幕垂直位置：top=顶部5%，center=垂直居中，其他=底部90%位置
         let subtitle_position = params.subtitle_position.as_deref().unwrap_or("bottom");
         let y_pos = match subtitle_position {
             "top" => format!("(h*5/100)"),
@@ -161,31 +275,43 @@ impl Ffmpeg {
             _ => format!("(h*90/100)"),
         };
 
+        // 背景音乐和音量参数
         let bgm_file = params.bgm_file.as_deref().unwrap_or("");
         let bgm_volume = params.get_bgm_volume();
         let voice_volume = params.get_voice_volume();
 
+        // 构建 FFmpeg 命令参数
         let mut cmd_args = vec![
             "-y".to_string(),
-            "-i".to_string(), video_path.to_string(),
-            "-i".to_string(), audio_path.to_string(),
+            "-i".to_string(), video_path.to_string(),   // 输入0：视频流
+            "-i".to_string(), audio_path.to_string(),    // 输入1：配音音频流
         ];
 
+        // 如果有背景音乐，添加第三个输入流
         let bgm_index = if !bgm_file.is_empty() {
             cmd_args.push("-i".to_string());
-            cmd_args.push(bgm_file.to_string());
+            cmd_args.push(bgm_file.to_string());         // 输入2：背景音乐流
             Some(2u32)
         } else {
             None
         };
 
+        // 如果启用字幕，通过 drawtext 滤镜实时渲染字幕文本
         if subtitle_enabled && !subtitle_path.is_empty() {
+            // 优先从字体目录查找字体文件，找不到则直接使用字体名称
             let font_path = soma_core::utils::font_dir().join(font_name);
             let font_path_str = if font_path.exists() {
                 font_path.to_string_lossy().to_string()
             } else {
                 font_name.to_string()
             };
+            // 构建 drawtext 滤镜参数
+            // fontfile: 字体文件路径（冒号需转义为 \:）
+            // text: %{pts\:text} 使用 PTS 时间码作为动态字幕内容
+            // fontsize: 字体大小
+            // fontcolor: 字体颜色
+            // borderw/bordercolor: 描边宽度和颜色
+            // y: 字幕垂直位置表达式
             let drawtext = format!(
                 "drawtext=fontfile='{}':text='{}':fontsize={}:fontcolor={}:borderw={}:bordercolor={}:y={}",
                 font_path_str.replace(':', "\\:"), "%{pts\\:text}", font_size, text_color, stroke_width, stroke_color, y_pos
@@ -194,31 +320,39 @@ impl Ffmpeg {
             cmd_args.push(drawtext);
         }
 
+        // 编码参数
         cmd_args.push("-c:v".to_string());
-        cmd_args.push(self.codec.clone());
+        cmd_args.push(self.codec.clone());      // 视频编码器
         cmd_args.push("-c:a".to_string());
-        cmd_args.push("aac".to_string());
+        cmd_args.push("aac".to_string());       // 音频编码器：AAC
         cmd_args.push("-b:a".to_string());
-        cmd_args.push("192k".to_string());
+        cmd_args.push("192k".to_string());      // 音频比特率：192kbps
         cmd_args.push("-pix_fmt".to_string());
-        cmd_args.push("yuv420p".to_string());
-        cmd_args.push("-shortest".to_string());
+        cmd_args.push("yuv420p".to_string());   // 像素格式
+        cmd_args.push("-shortest".to_string()); // 以最短的流为准截断输出
 
+        // 音频混合处理：背景音乐与配音混音
         if let Some(bgm_i) = bgm_index {
+            // filter_complex: 将配音和背景音乐分别调整音量后混合
+            // [1:a]volume=VOICE → 配音音频调整音量为 [a1]
+            // [2:a]volume=BGM  → 背景音乐调整音量为 [a2]
+            // [a1][a2]amix=inputs=2:duration=longest → 混合为双输入音频，取较长时长
             cmd_args.push("-filter_complex".to_string());
             cmd_args.push(format!(
                 "[1:a]volume={}[a1];[{}:a]volume={}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]",
                 voice_volume, bgm_i, bgm_volume
             ));
+            // 映射视频流和混合后的音频流
             cmd_args.push("-map".to_string());
-            cmd_args.push("0:v".to_string());
+            cmd_args.push("0:v".to_string());    // 取输入0的视频流
             cmd_args.push("-map".to_string());
-            cmd_args.push("[aout]".to_string());
+            cmd_args.push("[aout]".to_string()); // 取混合后的音频流
         } else {
+            // 无背景音乐时，直接映射视频和配音音频
             cmd_args.push("-map".to_string());
-            cmd_args.push("0:v".to_string());
+            cmd_args.push("0:v".to_string());    // 取输入0的视频流
             cmd_args.push("-map".to_string());
-            cmd_args.push("1:a".to_string());
+            cmd_args.push("1:a".to_string());    // 取输入1的音频流
         }
 
         cmd_args.push(output_path.to_string());
@@ -235,6 +369,15 @@ impl Ffmpeg {
         Ok(())
     }
 
+    /// 获取视频文件时长（秒）
+    ///
+    /// 使用 ffprobe 查询视频文件的 format duration 信息。
+    ///
+    /// # 参数
+    /// - `video_path`: 视频文件路径
+    ///
+    /// # 返回
+    /// 成功返回时长（f64 秒），失败返回 SomaError
     pub fn get_video_duration(&self, video_path: &str) -> Result<f64, SomaError> {
         let output = std::process::Command::new("ffprobe")
             .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
@@ -244,12 +387,25 @@ impl Ffmpeg {
             .map_err(|e| SomaError::Ffmpeg(format!("parse duration failed: {}", e)))
     }
 
+    /// 获取视频文件分辨率
+    ///
+    /// 使用 ffprobe 查询视频流的宽高信息。
+    ///
+    /// # 参数
+    /// - `video_path`: 视频文件路径
+    ///
+    /// # 返回
+    /// 成功返回 (宽度, 高度)，失败返回 SomaError
     pub fn get_video_resolution(&self, video_path: &str) -> Result<(u32, u32), SomaError> {
         let output = std::process::Command::new("ffprobe")
+            // -select_streams v:0: 选择第一个视频流
+            // -show_entries stream=width,height: 显示宽高
+            // -of csv=s=x:p=0: 用 x 分隔输出，不含前缀
             .args(&["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe resolution failed: {}", e)))?;
         let res_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        // 解析 "宽x高" 格式的输出
         let parts: Vec<&str> = res_str.split('x').collect();
         if parts.len() == 2 {
             let w = parts[0].parse::<u32>().unwrap_or(0);
@@ -261,38 +417,69 @@ impl Ffmpeg {
         Err(SomaError::Ffmpeg("failed to get video resolution".into()))
     }
 
+    /// 预处理本地素材：将图片转为视频，过滤非视频文件
+    ///
+    /// 遍历素材列表，将图片文件转换为指定分辨率和时长的视频片段，
+    /// 视频文件直接保留路径。不存在的文件会被跳过。
+    ///
+    /// # 参数
+    /// - `materials`: 素材信息列表
+    /// - `clip_duration`: 图片转视频时的单片段时长（秒）
+    /// - `aspect`: 目标视频宽高比
+    ///
+    /// # 返回
+    /// 成功返回处理后的视频文件路径列表，失败返回 SomaError
     pub fn preprocess_local_materials(&self, materials: &[soma_core::models::MaterialInfo], clip_duration: u32, aspect: &soma_core::models::VideoAspect) -> Result<Vec<String>, SomaError> {
         let (target_w, target_h) = aspect.to_resolution();
         let mut result = Vec::new();
 
         for mat in materials {
             let path = &mat.url;
+            // 跳过不存在的文件
             if !Path::new(path).exists() {
                 continue;
             }
             let ext = Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("");
             if soma_core::models::FILE_TYPE_IMAGES.contains(&ext) {
+                // 图片文件：转换为同名的 .mp4 视频
                 let output = format!("{}.mp4", path.trim_end_matches(&format!(".{}", ext)));
                 let dur = clip_duration as f64;
                 self.image_to_video(path, &output, dur, target_w, target_h)?;
                 result.push(output);
             } else if soma_core::models::FILE_TYPE_VIDEOS.contains(&ext) {
+                // 视频文件：直接使用原始路径
                 result.push(path.clone());
             }
         }
         Ok(result)
     }
 
+    /// 将静态图片转换为视频
+    ///
+    /// 使用 FFmpeg 的 -loop 1 参数循环播放图片，生成指定时长和分辨率的视频。
+    /// 缩放策略与 clip_and_resize 相同：等比缩放 + 黑边填充居中。
+    ///
+    /// # 参数
+    /// - `image_path`: 输入图片路径
+    /// - `output_path`: 输出视频路径
+    /// - `duration`: 视频时长（秒）
+    /// - `width`: 目标宽度
+    /// - `height`: 目标高度
+    ///
+    /// # 返回
+    /// 成功返回 Ok(())，失败返回 SomaError
     fn image_to_video(&self, image_path: &str, output_path: &str, duration: f64, width: u32, height: u32) -> Result<(), SomaError> {
         let result = std::process::Command::new(&self.path)
             .args(&[
-                "-y", "-loop", "1",
+                "-y",
+                "-loop", "1",               // 循环播放输入图片
                 "-i", image_path,
-                "-t", &duration.to_string(),
+                "-t", &duration.to_string(), // 指定输出时长
+                // 等比缩放 + 黑边填充，与 clip_and_resize 相同策略
                 "-vf", &format!("scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:(ow-iw)/2:(oh-ih)/2:black", width, height, width, height),
                 "-c:v", &self.codec,
                 "-pix_fmt", "yuv420p",
-                "-r", &FPS.to_string(),
+                "-r", &FPS.to_string(),     // 输出帧率
                 output_path,
             ])
             .output()

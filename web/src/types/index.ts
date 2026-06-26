@@ -81,8 +81,8 @@ export interface SubtitleCue {
 
 export interface ApiResponse<T = unknown> {
   code: number
-  msg: string
-  data: T
+  message: string
+  result: T
 }
 
 export interface LlmProviderOption {

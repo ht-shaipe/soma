@@ -1,7 +1,13 @@
-export function getStreamUrl(path: string) {
-  return `/api/v1/stream/${encodeURIComponent(path)}`
+import api, { extractData } from './index'
+
+export function getStreamUrl(taskId: string, index?: number) {
+  return api.post('/stream/play', { taskId, index }).then(extractData<{ url: string; path: string }>)
 }
 
-export function getDownloadUrl(path: string) {
-  return `/api/v1/download/${encodeURIComponent(path)}`
+export function getDownloadUrl(taskId: string, index?: number) {
+  return api.post('/stream/download', { taskId, index }).then(extractData<{ url: string; path: string }>)
+}
+
+export function getStaticUrl(relativePath: string) {
+  return `/storage/${relativePath}`
 }

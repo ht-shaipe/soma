@@ -1,12 +1,35 @@
+/// API 路由分发模块
+///
+/// 作为所有 /api/v1/* 请求的统一入口，根据请求中的 module 名称
+/// 将请求分发到对应的 handler 处理函数。
+
 use actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
 use tube::Error;
 use tube_web::{
     response::{get_error, get_success},
 };
 
+/// API 请求统一处理函数
+///
+/// 解析请求参数后，根据 param.module 字段匹配对应的业务处理器：
+/// - "videos" → 视频创建
+/// - "tasks" → 任务列表/查询/删除
+/// - "scripts" → LLM 脚本生成
+/// - "terms" → LLM 关键词提取
+/// - "social" → LLM 社交元数据生成
+/// - "musics" → 音乐文件管理
+/// - "materials" → 素材文件管理
+/// - "stream" → 视频流播放/下载
+///
+/// 参数：
+/// - `req`: HTTP 请求
+/// - `payload`: 请求体
+///
+/// 返回：成功返回业务数据，失败返回错误信息
 pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<HttpResponse, ActixError> {
     let param = tube_web::parse_request(req, payload).await;
 
+    // 根据 module 名称分发到对应 handler
     let res = match param.module.to_lowercase().as_str() {
         "videos" => crate::handler::video::distribute(&param).await,
         "tasks" => crate::handler::video::distribute_tasks(&param).await,
@@ -19,6 +42,7 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
         _ => Err(error!("请求方法{}.{}系统未提供。", param.module, param.method)),
     };
 
+    // 统一封装成功/失败响应
     match res {
         Ok(v) => get_success(&v),
         Err(e) => get_error(e),
