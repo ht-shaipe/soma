@@ -41,3 +41,5 @@ conf/config.local.toml
 *.tmp
 *.temp
 .cache/
+
+*.lock
