@@ -6,26 +6,25 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { TaskStatus } from '@/types'
+import { TaskStateCode, isTaskCompleted, isTaskFailed, isTaskProcessing } from '@/types'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
-  status: TaskStatus
+  state: number
 }>()
 
 const { t } = useI18n()
 
 const type = computed(() => {
-  switch (props.status) {
-    case TaskStatus.Completed: return 'success'
-    case TaskStatus.Failed: return 'danger'
-    case TaskStatus.Pending: return 'info'
-    default: return 'warning'
-  }
+  if (isTaskCompleted({ state: props.state } as any)) return 'success'
+  if (isTaskFailed({ state: props.state } as any)) return 'danger'
+  if (isTaskProcessing({ state: props.state } as any)) return 'warning'
+  return 'info'
 })
 
 const label = computed(() => {
-  const key = `task.status${props.status}`
-  return t(key)
+  if (props.state === TaskStateCode.Completed) return t('task.statusCompleted')
+  if (props.state === TaskStateCode.Failed) return t('task.statusFailed')
+  return t('task.statusProcessing')
 })
 </script>

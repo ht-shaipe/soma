@@ -2,8 +2,11 @@
 ///
 /// 处理视频素材相关的 API 请求：
 /// - "list" → 列出素材目录下的视频/图片文件
-/// - "upload" → 上传素材文件（暂未实现）
+/// - "upload" → 上传素材文件
 
+use actix_multipart::Multipart;
+use actix_web::HttpResponse;
+use futures::StreamExt;
 use tube::{Error, Result, Value};
 use tube_web::RequestParameter;
 use soma_core::utils;
@@ -14,20 +17,13 @@ use soma_core::utils;
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "list" => list_materials(param).await,
-        "upload" => upload_material(param).await,
+        "upload" => Err(error!("素材上传请使用 /api/v1/materials/upload 接口")),
         _ => Err(error!("不支持的方法: {}", param.method)),
     }
 }
 
 /// 列出素材目录中的文件
-///
-/// 扫描指定目录（默认为 materials 存储目录）下的视频和图片文件，
-/// 支持通过 directory 参数自定义扫描路径。
-/// 仅列出 FILE_TYPE_VIDEOS 和 FILE_TYPE_IMAGES 中定义的格式。
-///
-/// 返回：包含 list 数组和 total 数量的 JSON 对象
 async fn list_materials(param: &RequestParameter) -> Result<Value> {
-    // 支持自定义目录，默认使用标准素材存储目录
     let custom_dir = param.value.get_def_string("directory", "");
     let material_dir = if custom_dir.is_empty() {
         utils::storage_dir("materials", true).to_string_lossy().to_string()
@@ -36,7 +32,6 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
     };
 
     let dir = std::path::Path::new(&material_dir);
-    // 目录不存在时返回空列表
     if !dir.exists() {
         return Ok(value!({
             "list": [],
@@ -50,7 +45,6 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
     for entry in entries.flatten() {
         let path = entry.path();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-        // 仅列出视频和图片格式的文件
         if !soma_core::models::FILE_TYPE_VIDEOS.contains(&ext.as_str())
             && !soma_core::models::FILE_TYPE_IMAGES.contains(&ext.as_str())
         {
@@ -73,9 +67,43 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
     }))
 }
 
-/// 上传素材文件（暂未实现）
-///
-/// 当前提示用户通过文件系统直接将文件放入素材目录
-async fn upload_material(_param: &RequestParameter) -> Result<Value> {
-    Err(error!("素材上传暂未实现，请通过文件系统直接放入素材目录"))
+/// 处理素材文件上传（multipart/form-data）
+pub async fn upload_file(mut payload: Multipart) -> HttpResponse {
+    let material_dir = utils::storage_dir("materials", true);
+    std::fs::create_dir_all(&material_dir).ok();
+
+    let mut saved_name = String::new();
+
+    while let Some(Ok(mut field)) = payload.next().await {
+        let filename = match field.content_disposition() {
+            Some(cd) => cd.get_filename().unwrap_or("unknown").to_string(),
+            None => "unknown".to_string(),
+        };
+
+        if filename.is_empty() {
+            continue;
+        }
+
+        let dest_path = material_dir.join(&filename);
+        let mut body = Vec::new();
+        while let Some(Ok(chunk)) = field.next().await {
+            body.extend_from_slice(&chunk);
+        }
+
+        if std::fs::write(&dest_path, &body).is_ok() {
+            saved_name = filename;
+        }
+    }
+
+    if saved_name.is_empty() {
+        let resp = tube_web::response::get_error(error!("未接收到上传文件"));
+        return resp.unwrap_or(HttpResponse::BadRequest().finish());
+    }
+
+    let result = value!({
+        "name": saved_name.clone(),
+        "path": material_dir.join(&saved_name).to_string_lossy().to_string(),
+    });
+    let resp = tube_web::response::get_success(&result);
+    resp.unwrap_or(HttpResponse::Ok().finish())
 }

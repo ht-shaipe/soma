@@ -37,45 +37,71 @@ export interface VideoParams {
 }
 
 export interface MaterialInfo {
-  url: string
-  provider: string
+  name: string
+  path: string
+  size?: number
+  type?: string
+  url?: string
+  provider?: string
   duration?: number
   width?: number
   height?: number
 }
 
-export const TaskStatus = {
-  Pending: 'Pending',
-  Script: 'Script',
-  Terms: 'Terms',
-  Audio: 'Audio',
-  Subtitle: 'Subtitle',
-  Materials: 'Materials',
-  Video: 'Video',
-  Completed: 'Completed',
-  Failed: 'Failed',
+export const TaskStateCode = {
+  Failed: -1,
+  Completed: 1,
+  Processing: 4,
 } as const
 
-export type TaskStatus = typeof TaskStatus[keyof typeof TaskStatus]
+export type TaskStateCode = typeof TaskStateCode[keyof typeof TaskStateCode]
 
 export interface TaskInfo {
-  task_id: string
-  params: VideoParams
-  status: TaskStatus
+  taskId: string
+  state: number
   progress: number
   script?: string
-  audio_url?: string
-  subtitle_url?: string
-  video_url?: string
-  created_at: string
-  updated_at: string
-  error_message?: string
+  terms?: string[]
+  audioFile?: string
+  audioDuration?: number
+  subtitlePath?: string
+  materials?: string[]
+  videos?: string[]
+  combinedVideos?: string[]
+  errorMessage?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export function isTaskCompleted(task: TaskInfo): boolean {
+  return task.state === TaskStateCode.Completed
+}
+
+export function isTaskFailed(task: TaskInfo): boolean {
+  return task.state === TaskStateCode.Failed
+}
+
+export function isTaskProcessing(task: TaskInfo): boolean {
+  return task.state === TaskStateCode.Processing
+}
+
+export function getTaskStepLabel(task: TaskInfo): string {
+  if (isTaskFailed(task)) return 'Failed'
+  if (isTaskCompleted(task)) return 'Completed'
+  const p = task.progress
+  if (p < 10) return 'Script'
+  if (p < 20) return 'Terms'
+  if (p < 40) return 'Audio'
+  if (p < 60) return 'Subtitle'
+  if (p < 80) return 'Materials'
+  if (p < 100) return 'Video'
+  return 'Completed'
 }
 
 export interface SubtitleCue {
   index: number
-  start_ms: number
-  end_ms: number
+  startMs: number
+  endMs: number
   text: string
 }
 
@@ -105,6 +131,7 @@ export interface VoiceOption {
 
 export interface MusicInfo {
   name: string
+  file?: string
   path: string
   size?: number
 }

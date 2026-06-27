@@ -37,21 +37,28 @@ pub trait SomaStockProvider: Send + Sync {
     async fn search(&self, keyword: &str, video_aspect: &VideoAspect, min_duration: u32) -> Result<Vec<MaterialInfo>, SomaError>;
 }
 
-/// 从 API 密钥列表中获取第一个可用密钥
+/// 从 API 密钥列表中轮换获取密钥
 ///
-/// 大部分素材 API 需要密钥认证，此函数从密钥列表中
-/// 选取第一个密钥用于请求。
+/// 使用原子计数器实现线程安全的轮询（Round-Robin）策略，
+/// 每次调用返回下一个密钥，循环使用所有密钥。
+/// 支持多 Key 轮换以避免单一 Key 被限流。
 ///
 /// # 参数
 /// - `keys`: API 密钥列表
 ///
 /// # 返回
-/// 第一个可用的 API 密钥，列表为空时返回错误
+/// 当前轮次的 API 密钥，列表为空时返回错误
 pub fn get_api_key(keys: &[String]) -> Result<String, SomaError> {
     if keys.is_empty() {
         return Err(SomaError::Stock("API key is not set".into()));
     }
-    Ok(keys[0].clone())
+    if keys.len() == 1 {
+        return Ok(keys[0].clone());
+    }
+    // 线程安全的原子计数器轮换
+    static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let idx = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % keys.len();
+    Ok(keys[idx].clone())
 }
 
 /// 根据素材源搜索视频
@@ -101,40 +108,35 @@ pub async fn search_videos(
 /// 下载指定 URL 的视频文件并保存到本地目录。
 /// 使用 URL 的 MD5 哈希作为文件名，避免重复下载。
 /// 如果文件已存在且非空，则直接返回路径，不再重复下载。
-///
-/// # 参数
-/// - `video_url`: 视频下载地址
-/// - `save_dir`: 本地保存目录路径
-///
-/// # 返回
-/// 保存后的视频文件绝对路径，失败时返回 SomaError
+/// 支持通过环境变量 HTTP_PROXY/HTTPS_PROXY 配置代理。
 pub async fn save_video(video_url: &str, save_dir: &str) -> Result<String, SomaError> {
     let dir = std::path::Path::new(save_dir);
-    // 确保保存目录存在，不存在则递归创建
     if !dir.exists() {
         std::fs::create_dir_all(dir).map_err(SomaError::Io)?;
     }
-    // 去除 URL 查询参数，用纯 URL 计算 MD5 作为文件标识
     let url_without_query = video_url.split('?').next().unwrap_or(video_url);
     let hash = soma_core::utils::md5(url_without_query);
     let video_id = format!("vid-{}", hash);
     let video_path = dir.join(format!("{}.mp4", video_id));
     let video_path_str = video_path.to_string_lossy().to_string();
 
-    // 文件已存在且非空，跳过下载（缓存命中）
     if video_path.exists() && video_path.metadata().map(|m| m.len()).unwrap_or(0) > 0 {
         return Ok(video_path_str);
     }
 
-    // 发起 HTTP 请求下载视频
-    let resp = reqwest::get(video_url).await.map_err(|e| SomaError::Http(e.to_string()))?;
+    // 构建支持系统代理的 HTTP 客户端（自动读取 HTTP_PROXY/HTTPS_PROXY/NO_PROXY 环境变量）
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0")
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
+    let resp = client.get(video_url).send().await.map_err(|e| SomaError::Http(e.to_string()))?;
     if !resp.status().is_success() {
         return Err(SomaError::Stock(format!("download failed: status {}", resp.status())));
     }
     let bytes = resp.bytes().await.map_err(|e| SomaError::Http(e.to_string()))?;
     std::fs::write(&video_path, &bytes).map_err(SomaError::Io)?;
 
-    // 验证下载后的文件是否有效（非空）
     if video_path.exists() && video_path.metadata().map(|m| m.len()).unwrap_or(0) > 0 {
         Ok(video_path_str)
     } else {
@@ -174,7 +176,6 @@ pub async fn download_videos(
     coverr_keys: &[String],
     material_directory: &str,
 ) -> Result<Vec<String>, SomaError> {
-    // 确定素材保存目录：空字符串使用默认缓存目录，"task" 使用任务目录，否则使用指定路径
     let save_dir = if material_directory.is_empty() {
         soma_core::utils::storage_dir("cache_videos", true).to_string_lossy().to_string()
     } else if material_directory == "task" {
@@ -183,41 +184,76 @@ pub async fn download_videos(
         material_directory.to_string()
     };
 
-    let mut valid_items: Vec<MaterialInfo> = Vec::new();
-    // 用于 URL 去重，避免同一视频被重复收录
+    // 按关键词分组搜索，保持脚本顺序
+    let mut candidate_groups: Vec<Vec<MaterialInfo>> = Vec::new();
     let mut seen_urls: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    // 逐个关键词搜索，合并结果并按 URL 去重
     for term in search_terms {
         let items = search_videos(source, term, video_aspect, max_clip_duration, pexels_keys, pixabay_keys, coverr_keys).await?;
+        let mut group = Vec::new();
         for item in items {
             if seen_urls.insert(item.url.clone()) {
-                valid_items.push(item);
+                group.push(item);
             }
+        }
+        if !group.is_empty() {
+            candidate_groups.push(group);
         }
     }
 
+    // 轮询下载：第1轮取每个关键词的第1个候选，第2轮取第2个...
+    // 确保素材按脚本关键词顺序排列
     let mut video_paths: Vec<String> = Vec::new();
     let mut total_duration: f64 = 0.0;
+    let mut candidate_index: usize = 0;
 
-    // 按顺序下载视频，直到总时长达到音频时长要求
-    for item in &valid_items {
-        if total_duration >= audio_duration {
+    while !candidate_groups.is_empty() && total_duration < audio_duration {
+        let mut has_candidate = false;
+        for group in &candidate_groups {
+            if candidate_index >= group.len() {
+                continue;
+            }
+            has_candidate = true;
+            let item = &group[candidate_index];
+            match save_video(&item.url, &save_dir).await {
+                Ok(path) => {
+                    if validate_video_file(&path) {
+                        let seconds = max_clip_duration.min(item.duration as u32);
+                        total_duration += seconds as f64;
+                        video_paths.push(path);
+                    } else {
+                        log!("invalid video file, removing: {}", item.url);
+                        let _ = std::fs::remove_file(&path);
+                    }
+                }
+                Err(e) => {
+                    log!("failed to download video: {:?}", e);
+                }
+            }
+        }
+        if !has_candidate {
             break;
         }
-        match save_video(&item.url, &save_dir).await {
-            Ok(path) => {
-                // 单个片段时长不超过最大限制
-                let seconds = max_clip_duration.min(item.duration as u32);
-                total_duration += seconds as f64;
-                video_paths.push(path);
-            }
-            Err(e) => {
-                // 下载失败时记录日志，继续下载下一个
-                log!("failed to download video: {:?}", e);
-            }
-        }
+        candidate_index += 1;
     }
 
     Ok(video_paths)
+}
+
+/// 验证视频文件是否有效可播放
+///
+/// 通过 ffprobe 检查视频的时长和帧率，确认文件可正常解码。
+/// 无效文件（时长为0或无法读取）返回 false。
+fn validate_video_file(path: &str) -> bool {
+    let output = std::process::Command::new("ffprobe")
+        .args(&["-v", "error", "-show_entries", "format=duration:stream=r_frame_rate", "-of", "default=noprint_wrappers=1", path])
+        .output();
+    match output {
+        Ok(out) => {
+            let info = String::from_utf8_lossy(&out.stdout);
+            // 检查有时长信息且非零
+            info.contains("duration=") && !info.contains("duration=N/A") && !info.contains("duration=0")
+        }
+        Err(_) => false,
+    }
 }

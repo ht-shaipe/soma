@@ -16,6 +16,10 @@ use soma_core::utils;
 /// 第一句字幕
 /// ```
 ///
+/// 自动对超长字幕文本进行换行处理：
+/// - 中文/全角字符：每行最多 20 字
+/// - 英文/半角字符：每行最多 40 字
+///
 /// - `cues` - 字幕时间轴列表
 ///
 /// 返回 SRT 格式的字符串内容。
@@ -24,9 +28,42 @@ pub fn cues_to_srt(cues: &[SubtitleCue]) -> String {
     for cue in cues {
         let start = utils::time_convert_seconds_to_hmsm(cue.start_ms as f64 / 1000.0);
         let end = utils::time_convert_seconds_to_hmsm(cue.end_ms as f64 / 1000.0);
-        srt.push_str(&format!("{}\n{} --> {}\n{}\n\n", cue.index, start, end, cue.text));
+        let wrapped = wrap_subtitle_text(&cue.text, 20, 40);
+        srt.push_str(&format!("{}\n{} --> {}\n{}\n\n", cue.index, start, end, wrapped));
     }
     srt
+}
+
+/// 对字幕文本进行自动换行
+///
+/// 按字符宽度累计：中文/全角字符计为 2 单位，英文/半角字符计为 1 单位。
+/// 当累计宽度超过 max_units 时换行。max_units 对应 max_cjk 个中文字符或 max_ascii 个英文字符。
+///
+/// - `text` - 原始字幕文本
+/// - `max_cjk` - 中文每行最大字符数
+/// - `max_ascii` - 英文每行最大字符数（= max_cjk * 2）
+fn wrap_subtitle_text(text: &str, max_cjk: usize, max_ascii: usize) -> String {
+    let max_units = max_cjk * 2;
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    let mut current_units = 0;
+
+    for ch in text.chars() {
+        let char_units = if ch.is_ascii() { 1 } else { 2 };
+        if current_units + char_units > max_units && !current.is_empty() {
+            lines.push(current.clone());
+            current.clear();
+            current_units = 0;
+        }
+        current.push(ch);
+        current_units += char_units;
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+
+    let _ = (max_ascii, max_cjk);
+    lines.join("\n")
 }
 
 /// 将字幕时间轴列表写入 SRT 文件

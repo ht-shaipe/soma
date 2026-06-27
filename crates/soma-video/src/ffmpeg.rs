@@ -10,13 +10,62 @@
 use soma_core::error::SomaError;
 use std::path::Path;
 
+/// 将 #RRGGBB 颜色字符串转换为 ASS 字幕格式 &H00BBGGRR
+fn hex_to_ass_color(hex: &str) -> String {
+    let clean = hex.trim_start_matches('#');
+    if clean.len() == 6 {
+        let r = &clean[0..2];
+        let g = &clean[2..4];
+        let b = &clean[4..6];
+        format!("&H00{}{}{}", b, g, r)
+    } else {
+        "&H00FFFFFF".to_string()
+    }
+}
+
+/// 将 #RRGGBB 颜色转换为 ASS 格式 &HAABBGGRR（带透明度）
+fn hex_to_ass_color_with_alpha(hex: &str, alpha: &str) -> String {
+    let clean = hex.trim_start_matches('#');
+    if clean.len() == 6 {
+        let r = &clean[0..2];
+        let g = &clean[2..4];
+        let b = &clean[4..6];
+        format!("&H{}{}{}{}", alpha, b, g, r)
+    } else {
+        format!("&H{}FFFFFF", alpha)
+    }
+}
+
+/// 从 VideoParams.text_background_color 解析出 #RRGGBB 颜色字符串
+///
+/// text_background_color 可为：
+/// - bool true → "#000000"（黑色背景）
+/// - bool false / null → 空字符串（无背景）
+/// - 字符串 "#RRGGBB" → 该颜色
+fn resolve_background_color(val: &serde_json::Value) -> String {
+    match val {
+        serde_json::Value::Bool(true) => "#000000".to_string(),
+        serde_json::Value::Bool(false) => String::new(),
+        serde_json::Value::String(s) => {
+            if s.starts_with('#') && s.len() == 7 {
+                s.clone()
+            } else if !s.is_empty() {
+                format!("#{}", s)
+            } else {
+                String::new()
+            }
+        }
+        _ => String::new(),
+    }
+}
+
 /// FFmpeg 命令行封装结构体
 ///
 /// 封装了 FFmpeg 可执行文件路径、编码线程数和视频编码器配置，
 /// 提供视频处理的各种便捷方法。
 pub struct Ffmpeg {
     /// FFmpeg 可执行文件路径
-    path: String,
+    pub path: String,
     /// 编码使用的线程数
     threads: u32,
     /// 视频编码器名称（如 libx264、h264_nvenc 等）
@@ -257,7 +306,7 @@ impl Ffmpeg {
         params: &soma_core::models::VideoParams,
     ) -> Result<(), SomaError> {
         let aspect = params.get_video_aspect();
-        let (w, _h) = aspect.to_resolution();
+        let (_w, _h) = aspect.to_resolution();
 
         // 字幕参数，带默认值
         let subtitle_enabled = params.get_subtitle_enabled();
@@ -267,13 +316,7 @@ impl Ffmpeg {
         let stroke_color = params.stroke_color.as_deref().unwrap_or("#000000");
         let stroke_width = params.stroke_width.unwrap_or(1.5);
 
-        // 字幕垂直位置：top=顶部5%，center=垂直居中，其他=底部90%位置
         let subtitle_position = params.subtitle_position.as_deref().unwrap_or("bottom");
-        let y_pos = match subtitle_position {
-            "top" => format!("(h*5/100)"),
-            "center" => format!("(h/2-th/2)"),
-            _ => format!("(h*90/100)"),
-        };
 
         // 背景音乐和音量参数
         let bgm_file = params.bgm_file.as_deref().unwrap_or("");
@@ -296,7 +339,7 @@ impl Ffmpeg {
             None
         };
 
-        // 如果启用字幕，通过 drawtext 滤镜实时渲染字幕文本
+        // 如果启用字幕，使用 subtitles 滤镜加载 SRT 文件渲染字幕
         if subtitle_enabled && !subtitle_path.is_empty() {
             // 优先从字体目录查找字体文件，找不到则直接使用字体名称
             let font_path = soma_core::utils::font_dir().join(font_name);
@@ -305,19 +348,54 @@ impl Ffmpeg {
             } else {
                 font_name.to_string()
             };
-            // 构建 drawtext 滤镜参数
-            // fontfile: 字体文件路径（冒号需转义为 \:）
-            // text: %{pts\:text} 使用 PTS 时间码作为动态字幕内容
-            // fontsize: 字体大小
-            // fontcolor: 字体颜色
-            // borderw/bordercolor: 描边宽度和颜色
-            // y: 字幕垂直位置表达式
-            let drawtext = format!(
-                "drawtext=fontfile='{}':text='{}':fontsize={}:fontcolor={}:borderw={}:bordercolor={}:y={}",
-                font_path_str.replace(':', "\\:"), "%{pts\\:text}", font_size, text_color, stroke_width, stroke_color, y_pos
+            // subtitles 滤镜会按 SRT 时间轴逐段渲染字幕文本
+            // force_style: 设置字幕样式（字体、大小、颜色、描边、位置等）
+            //   FontName: 字体文件路径
+            //   FontSize: 字体大小
+            //   PrimaryColour: 字体颜色（ASS 格式 &H00BBGGRR，注意 BGR 顺序且高位字节 00=不透明）
+            //   OutlineColour: 描边颜色（同上 BGR 格式）
+            //   Outline: 描边宽度
+            //   Alignment: 对齐方式 2=底部居中, 5=上方居中, 6=上方左对齐, 8=顶部居中, 9=顶部左对齐
+            //   MarginV: 垂直边距（像素）
+            let alignment = match subtitle_position {
+                "top" => 8,
+                "center" => 5,
+                _ => 2,
+            };
+            // 将 #RRGGBB 颜色转为 ASS 的 &H00BBGGRR 格式
+            let ass_text_color = hex_to_ass_color(text_color);
+            let ass_stroke_color = hex_to_ass_color(stroke_color);
+
+            // 字幕背景样式
+            // BackColour: 背景颜色（ASS 格式 &HAABBGGRR，AA=透明度 00=不透明 FF=全透明）
+            // BorderStyle: 3=不透明底框背景, 4=不透明底框+描边
+            let bg_style = if let Some(ref bg_color_val) = params.text_background_color {
+                let bg_hex = resolve_background_color(bg_color_val);
+                if !bg_hex.is_empty() {
+                    let is_rounded = params.rounded_subtitle_background.unwrap_or(false);
+                    // 圆角背景: 半透明(alpha=140 ≈ 0x8C)，否则不透明
+                    let alpha = if is_rounded { "8C" } else { "00" };
+                    let ass_bg = hex_to_ass_color_with_alpha(&bg_hex, alpha);
+                    let border_type = if stroke_width > 0.0 { 4 } else { 3 };
+                    // Shadow: 背景扩展量，模拟圆角/矩形的内边距
+                    let shadow = if is_rounded { (font_size as f32 * 0.15).ceil() as u32 } else { (font_size as f32 * 0.3).ceil() as u32 };
+                    format!(",BackColour={},BorderStyle={},Shadow={}", ass_bg, border_type, shadow)
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+
+            let style = format!(
+                "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},Alignment={},MarginV=20{}",
+                font_path_str.replace(':', "\\:"), font_size, ass_text_color, ass_stroke_color, stroke_width, alignment, bg_style
             );
+            // subtitles 滤镜：filename 需要转义冒号和反斜杠
+            let escaped_sub = subtitle_path.replace('\\', "/").replace(':', "\\:");
+            let sub_filter = format!("subtitles='{}':force_style='{}'", escaped_sub, style);
             cmd_args.push("-vf".to_string());
-            cmd_args.push(drawtext);
+            cmd_args.push(sub_filter);
         }
 
         // 编码参数
@@ -333,14 +411,18 @@ impl Ffmpeg {
 
         // 音频混合处理：背景音乐与配音混音
         if let Some(bgm_i) = bgm_index {
-            // filter_complex: 将配音和背景音乐分别调整音量后混合
-            // [1:a]volume=VOICE → 配音音频调整音量为 [a1]
-            // [2:a]volume=BGM  → 背景音乐调整音量为 [a2]
-            // [a1][a2]amix=inputs=2:duration=longest → 混合为双输入音频，取较长时长
+            // filter_complex:
+            // [1:a]volume=VOICE → 配音调整音量
+            // [2:a]volume=BGM,aloop=loop=-1:size=2e+09,atrim=1:duration=VID_DUR,afade=t=out:st=END-3:d=3 → BGM循环+淡出
+            //   aloop: 无限循环BGM
+            //   atrim: 截取到视频时长
+            //   afade: 最后3秒淡出
+            let video_dur = self.get_video_duration(video_path).unwrap_or(60.0);
+            let fade_start = (video_dur - 3.0).max(0.0);
             cmd_args.push("-filter_complex".to_string());
             cmd_args.push(format!(
-                "[1:a]volume={}[a1];[{}:a]volume={}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]",
-                voice_volume, bgm_i, bgm_volume
+                "[1:a]volume={}[a1];[{}:a]volume={}[a2r];[a2r]aloop=loop=-1:size=2e+09,atrim=1:duration={:.3},afade=t=out:st={:.3}:d=3[a2];[a1][a2]amix=inputs=2:duration=longest[aout]",
+                voice_volume, bgm_i, bgm_volume, video_dur, fade_start
             ));
             // 映射视频流和混合后的音频流
             cmd_args.push("-map".to_string());
@@ -469,17 +551,24 @@ impl Ffmpeg {
     /// # 返回
     /// 成功返回 Ok(())，失败返回 SomaError
     fn image_to_video(&self, image_path: &str, output_path: &str, duration: f64, width: u32, height: u32) -> Result<(), SomaError> {
+        // 图片缩放效果：从1.0逐渐放大到1.0+clip_duration*0.03
+        // 使用 zoompan 滤镜实现动态缩放，zoom 从 1.0 线性增长
+        // zoom='min(zoom+0.0005,1.2)' 每帧增大0.0005，最大1.2倍
+        // d=帧数 指定动画总帧数，x/y 居中
+        let total_frames = (duration * FPS as f64).ceil() as u32;
+        let zoom_expr = format!("min(zoom+0.0005,{:.3})", 1.0 + duration * 0.03);
         let result = std::process::Command::new(&self.path)
             .args(&[
                 "-y",
-                "-loop", "1",               // 循环播放输入图片
+                "-loop", "1",
                 "-i", image_path,
-                "-t", &duration.to_string(), // 指定输出时长
-                // 等比缩放 + 黑边填充，与 clip_and_resize 相同策略
-                "-vf", &format!("scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:(ow-iw)/2:(oh-ih)/2:black", width, height, width, height),
+                "-vf", &format!(
+                    "zoompan=z='{}':d={}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={}x{}:fps={}",
+                    zoom_expr, total_frames, width, height, FPS
+                ),
                 "-c:v", &self.codec,
                 "-pix_fmt", "yuv420p",
-                "-r", &FPS.to_string(),     // 输出帧率
+                "-t", &duration.to_string(),
                 output_path,
             ])
             .output()

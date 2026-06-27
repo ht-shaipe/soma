@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { TaskInfo, VideoParams } from '@/types'
-import { TaskStatus } from '@/types'
+import { isTaskCompleted, isTaskFailed, getTaskStepLabel } from '@/types'
 import { createVideo, listTasks, getTask, deleteTask } from '@/api/video'
 
 export const useTaskStore = defineStore('task', () => {
@@ -13,37 +13,28 @@ export const useTaskStore = defineStore('task', () => {
 
   const pipelineSteps = computed(() => {
     if (!currentTask.value) return []
-    const status = currentTask.value.status
+    const stepLabel = getTaskStepLabel(currentTask.value)
     const steps = [
-      { key: TaskStatus.Script, label: 'Script', done: false },
-      { key: TaskStatus.Terms, label: 'Keywords', done: false },
-      { key: TaskStatus.Audio, label: 'Audio', done: false },
-      { key: TaskStatus.Subtitle, label: 'Subtitle', done: false },
-      { key: TaskStatus.Materials, label: 'Materials', done: false },
-      { key: TaskStatus.Video, label: 'Video', done: false },
+      { key: 'Script', label: 'Script' },
+      { key: 'Terms', label: 'Keywords' },
+      { key: 'Audio', label: 'Audio' },
+      { key: 'Subtitle', label: 'Subtitle' },
+      { key: 'Materials', label: 'Materials' },
+      { key: 'Video', label: 'Video' },
     ]
-    const order: string[] = [
-      TaskStatus.Pending,
-      TaskStatus.Script,
-      TaskStatus.Terms,
-      TaskStatus.Audio,
-      TaskStatus.Subtitle,
-      TaskStatus.Materials,
-      TaskStatus.Video,
-      TaskStatus.Completed,
-      TaskStatus.Failed,
-    ]
-    const currentIndex = order.indexOf(status)
+    const order = ['Script', 'Terms', 'Audio', 'Subtitle', 'Materials', 'Video', 'Completed', 'Failed']
+    const currentIndex = order.indexOf(stepLabel)
     return steps.map((s, i) => ({
       ...s,
-      done: currentIndex > i + 1 || status === TaskStatus.Completed,
-      active: currentIndex === i + 1,
+      done: currentIndex > i || stepLabel === 'Completed',
+      active: currentIndex === i,
     }))
   })
 
   async function fetchTasks() {
     try {
-      tasks.value = await listTasks()
+      const result = await listTasks()
+      tasks.value = result.list
     } catch {
       tasks.value = []
     }
@@ -69,14 +60,15 @@ export const useTaskStore = defineStore('task', () => {
     pollTimer.value = setInterval(async () => {
       if (!currentTask.value) return
       try {
-        const task = await getTask(currentTask.value.task_id)
+        const task = await getTask(currentTask.value.taskId)
         currentTask.value = task
-        logs.value.push(`[${task.status}] Progress: ${task.progress}%`)
-        if (task.status === TaskStatus.Completed || task.status === TaskStatus.Failed) {
+        const stepLabel = getTaskStepLabel(task)
+        logs.value.push(`[${stepLabel}] Progress: ${task.progress}%`)
+        if (isTaskCompleted(task) || isTaskFailed(task)) {
           stopPolling()
           isGenerating.value = false
-          if (task.status === TaskStatus.Failed) {
-            logs.value.push(`Failed: ${task.error_message || 'Unknown error'}`)
+          if (isTaskFailed(task)) {
+            logs.value.push(`Failed: ${task.errorMessage || 'Unknown error'}`)
           } else {
             logs.value.push('Video generation completed!')
           }
@@ -97,8 +89,8 @@ export const useTaskStore = defineStore('task', () => {
 
   async function removeTask(taskId: string) {
     await deleteTask(taskId)
-    tasks.value = tasks.value.filter((t) => t.task_id !== taskId)
-    if (currentTask.value?.task_id === taskId) {
+    tasks.value = tasks.value.filter((t) => t.taskId !== taskId)
+    if (currentTask.value?.taskId === taskId) {
       currentTask.value = null
     }
   }

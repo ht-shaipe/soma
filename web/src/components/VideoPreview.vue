@@ -1,14 +1,14 @@
 <template>
-  <div v-if="task && task.video_url" class="video-results">
+  <div v-if="task && task.combinedVideos && task.combinedVideos.length > 0" class="video-results">
     <div class="section-title">{{ $t('task.playVideo') }}</div>
-    <div class="video-item">
+    <div v-for="(video, idx) in task.combinedVideos" :key="idx" class="video-item">
       <video
-        :src="videoSrc"
+        :src="getStaticUrl(video)"
         controls
         preload="metadata"
       />
       <div style="margin-top: 8px; display: flex; gap: 8px">
-        <el-button type="primary" size="small" @click="onDownload">
+        <el-button type="primary" size="small" @click="onDownload(video)">
           <el-icon><Download /></el-icon>
           {{ $t('task.downloadVideo') }}
         </el-button>
@@ -21,22 +21,12 @@
 import { computed } from 'vue'
 import { Download } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
-import { getStreamUrl, getDownloadUrl } from '@/api/stream'
+import { getStaticUrl } from '@/api/stream'
 
 const taskStore = useTaskStore()
 const task = computed(() => taskStore.currentTask)
 
-const videoSrc = computed(() => {
-  if (task.value?.video_url) {
-    return getStreamUrl(task.value.video_url)
-  }
-  return ''
-})
-
-function onDownload() {
-  if (task.value?.video_url) {
-    const url = getDownloadUrl(task.value.video_url)
-    window.open(url, '_blank')
-  }
+function onDownload(videoPath: string) {
+  window.open(getStaticUrl(videoPath), '_blank')
 }
 </script>

@@ -224,7 +224,7 @@ function onProviderChange(value: string) {
   }
 }
 
-function onSave() {
+async function onSave() {
   configStore.updateLlmConfig({
     provider: llmProvider.value,
     api_key: llmApiKey.value,
@@ -253,6 +253,11 @@ function onSave() {
     storage_path: storagePath.value,
     concurrent_tasks: concurrentTasks.value,
   })
-  ElMessage.success(t('settings.saveSuccess'))
+  const ok = await configStore.save()
+  if (ok) {
+    ElMessage.success(t('settings.saveSuccess'))
+  } else {
+    ElMessage.error(t('settings.saveFailed') || 'Save failed')
+  }
 }
 </script>

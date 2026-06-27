@@ -8,35 +8,35 @@
     </div>
 
     <el-table :data="taskStore.tasks" stripe style="width: 100%" empty-text="No tasks">
-      <el-table-column prop="task_id" :label="$t('task.taskId')" width="280">
+      <el-table-column prop="taskId" :label="$t('task.taskId')" width="280">
         <template #default="{ row }">
-          <el-text size="small" truncated>{{ row.task_id }}</el-text>
+          <el-text size="small" truncated>{{ row.taskId }}</el-text>
         </template>
       </el-table-column>
-      <el-table-column prop="params.video_subject" :label="$t('task.topic')" min-width="120">
+      <el-table-column prop="script" :label="$t('task.topic')" min-width="120">
         <template #default="{ row }">
-          {{ row.params?.video_subject || '—' }}
+          {{ row.script ? row.script.substring(0, 50) + '...' : '—' }}
         </template>
       </el-table-column>
-      <el-table-column prop="status" :label="$t('task.status')" width="140">
+      <el-table-column prop="state" :label="$t('task.status')" width="140">
         <template #default="{ row }">
-          <TaskStatusTag :status="row.status" />
+          <TaskStatusTag :state="row.state" />
         </template>
       </el-table-column>
       <el-table-column prop="progress" :label="$t('task.progress')" width="100">
         <template #default="{ row }">
-          <el-progress :percentage="row.progress" :status="getProgressStatus(row.status)" :stroke-width="10" />
+          <el-progress :percentage="row.progress" :status="getProgressStatus(row.state)" :stroke-width="10" />
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" :label="$t('task.createdAt')" width="180">
+      <el-table-column prop="createdAt" :label="$t('task.createdAt')" width="180">
         <template #default="{ row }">
-          {{ formatDate(row.created_at) }}
+          {{ formatDate(row.createdAt) }}
         </template>
       </el-table-column>
       <el-table-column :label="$t('task.video')" width="80">
         <template #default="{ row }">
           <el-button
-            v-if="row.video_url"
+            v-if="row.combinedVideos && row.combinedVideos.length > 0"
             type="primary"
             size="small"
             circle
@@ -64,10 +64,11 @@ import { onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, VideoPlay, Delete } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
-import { useI18n } from 'vue-i18n'
-import { TaskStatus } from '@/types'
+import { TaskStateCode, isTaskCompleted, isTaskFailed } from '@/types'
 import type { TaskInfo } from '@/types'
+import { getStaticUrl } from '@/api/stream'
 import TaskStatusTag from '@/components/TaskStatusTag.vue'
+import { useI18n } from 'vue-i18n'
 
 const taskStore = useTaskStore()
 const { t } = useI18n()
@@ -80,9 +81,9 @@ function onRefresh() {
   taskStore.fetchTasks()
 }
 
-function getProgressStatus(status: TaskStatus) {
-  if (status === TaskStatus.Completed) return 'success' as const
-  if (status === TaskStatus.Failed) return 'exception' as const
+function getProgressStatus(state: number) {
+  if (state === TaskStateCode.Completed) return 'success' as const
+  if (state === TaskStateCode.Failed) return 'exception' as const
   return undefined
 }
 
@@ -98,7 +99,7 @@ async function onDeleteTask(row: TaskInfo) {
       cancelButtonText: t('common.cancel'),
       type: 'warning',
     })
-    await taskStore.removeTask(row.task_id)
+    await taskStore.removeTask(row.taskId)
     ElMessage.success(t('common.success'))
   } catch {
     // cancelled
@@ -106,8 +107,8 @@ async function onDeleteTask(row: TaskInfo) {
 }
 
 function onPlayVideo(row: TaskInfo) {
-  if (row.video_url) {
-    window.open(`/api/v1/stream/${encodeURIComponent(row.video_url)}`, '_blank')
+  if (row.combinedVideos && row.combinedVideos.length > 0) {
+    window.open(getStaticUrl(row.combinedVideos[0]), '_blank')
   }
 }
 </script>

@@ -101,7 +101,6 @@ async function onGenerateScriptAndKeywords() {
       store.useCustomSystemPrompt
     )
     if (result.script) store.videoScript = result.script
-    if (result.terms) store.videoTerms = result.terms
     ElMessage.success(t('common.success'))
   } catch (e) {
     ElMessage.error(`${t('common.error')}: ${e instanceof Error ? e.message : String(e)}`)
@@ -121,7 +120,7 @@ async function onGenerateKeywords() {
       store.videoScript,
       store.videoLanguage !== 'auto' ? store.videoLanguage : undefined
     )
-    if (result.terms) store.videoTerms = result.terms
+    if (result.terms) store.videoTerms = result.terms.join(',')
     ElMessage.success(t('common.success'))
   } catch (e) {
     ElMessage.error(`${t('common.error')}: ${e instanceof Error ? e.message : String(e)}`)

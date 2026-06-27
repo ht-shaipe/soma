@@ -161,13 +161,11 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
 ///
 /// 返回：脚本文本内容
 fn generate_script(_task_id: &str, params: &VideoParams) -> Result<String, SomaError> {
-    // 优先使用用户提供的脚本
     let script = params.video_script.trim().to_string();
     if !script.is_empty() {
         return Ok(script);
     }
 
-    // 用户未提供脚本，调用 LLM 生成
     let conf = Config::get();
     let provider = conf.app.app.llm_provider.as_deref().unwrap_or("openai");
     let language = params.video_language.as_deref().unwrap_or("");
@@ -175,9 +173,11 @@ fn generate_script(_task_id: &str, params: &VideoParams) -> Result<String, SomaE
     let prompt = params.video_script_prompt.as_deref().unwrap_or("");
     let system_prompt = params.custom_system_prompt.as_deref().unwrap_or("");
 
-    // 在同步上下文中创建 tokio 运行时执行异步 LLM 调用
     let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Llm(e.to_string()))?;
-    rt.block_on(super::llm::generate_script(provider, &params.video_subject, language, paragraph_number, prompt, system_prompt, &conf))
+    retry(5, || {
+        let fut = super::llm::generate_script(provider, &params.video_subject, language, paragraph_number, prompt, system_prompt, &conf);
+        rt.block_on(fut)
+    })
 }
 
 /// 提取素材搜索关键词
@@ -211,7 +211,10 @@ fn generate_terms(_task_id: &str, params: &VideoParams, script: &str) -> Result<
     let amount = if params.match_materials_to_script.unwrap_or(false) { 8 } else { 5 };
 
     let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Llm(e.to_string()))?;
-    rt.block_on(super::llm::generate_terms(provider, &params.video_subject, script, amount, &conf))
+    retry(5, || {
+        let fut = super::llm::generate_terms(provider, &params.video_subject, script, amount, &conf);
+        rt.block_on(fut)
+    })
 }
 
 /// 使用 Edge TTS 生成语音音频
@@ -233,15 +236,45 @@ fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &crat
     let voice_name = params.get_voice_name();
     let rate = params.get_voice_rate();
 
-    // 创建 Edge TTS 实例
-    let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
+    if let Some(parent) = std::path::Path::new(&audio_file).parent() {
+        std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
+    }
 
-    // 在同步上下文中执行异步 TTS 合成
+    // 根据语音名称前缀路由到对应 TTS 引擎
     let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Tts(e.to_string()))?;
-    let result = rt.block_on(
-        soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file))
-    ).map_err(|e| {
-        // TTS 失败时标记任务为失败状态
+    let result = if soma_tts::voices::is_siliconflow_voice(voice_name) {
+        let sf_key = conf.app.siliconflow.api_key.as_deref().unwrap_or("");
+        let tts = soma_tts::siliconflow_tts::SiliconflowTts::new(sf_key);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            rt.block_on(fut)
+        })
+    } else if soma_tts::voices::is_elevenlabs_voice(voice_name) {
+        let el_key = conf.app.elevenlabs.api_key.as_deref().unwrap_or("");
+        let el_model = conf.app.elevenlabs.model_id.as_deref().unwrap_or("eleven_multilingual_v2");
+        let tts = soma_tts::elevenlabs_tts::ElevenlabsTts::new(el_key, el_model);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            rt.block_on(fut)
+        })
+    } else if soma_tts::voices::is_mimo_voice(voice_name) {
+        let mimo_key = conf.app.app.mimo_api_key.as_deref().unwrap_or("");
+        let mimo_base = conf.app.app.mimo_base_url.as_deref().unwrap_or("");
+        let mimo_model = conf.app.app.mimo_tts_model_name.as_deref().unwrap_or("");
+        let mimo_style = conf.app.app.mimo_tts_style_prompt.as_deref().unwrap_or("");
+        let tts = soma_tts::mimo_tts::MimoTts::new(mimo_key, mimo_base, mimo_model, mimo_style);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            rt.block_on(fut)
+        })
+    } else {
+        // 默认使用 EdgeTTS
+        let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            rt.block_on(fut)
+        })
+    }.map_err(|e| {
         state::update_task(task_id, Some(TaskStatus::Failed.as_i32()), None);
         e
     })?;
@@ -355,9 +388,10 @@ fn generate_final_videos(
 ) -> Result<(Vec<String>, Vec<String>), SomaError> {
     let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), conf.app.get_video_codec());
     let composer = soma_video::VideoComposer::new(ffmpeg);
-    let aspect = params.get_video_aspect();
-    let clip_dur = params.get_clip_duration();
-    let video_count = params.get_video_count();
+        let aspect = params.get_video_aspect();
+        let clip_dur = params.get_clip_duration();
+        let video_count = params.get_video_count();
+        let transition_mode = params.video_transition_mode.as_deref().unwrap_or("none");
 
     let mut final_videos = Vec::new();
     let mut combined_videos = Vec::new();
@@ -370,7 +404,7 @@ fn generate_final_videos(
         let final_path = task_dir_path.join(format!("final-{}.mp4", i)).to_string_lossy().to_string();
 
         // 步骤1：拼接素材视频片段为合成视频
-        composer.combine_videos(materials, audio_file, &combined_path, &aspect, clip_dur)?;
+        composer.combine_videos(materials, audio_file, &combined_path, &aspect, clip_dur, transition_mode)?;
 
         progress += (50 / video_count / 2).max(1);
         state::update_task(task_id, None, Some(progress));
@@ -397,4 +431,33 @@ fn generate_final_videos(
     }
 
     Ok((final_videos, combined_videos))
+}
+
+/// 通用重试包装函数
+///
+/// 对可能失败的操作进行多次重试，每次失败后等待指数退避时间。
+/// 适用于 LLM API 调用（网络波动、限流）和 TTS 合成等不稳定操作。
+///
+/// - `max_retries`: 最大重试次数（不含首次执行）
+/// - `f`: 待执行的操作闭包
+///
+/// 返回：首次成功的结果，或最后一次的错误
+fn retry<F, T>(max_retries: usize, f: F) -> Result<T, SomaError>
+where
+    F: Fn() -> Result<T, SomaError>,
+{
+    let mut last_err = None;
+    for attempt in 0..=max_retries {
+        match f() {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                if attempt < max_retries {
+                    let delay = std::time::Duration::from_millis(500 * (1 << attempt) as u64);
+                    std::thread::sleep(delay);
+                }
+                last_err = Some(e);
+            }
+        }
+    }
+    Err(last_err.unwrap())
 }

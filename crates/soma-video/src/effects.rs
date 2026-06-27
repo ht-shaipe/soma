@@ -1,72 +1,134 @@
 /// 视频转场特效模块
 ///
-/// 提供独立的转场特效应用函数，包括淡入（FadeIn）和淡出（FadeOut）效果。
-/// 使用 FFmpeg 的 fade 视频滤镜实现。
+/// 提供独立的转场特效应用函数，包括淡入、淡出、滑入、滑出效果，
+/// 以及 Shuffle 随机混合模式。使用 FFmpeg 滤镜实现。
 use soma_core::error::SomaError;
 
 /// 为视频应用转场特效
-///
-/// 根据指定的转场类型，使用 FFmpeg fade 滤镜添加淡入或淡出效果。
-/// 不识别的转场类型会被静默跳过。
-///
-/// # 参数
-/// - `input_path`: 输入视频路径
-/// - `output_path`: 输出视频路径
-/// - `transition`: 转场类型名称（"FadeIn" 或 "FadeOut"）
-/// - `duration`: 转场效果持续时间（秒）
-/// - `ffmpeg_path`: FFmpeg 可执行文件路径
-///
-/// # 返回
-/// 成功返回 Ok(())，无法识别的转场类型返回 Ok(())（跳过），失败返回 SomaError
-pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, duration: f64, ffmpeg_path: &str) -> Result<(), SomaError> {
-    // 根据转场类型构建对应的 fade 滤镜参数
+pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, duration: f64, ffmpeg_path: &str, side: &str) -> Result<(), SomaError> {
     let vf = match transition {
-        // fade=t=in:st=0:d=N → 从第 0 秒开始淡入，持续 N 秒
         "FadeIn" => format!("fade=t=in:st=0:d={}", duration),
         "FadeOut" => {
-            // 淡出起始时间 = 视频总时长 - 淡出持续时间
             let dur = get_video_duration(input_path, ffmpeg_path)?;
-            // fade=t=out:st=START:d=N → 从 START 秒开始淡出，持续 N 秒
-            format!("fade=t=out:st={}:d={}", dur - duration, duration)
+            format!("fade=t=out:st={}:d={}", (dur - duration).max(0.0), duration)
         }
-        // 未识别的转场类型，跳过不做处理
+        "SlideIn" => build_slide_in_filter(duration, side)?,
+        "SlideOut" => build_slide_out_filter(input_path, duration, side, ffmpeg_path)?,
         _ => return Ok(()),
     };
-    let result = std::process::Command::new(ffmpeg_path)
-        // -y: 覆盖输出
-        // -vf: 应用视频滤镜
-        // -c:v libx264: 使用 H.264 编码
-        // -an: 移除音频
-        // -pix_fmt yuv420p: 设置像素格式确保兼容性
-        .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", "libx264", "-an", "-pix_fmt", "yuv420p", output_path])
-        .output()
-        .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", e)))?;
-    if !result.status.success() {
-        return Err(SomaError::Ffmpeg("ffmpeg transition failed".into()));
+    // SlideIn 使用 filter_complex，其他使用 -vf
+    if transition == "SlideIn" {
+        let (w, h) = get_video_resolution(input_path, ffmpeg_path)?;
+        let total_dur = get_video_duration(input_path, ffmpeg_path)?;
+        let result = std::process::Command::new(ffmpeg_path)
+            .args(&[
+                "-y",
+                "-f", "lavfi", "-i", &format!("color=c=black:s={}x{}:duration={:.3}", w, h, total_dur),
+                "-i", input_path,
+                "-filter_complex", &format!("[1:v]setpts=PTS-STARTPTS[fg];[0:v][fg]overlay=x='{}':y='{}':shortest=1",
+                    build_slide_x_expr(duration, side, w, h, true),
+                    build_slide_y_expr(duration, side, w, h, true)
+                ),
+                "-c:v", "libx264", "-an", "-pix_fmt", "yuv420p", output_path,
+            ])
+            .output()
+            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg slide_in failed: {}", e)))?;
+        if !result.status.success() {
+            return Err(SomaError::Ffmpeg("ffmpeg slide_in failed".into()));
+        }
+    } else {
+        let result = std::process::Command::new(ffmpeg_path)
+            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", "libx264", "-an", "-pix_fmt", "yuv420p", output_path])
+            .output()
+            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", e)))?;
+        if !result.status.success() {
+            return Err(SomaError::Ffmpeg("ffmpeg transition failed".into()));
+        }
     }
     Ok(())
 }
 
-/// 获取视频文件时长（秒）
-///
-/// 使用 ffprobe 查询视频文件的 format duration 信息。
-///
-/// # 参数
-/// - `video_path`: 视频文件路径
-/// - `ffmpeg_path`: FFmpeg 路径（当前未使用，预留扩展）
-///
-/// # 返回
-/// 成功返回时长（f64 秒），失败返回 SomaError
-fn get_video_duration(video_path: &str, ffmpeg_path: &str) -> Result<f64, SomaError> {
-    // ffmpeg_path 参数预留，当前使用 ffprobe 独立命令
-    let _ = ffmpeg_path;
+/// 随机选择一种转场效果并应用（Shuffle 模式）
+pub fn apply_shuffle_transition(input_path: &str, output_path: &str, duration: f64, ffmpeg_path: &str) -> Result<(), SomaError> {
+    use rand::Rng;
+    let mut rng = rand::rng();
+    let transitions = ["FadeIn", "FadeOut", "SlideIn", "SlideOut"];
+    let sides = ["left", "right", "top", "bottom"];
+    let t_idx = rng.random_range(0..transitions.len());
+    let s_idx = rng.random_range(0..sides.len());
+    apply_transition(input_path, output_path, transitions[t_idx], duration, ffmpeg_path, sides[s_idx])
+}
+
+fn build_slide_in_filter(_duration: f64, _side: &str) -> Result<String, SomaError> {
+    // SlideIn 通过 filter_complex 处理，此处返回占位符（不会被 -vf 使用）
+    Ok("null".to_string())
+}
+
+fn build_slide_out_filter(input_path: &str, duration: f64, side: &str, ffmpeg_path: &str) -> Result<String, SomaError> {
+    let (w, h) = get_video_resolution(input_path, ffmpeg_path)?;
+    let total_dur = get_video_duration(input_path, ffmpeg_path)?;
+    let start_t = (total_dur - duration).max(0.0);
+    let x_expr = build_slide_x_expr_slideout(duration, side, w, start_t);
+    let y_expr = build_slide_y_expr_slideout(duration, side, h, start_t);
+    // 使用 filter_complex 方式
+    Ok(format!(
+        "color=c=black:s={}x{}:duration={:.3}[bg];[0:v]setpts=PTS-STARTPTS[fg];[bg][fg]overlay=x='{}':y='{}':shortest=1",
+        w, h, total_dur, x_expr, y_expr
+    ))
+}
+
+fn build_slide_x_expr(duration: f64, side: &str, w: u32, _h: u32, is_in: bool) -> String {
+    match side {
+        "left" if is_in => format!("if(lt(t,{duration}),{neg_w}+{w}*t/{duration},0)", neg_w = -(w as i64), w = w, duration = duration),
+        "right" if is_in => format!("if(lt(t,{duration}),{w}-{w}*t/{duration},0)", w = w, duration = duration),
+        _ => "0".to_string(),
+    }
+}
+
+fn build_slide_y_expr(duration: f64, side: &str, _w: u32, h: u32, is_in: bool) -> String {
+    match side {
+        "top" if is_in => format!("if(lt(t,{duration}),{neg_h}+{h}*t/{duration},0)", neg_h = -(h as i64), h = h, duration = duration),
+        "bottom" if is_in => format!("if(lt(t,{duration}),{h}-{h}*t/{duration},0)", h = h, duration = duration),
+        _ => "0".to_string(),
+    }
+}
+
+fn build_slide_x_expr_slideout(duration: f64, side: &str, w: u32, start_t: f64) -> String {
+    match side {
+        "left" => format!("if(gte(t,{start_t}),-{w}*(t-{start_t})/{duration},0)", w = w, start_t = start_t, duration = duration),
+        "right" => format!("if(gte(t,{start_t}),{w}*(t-{start_t})/{duration},0)", w = w, start_t = start_t, duration = duration),
+        _ => "0".to_string(),
+    }
+}
+
+fn build_slide_y_expr_slideout(duration: f64, side: &str, h: u32, start_t: f64) -> String {
+    match side {
+        "top" => format!("if(gte(t,{start_t}),-{h}*(t-{start_t})/{duration},0)", h = h, start_t = start_t, duration = duration),
+        "bottom" => format!("if(gte(t,{start_t}),{h}*(t-{start_t})/{duration},0)", h = h, start_t = start_t, duration = duration),
+        _ => "0".to_string(),
+    }
+}
+
+fn get_video_duration(video_path: &str, _ffmpeg_path: &str) -> Result<f64, SomaError> {
     let output = std::process::Command::new("ffprobe")
-        // -v error: 只输出错误
-        // -show_entries format=duration: 只显示时长
-        // -of default=noprint_wrappers=1:nokey=1: 仅输出纯数值
         .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
         .output()
         .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
     String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
         .map_err(|e| SomaError::Ffmpeg(format!("parse duration failed: {}", e)))
+}
+
+fn get_video_resolution(video_path: &str, _ffmpeg_path: &str) -> Result<(u32, u32), SomaError> {
+    let output = std::process::Command::new("ffprobe")
+        .args(&["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
+        .output()
+        .map_err(|e| SomaError::Ffmpeg(format!("ffprobe resolution failed: {}", e)))?;
+    let res_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let parts: Vec<&str> = res_str.split('x').collect();
+    if parts.len() == 2 {
+        let w = parts[0].parse::<u32>().unwrap_or(0);
+        let h = parts[1].parse::<u32>().unwrap_or(0);
+        if w > 0 && h > 0 { return Ok((w, h)); }
+    }
+    Err(SomaError::Ffmpeg("failed to get video resolution".into()))
 }

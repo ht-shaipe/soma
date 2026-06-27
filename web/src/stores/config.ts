@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AppConfig } from '@/types'
+import { getConfig, saveConfig } from '@/api/config'
 
 export const useConfigStore = defineStore('config', () => {
   const config = ref<AppConfig>({
     app: {
-      name: 'MoneyPrinterTurbo',
-      version: '1.3.0',
+      name: 'Soma',
+      version: '1.0.0',
       host: '0.0.0.0',
       port: 8080,
       storage_path: './storage',
@@ -37,9 +38,31 @@ export const useConfigStore = defineStore('config', () => {
     },
   })
 
+  const loaded = ref(false)
   const uiLanguage = ref('zh-CN')
   const hideConfig = ref(false)
   const hideLog = ref(false)
+
+  async function loadConfig() {
+    try {
+      const data = await getConfig()
+      if (data) {
+        config.value = { ...config.value, ...data }
+        loaded.value = true
+      }
+    } catch {
+      // 使用默认值
+    }
+  }
+
+  async function save() {
+    try {
+      await saveConfig(config.value)
+      return true
+    } catch {
+      return false
+    }
+  }
 
   function updateLlmConfig(payload: Partial<AppConfig['llm']>) {
     Object.assign(config.value.llm, payload)
@@ -63,9 +86,12 @@ export const useConfigStore = defineStore('config', () => {
 
   return {
     config,
+    loaded,
     uiLanguage,
     hideConfig,
     hideLog,
+    loadConfig,
+    save,
     updateLlmConfig,
     updateTtsConfig,
     updateStockConfig,

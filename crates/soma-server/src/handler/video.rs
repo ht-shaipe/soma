@@ -91,6 +91,7 @@ async fn list(param: &RequestParameter) -> Result<Value> {
             "materials": t.materials.as_deref().unwrap_or(&[]).iter().map(|s| value!(s.clone())).collect::<Vec<Value>>(),
             "videos": t.videos.as_deref().unwrap_or(&[]).iter().map(|s| value!(s.clone())).collect::<Vec<Value>>(),
             "combinedVideos": t.combined_videos.as_deref().unwrap_or(&[]).iter().map(|s| value!(s.clone())).collect::<Vec<Value>>(),
+            "errorMessage": t.error_message.as_deref().unwrap_or(""),
             "createdAt": t.created_at.to_rfc3339(),
             "updatedAt": t.updated_at.to_rfc3339(),
         })
@@ -129,6 +130,7 @@ async fn get(param: &RequestParameter) -> Result<Value> {
         "materials": task.materials.as_deref().unwrap_or(&[]).iter().map(|s| value!(s.clone())).collect::<Vec<Value>>(),
         "videos": task.videos.as_deref().unwrap_or(&[]).iter().map(|s| value!(s.clone())).collect::<Vec<Value>>(),
         "combinedVideos": task.combined_videos.as_deref().unwrap_or(&[]).iter().map(|s| value!(s.clone())).collect::<Vec<Value>>(),
+        "errorMessage": task.error_message.as_deref().unwrap_or(""),
         "createdAt": task.created_at.to_rfc3339(),
         "updatedAt": task.updated_at.to_rfc3339(),
     }))

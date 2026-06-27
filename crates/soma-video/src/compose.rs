@@ -47,47 +47,83 @@ impl VideoComposer {
         output_path: &str,
         video_aspect: &VideoAspect,
         max_clip_duration: u32,
+        transition_mode: &str,
     ) -> Result<(), SomaError> {
-        // 获取音频时长，视频总时长需略大于音频时长
         let audio_duration = self.ffmpeg.get_audio_duration(audio_path)?;
         let (target_w, target_h) = video_aspect.to_resolution();
-        // 加 0.1 秒余量，避免视频比音频略短
         let required_duration = audio_duration + 0.1;
 
         let output_dir = std::path::Path::new(output_path).parent().unwrap_or(std::path::Path::new("."));
         std::fs::create_dir_all(output_dir).map_err(SomaError::Io)?;
 
-        let mut clip_files: Vec<String> = Vec::new();
-        let mut total_duration: f64 = 0.0;
-
-        // 逐个裁剪素材视频，直到累计时长满足要求
+        let mut segments: Vec<(String, f64)> = Vec::new();
         for (i, video_path) in video_paths.iter().enumerate() {
-            if total_duration >= required_duration {
-                break;
-            }
-            // 获取素材实际时长，若失败则使用最大片段时长
             let clip_dur = self.ffmpeg.get_video_duration(video_path).unwrap_or(max_clip_duration as f64);
-            // 取素材时长和最大片段时长的较小值
-            let actual_dur = clip_dur.min(max_clip_duration as f64);
-
-            // 裁剪并缩放到目标分辨率
-            let clip_output = output_dir.join(format!("temp-clip-{}.mp4", i + 1)).to_string_lossy().to_string();
-            self.ffmpeg.clip_and_resize(video_path, &clip_output, target_w, target_h, 0.0, actual_dur)?;
-            clip_files.push(clip_output);
-            total_duration += actual_dur;
+            let mut start: f64 = 0.0;
+            let mut seg_idx: usize = 0;
+            while start < clip_dur {
+                let seg_dur = (max_clip_duration as f64).min(clip_dur - start);
+                if seg_dur <= 0.0 {
+                    break;
+                }
+                let clip_output = output_dir.join(format!("temp-seg-{}-{}.mp4", i, seg_idx)).to_string_lossy().to_string();
+                self.ffmpeg.clip_and_resize(video_path, &clip_output, target_w, target_h, start, seg_dur)?;
+                segments.push((clip_output, seg_dur));
+                start += seg_dur;
+                seg_idx += 1;
+            }
         }
 
-        // 只有一个片段时直接复制，无需拼接
+        let total_seg_duration: f64 = segments.iter().map(|(_, d)| *d).sum();
+        if total_seg_duration < required_duration && !segments.is_empty() {
+            let base_count = segments.len();
+            let mut idx = 0;
+            let mut accumulated = total_seg_duration;
+            while accumulated < required_duration {
+                let (ref src_path, dur) = segments[idx % base_count];
+                let copy_path = output_dir.join(format!("temp-loop-{}.mp4", segments.len())).to_string_lossy().to_string();
+                std::fs::copy(src_path, &copy_path).map_err(SomaError::Io)?;
+                segments.push((copy_path, dur));
+                accumulated += dur;
+                idx += 1;
+            }
+        }
+
+        // 对每个片段应用转场特效（none/shuffle 以外跳过）
+        let transition_duration = 1.0;
+        let ffmpeg_path = &self.ffmpeg.path;
+        if transition_mode != "none" && !transition_mode.is_empty() {
+            let mut transitioned = Vec::new();
+            for (seg_i, (ref seg_path, seg_dur)) in segments.iter().enumerate() {
+                let trans_output = output_dir.join(format!("temp-trans-{}.mp4", seg_i)).to_string_lossy().to_string();
+                if transition_mode == "Shuffle" {
+                    crate::effects::apply_shuffle_transition(seg_path, &trans_output, transition_duration, ffmpeg_path)?;
+                } else {
+                    crate::effects::apply_transition(seg_path, &trans_output, transition_mode, transition_duration, ffmpeg_path, "left")?;
+                }
+                transitioned.push((trans_output, *seg_dur));
+            }
+            // 清理原始片段
+            for (p, _) in &segments {
+                let _ = std::fs::remove_file(p);
+            }
+            segments = transitioned;
+        }
+
+        let clip_files: Vec<String> = segments.iter().map(|(p, _)| p.clone()).collect();
+
+        if clip_files.is_empty() {
+            return Err(SomaError::Ffmpeg("no video clips to combine".into()));
+        }
+
         if clip_files.len() == 1 {
             let _ = std::fs::copy(&clip_files[0], output_path);
             let _ = std::fs::remove_file(&clip_files[0]);
             return Ok(());
         }
 
-        // 拼接所有片段
         self.ffmpeg.concat_clips(&clip_files, output_path)?;
 
-        // 清理临时片段文件
         for f in &clip_files {
             let _ = std::fs::remove_file(f);
         }

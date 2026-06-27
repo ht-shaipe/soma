@@ -20,6 +20,7 @@ use tube_web::{
 /// - "musics" → 音乐文件管理
 /// - "materials" → 素材文件管理
 /// - "stream" → 视频流播放/下载
+/// - "config" → 配置读写
 ///
 /// 参数：
 /// - `req`: HTTP 请求
@@ -39,6 +40,8 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
         "musics" => crate::handler::music::distribute(&param).await,
         "materials" => crate::handler::material::distribute(&param).await,
         "stream" => crate::handler::stream::distribute(&param).await,
+        "config" => crate::handler::config::distribute(&param).await,
+        "voices" => crate::handler::voice::distribute(&param).await,
         _ => Err(error!("请求方法{}.{}系统未提供。", param.module, param.method)),
     };
 

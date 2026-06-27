@@ -35,11 +35,9 @@ pub async fn generate_script(
     system_prompt: &str,
     conf: &Config,
 ) -> Result<String, SomaError> {
-    // 获取 LLM 提供商配置（提供商类型、API Key、模型名称）
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
     let llm = LlmFactory::create(llm_provider, &api_key);
 
-    // 构建 system 消息：若未提供自定义提示词，使用默认的脚本撰写专家提示
     let sys_msg = if system_prompt.is_empty() {
         format!(
             "你是一个短视频脚本撰写专家。请根据给定的主题，撰写一段适合短视频的脚本。\
@@ -56,21 +54,19 @@ pub async fn generate_script(
         system_prompt.to_string()
     };
 
-    // 构建 user 消息：若未提供自定义 prompt，使用默认模板
     let user_msg = if prompt.is_empty() {
         format!("请为以下主题撰写短视频脚本：{}", subject)
     } else {
         format!("{}\n主题：{}", prompt, subject)
     };
 
-    // 构造 LLM 请求体
     let body = serde_json::json!({
         "model": model_name,
         "messages": [
             {"role": "system", "content": sys_msg},
             {"role": "user", "content": user_msg}
         ],
-        "temperature": 0.7,  // 较高温度保证创意性
+        "temperature": 0.7,
         "max_tokens": 2048,
     });
 
@@ -78,8 +74,8 @@ pub async fn generate_script(
     let result = llm.chat(&body_value).await
         .map_err(|e| SomaError::Llm(format!("LLM chat failed: {:?}", e)))?;
 
-    // 从响应中提取文本内容
     let content = extract_content_from_response(&result);
+    let content = clean_llm_output(&content);
     Ok(content)
 }
 
@@ -106,7 +102,6 @@ pub async fn generate_terms(
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
     let llm = LlmFactory::create(llm_provider, &api_key);
 
-    // 构建关键词提取的 system 提示
     let sys_msg = format!(
         "你是一个视频素材搜索关键词提取专家。请从给定的视频脚本中提取{}个最适合搜索视频素材的关键词。\
          要求：\n\
@@ -125,7 +120,7 @@ pub async fn generate_terms(
             {"role": "system", "content": sys_msg},
             {"role": "user", "content": user_msg}
         ],
-        "temperature": 0.3,  // 低温度保证关键词提取的准确性
+        "temperature": 0.3,
         "max_tokens": 256,
     });
 
@@ -134,13 +129,8 @@ pub async fn generate_terms(
         .map_err(|e| SomaError::Llm(format!("LLM terms failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
-    // 解析 LLM 返回的逗号/换行分隔的关键词
-    let terms: Vec<String> = content
-        .split(&[',', '，', '\n'][..])
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty())
-        .take(amount)
-        .collect();
+    let content = clean_llm_output(&content);
+    let terms = parse_terms_output(&content, amount);
     Ok(terms)
 }
 
@@ -167,11 +157,23 @@ pub async fn generate_social_metadata(
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
     let llm = LlmFactory::create(llm_provider, &api_key);
 
-    let sys_msg = "你是一个社交媒体内容优化专家。请根据给定的视频主题和脚本，生成适合发布到社交媒体的标题、描述和标签。以JSON格式输出。";
+    let spec = get_social_platform_spec(platform);
+    let label = get_social_platform_label(platform);
+
+    let sys_msg = format!(
+        "你是一个社交媒体内容优化专家。请根据给定的视频主题和脚本，\
+         生成适合发布到{}的标题、描述和标签。以JSON格式输出。\
+         \n约束：\n\
+         1. title 最多{}字符\n\
+         2. description 最多{}字符，末尾加行动号召\n\
+         3. tags 为{}个以#开头的标签，无空格\n\
+         4. 只输出JSON，不要代码围栏或注释",
+        label, spec.title_max, spec.caption_max, spec.hashtag_count,
+    );
 
     let user_msg = format!(
-        "视频主题：{}\n视频脚本：\n{}\n目标平台：{}\n\n请输出JSON格式：{{\"title\": \"标题\", \"description\": \"描述\", \"tags\": [\"标签1\", \"标签2\"]}}",
-        subject, script, platform
+        "视频主题：{}\n视频脚本：\n{}\n目标平台：{}\n\n请输出JSON：{{\"title\":\"标题\",\"description\":\"描述\",\"tags\":[\"#标签1\"]}}",
+        subject, script, label
     );
 
     let body = serde_json::json!({
@@ -180,7 +182,7 @@ pub async fn generate_social_metadata(
             {"role": "system", "content": sys_msg},
             {"role": "user", "content": user_msg}
         ],
-        "temperature": 0.5,  // 中等温度平衡创意与准确性
+        "temperature": 0.5,
         "max_tokens": 512,
     });
 
@@ -189,21 +191,105 @@ pub async fn generate_social_metadata(
         .map_err(|e| SomaError::Llm(format!("LLM social metadata failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
+    let content = clean_llm_output(&content);
 
-    // 去除 LLM 可能返回的 markdown 代码块标记
-    let json_str = content
-        .trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
-        .trim();
+    let json_str = strip_code_fence(&content);
 
-    // 尝试解析 JSON，失败则降级为简单结构
-    Ok(serde_json::from_str::<serde_json::Value>(json_str).unwrap_or_else(|_| serde_json::json!({
-        "title": subject,
-        "description": content,
-        "tags": []
-    })))
+    // 尝试 JSON 解析，正则兜底
+    let parsed = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json_str) {
+        Some(v)
+    } else {
+        // 正则提取 {...} 块
+        if let Ok(re) = regex::Regex::new(r"\{.*\}") {
+            if let Some(caps) = re.find(&json_str) {
+                serde_json::from_str::<serde_json::Value>(caps.as_str()).ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    Ok(parsed.unwrap_or_else(|| fallback_social_metadata(subject, script, &spec)))
+}
+
+/// 社交平台规格
+struct SocialPlatformSpec {
+    title_max: usize,
+    caption_max: usize,
+    hashtag_count: usize,
+}
+
+fn get_social_platform_spec(platform: &str) -> SocialPlatformSpec {
+    match platform {
+        "tiktok" => SocialPlatformSpec { title_max: 100, caption_max: 2200, hashtag_count: 5 },
+        "youtube_shorts" | "youtube" => SocialPlatformSpec { title_max: 100, caption_max: 5000, hashtag_count: 3 },
+        "instagram_reels" | "instagram" => SocialPlatformSpec { title_max: 125, caption_max: 2200, hashtag_count: 8 },
+        "facebook_reels" | "facebook" => SocialPlatformSpec { title_max: 125, caption_max: 2200, hashtag_count: 5 },
+        "x" | "twitter" => SocialPlatformSpec { title_max: 70, caption_max: 280, hashtag_count: 3 },
+        _ => SocialPlatformSpec { title_max: 100, caption_max: 2200, hashtag_count: 5 },
+    }
+}
+
+fn get_social_platform_label(platform: &str) -> &str {
+    match platform {
+        "tiktok" => "TikTok",
+        "youtube_shorts" | "youtube" => "YouTube Shorts",
+        "instagram_reels" | "instagram" => "Instagram Reels",
+        "facebook_reels" | "facebook" => "Facebook Reels",
+        "x" | "twitter" => "X (Twitter)",
+        "小红书" | "xiaohongshu" => "小红书",
+        _ => platform,
+    }
+}
+
+/// LLM 失败时的社交元数据兜底生成
+fn fallback_social_metadata(subject: &str, script: &str, spec: &SocialPlatformSpec) -> serde_json::Value {
+    let default_tags = vec!["#shorts", "#viral", "#trending", "#fyp", "#video", "#reels", "#creator", "#content"];
+    let tags: Vec<String> = default_tags.iter().take(spec.hashtag_count).map(|t| t.to_string()).collect();
+    serde_json::json!({
+        "title": subject.chars().take(spec.title_max).collect::<String>(),
+        "description": script.chars().take(spec.caption_max).collect::<String>(),
+        "tags": tags,
+    })
+}
+
+/// 清理 LLM 输出中的思维块和格式标记
+///
+/// 推理模型（如 DeepSeek-R1、QwQ 等）会在输出中包含思维过程：
+/// - `<think>...</think>` 标签
+/// - 行首 `思考过程:` / `思维过程:` 等标记
+///
+/// 同时清除 Markdown 格式标记（# 标题、** 粗体、* 斜体等），
+/// 因为视频脚本不应包含这些格式符号。
+fn clean_llm_output(text: &str) -> String {
+    let mut result = text.to_string();
+
+    // 移除 <think>...</think> 块（支持多行）
+    let think_re = regex::Regex::new(r"(?s)<think>.*?</think>").unwrap();
+    result = think_re.replace_all(&result, "").to_string();
+
+    // 移除行首的思维过程标记
+    let thinking_re = regex::Regex::new(r"(?m)^.{0,5}(思考过程|思维过程|Reasoning|Thinking)[:：]\s*").unwrap();
+    result = thinking_re.replace_all(&result, "").to_string();
+
+    // 清除 Markdown 格式标记
+    // 移除 # 标题标记
+    let heading_re = regex::Regex::new(r"(?m)^#{1,6}\s*").unwrap();
+    result = heading_re.replace_all(&result, "").to_string();
+
+    // 移除 **粗体** 和 *斜体* 标记
+    let bold_re = regex::Regex::new(r"\*\*(.+?)\*\*").unwrap();
+    result = bold_re.replace_all(&result, "$1").to_string();
+    let italic_re = regex::Regex::new(r"\*(.+?)\*").unwrap();
+    result = italic_re.replace_all(&result, "$1").to_string();
+
+    // 清理多余空行（连续2个以上空行压缩为1个）
+    let blank_re = regex::Regex::new(r"\n{3,}").unwrap();
+    result = blank_re.replace_all(&result, "\n\n").to_string();
+
+    result.trim().to_string()
 }
 
 /// 获取 LLM 提供商配置
@@ -219,43 +305,88 @@ pub async fn generate_social_metadata(
 /// 返回：(LlmProvider, api_key, model_name) 三元组，或配置错误
 fn get_provider_config(provider: &str, conf: &Config) -> Result<(LlmProvider, String, String), SomaError> {
     match provider {
-        // OpenAI 配置，默认模型 gpt-4o-mini
         "openai" => {
             let key = conf.app.app.openai_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let base_url = conf.app.app.openai_base_url.as_deref().unwrap_or("");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
-        // DeepSeek 配置，默认模型 deepseek-chat
         "deepseek" => {
             let key = conf.app.app.deepseek_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.deepseek_model_name.as_deref().unwrap_or("deepseek-chat");
             Ok((LlmProvider::DeepSeek, key.to_string(), model.to_string()))
         }
-        // 通义千问配置，默认模型 qwen-plus
         "qwen" => {
             let key = conf.app.app.qwen_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.qwen_model_name.as_deref().unwrap_or("qwen-plus");
             Ok((LlmProvider::QWen, key.to_string(), model.to_string()))
         }
-        // Moonshot/Kimi 配置，默认模型 moonshot-v1-8k
         "moonshot" | "kimi" => {
             let key = conf.app.app.moonshot_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.moonshot_model_name.as_deref().unwrap_or("moonshot-v1-8k");
             Ok((LlmProvider::Kimi, key.to_string(), model.to_string()))
         }
-        // Ollama 本地模型配置，无需 API Key，默认模型 llama3
         "ollama" => {
             let key = "";
             let model = conf.app.app.ollama_model_name.as_deref().unwrap_or("llama3");
             Ok((LlmProvider::Ollama, key.to_string(), model.to_string()))
         }
-        // MiMo 配置
         "mimo" => {
             let key = conf.app.app.mimo_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.mimo_model_name.as_deref().unwrap_or("mimo");
             Ok((LlmProvider::MiMo, key.to_string(), model.to_string()))
         }
-        // 未识别的提供商，默认使用 OpenAI 配置
+        "gemini" => {
+            // Gemini 通过 OpenAI 兼容接口调用
+            let key = conf.app.app.gemini_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.gemini_model_name.as_deref().unwrap_or("gemini-2.0-flash");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "azure" => {
+            let key = conf.app.app.azure_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.azure_model_name.as_deref().unwrap_or("gpt-4o");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "groq" => {
+            let key = conf.app.app.groq_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.groq_model_name.as_deref().unwrap_or("llama-3.1-8b-instant");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "grok" => {
+            let key = conf.app.app.grok_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.grok_model_name.as_deref().unwrap_or("grok-3");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "doubao" => {
+            let key = conf.app.app.evolink_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.evolink_model_name.as_deref().unwrap_or("doubao-pro-32k");
+            Ok((LlmProvider::Doubao, key.to_string(), model.to_string()))
+        }
+        "hunyuan" => {
+            let key = conf.app.app.minimax_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.minimax_model_name.as_deref().unwrap_or("hunyuan-turbo");
+            Ok((LlmProvider::Hunyuan, key.to_string(), model.to_string()))
+        }
+        "zhipu" => {
+            let key = conf.app.app.aihubmix_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.aihubmix_model_name.as_deref().unwrap_or("glm-4-flash");
+            Ok((LlmProvider::Zhipu, key.to_string(), model.to_string()))
+        }
+        "wenxin" => {
+            let key = conf.app.app.aimlapi_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.aimlapi_model_name.as_deref().unwrap_or("ernie-4.0-8k");
+            Ok((LlmProvider::Wenxin, key.to_string(), model.to_string()))
+        }
+        "xunfei" => {
+            let key = conf.app.app.modelscope_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.modelscope_model_name.as_deref().unwrap_or("generalv3.5");
+            Ok((LlmProvider::Xunfei, key.to_string(), model.to_string()))
+        }
+        "oneapi" => {
+            let key = conf.app.app.oneapi_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.oneapi_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
         _ => {
             let key = conf.app.app.openai_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini");
@@ -285,7 +416,6 @@ fn extract_content_from_response(result: &tube::Value) -> String {
             }
         }
     }
-    // 响应格式不符预期时，返回原始内容
     result.to_string()
 }
 
@@ -295,4 +425,63 @@ fn extract_content_from_response(result: &tube::Value) -> String {
 /// 转换失败时返回 Null 值
 fn serde_json_to_tube_value(json: &serde_json::Value) -> tube::Value {
     tube::Value::from_serialize(json).unwrap_or(tube::Value::Null)
+}
+
+/// 解析 LLM 关键词提取输出，支持多种格式
+///
+/// 三阶段解析策略：
+/// 1. 尝试 JSON 数组解析（去除代码围栏后）
+/// 2. 正则提取 [...] 块后 JSON 解析
+/// 3. 逗号/换行分隔字符串解析（兜底）
+fn parse_terms_output(content: &str, amount: usize) -> Vec<String> {
+    let stripped = strip_code_fence(content);
+
+    // 阶段1：直接 JSON 解析
+    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&stripped) {
+        let terms: Vec<String> = arr.iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .filter(|t| !t.is_empty())
+            .take(amount)
+            .collect();
+        if !terms.is_empty() {
+            return terms;
+        }
+    }
+
+    // 阶段2：正则提取 [...] 块
+    if let Ok(re) = regex::Regex::new(r"\[.*\]") {
+        if let Some(caps) = re.find(&stripped) {
+            if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(caps.as_str()) {
+                let terms: Vec<String> = arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .filter(|t| !t.is_empty())
+                    .take(amount)
+                    .collect();
+                if !terms.is_empty() {
+                    return terms;
+                }
+            }
+        }
+    }
+
+    // 阶段3：逗号/换行分隔字符串兜底
+    content
+        .split(&[',', '\u{FF0C}', '\n'][..])
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .take(amount)
+        .collect()
+}
+
+/// 去除 LLM 输出中可能包裹的 Markdown 代码围栏
+fn strip_code_fence(text: &str) -> String {
+    let t = text.trim();
+    if t.starts_with("```") {
+        let re = regex::Regex::new(r"(?s)^```[a-zA-Z0-9]*\s*").unwrap();
+        let t = re.replace(t, "").to_string();
+        let re2 = regex::Regex::new(r"\s*```$").unwrap();
+        re2.replace(&t, "").trim().to_string()
+    } else {
+        t.to_string()
+    }
 }

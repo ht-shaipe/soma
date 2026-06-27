@@ -9,7 +9,8 @@ export const useMaterialStore = defineStore('material', () => {
   async function fetchMusics() {
     try {
       const { listMusics } = await import('@/api/music')
-      musics.value = await listMusics()
+      const result = await listMusics()
+      musics.value = result.list
     } catch {
       musics.value = []
     }
@@ -18,7 +19,8 @@ export const useMaterialStore = defineStore('material', () => {
   async function fetchMaterials() {
     try {
       const { listMaterials } = await import('@/api/material')
-      materials.value = await listMaterials()
+      const result = await listMaterials()
+      materials.value = result.list
     } catch {
       materials.value = []
     }

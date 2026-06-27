@@ -99,7 +99,16 @@ async fn main() -> std::io::Result<()> {
                     .service(
                         web::resource("/{cls}/{tail:.*}")
                             .route(web::to(soma_server::router::api_handler)),
-                    ),
+                    )
+                    // 文件上传接口（multipart/form-data，不走统一分发）
+                    .service(
+                        web::resource("/materials/upload")
+                            .route(web::post().to(soma_server::handler::material::upload_file)),
+                    )
+                    .service(
+                        web::resource("/musics/upload")
+                            .route(web::post().to(soma_server::handler::music::upload_file)),
+                    )
             )
     })
     .bind(ip)?

@@ -19,46 +19,37 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useTaskStore } from '@/stores/task'
-import { TaskStatus } from '@/types'
+import { isTaskCompleted, isTaskFailed, getTaskStepLabel } from '@/types'
 import { useI18n } from 'vue-i18n'
 
 const taskStore = useTaskStore()
 const { t } = useI18n()
 const task = computed(() => taskStore.currentTask)
 
-const statusOrder: string[] = [
-  TaskStatus.Pending,
-  TaskStatus.Script,
-  TaskStatus.Terms,
-  TaskStatus.Audio,
-  TaskStatus.Subtitle,
-  TaskStatus.Materials,
-  TaskStatus.Video,
-  TaskStatus.Completed,
-  TaskStatus.Failed,
-]
-
 const activeStep = computed(() => {
   if (!task.value) return -1
-  const idx = statusOrder.indexOf(task.value.status)
-  if (task.value.status === TaskStatus.Completed) return 6
-  if (task.value.status === TaskStatus.Failed) return idx - 1
-  return Math.max(0, idx - 1)
+  const stepLabel = getTaskStepLabel(task.value)
+  const steps = ['Script', 'Terms', 'Audio', 'Subtitle', 'Materials', 'Video']
+  if (stepLabel === 'Completed') return 6
+  if (stepLabel === 'Failed') {
+    const idx = steps.indexOf(taskStore.pipelineSteps.find(s => s.active)?.key || '')
+    return Math.max(0, idx - 1)
+  }
+  const idx = steps.indexOf(stepLabel)
+  return Math.max(0, idx)
 })
 
 const statusTagType = computed(() => {
   if (!task.value) return 'info'
-  switch (task.value.status) {
-    case TaskStatus.Completed: return 'success'
-    case TaskStatus.Failed: return 'danger'
-    case TaskStatus.Pending: return 'info'
-    default: return 'warning'
-  }
+  if (isTaskCompleted(task.value)) return 'success'
+  if (isTaskFailed(task.value)) return 'danger'
+  return 'warning'
 })
 
 const statusLabel = computed(() => {
   if (!task.value) return ''
-  const key = `task.status${task.value.status}`
+  const stepLabel = getTaskStepLabel(task.value)
+  const key = `task.status${stepLabel}`
   return t(key)
 })
 
