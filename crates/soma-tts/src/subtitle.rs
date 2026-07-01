@@ -28,7 +28,7 @@ pub fn cues_to_srt(cues: &[SubtitleCue]) -> String {
     for cue in cues {
         let start = utils::time_convert_seconds_to_hmsm(cue.start_ms as f64 / 1000.0);
         let end = utils::time_convert_seconds_to_hmsm(cue.end_ms as f64 / 1000.0);
-        let wrapped = wrap_subtitle_text(&cue.text, 20, 40);
+        let wrapped = wrap_subtitle_text(&cue.text, 14, 28);
         srt.push_str(&format!("{}\n{} --> {}\n{}\n\n", cue.index, start, end, wrapped));
     }
     srt
@@ -186,12 +186,17 @@ pub fn correct_subtitle(cues: &mut [SubtitleCue], video_script: &str) {
 ///
 /// - `audio_file` - 输入音频文件路径
 /// - `subtitle_file` - 字幕文件输出路径（用于确定输出目录）
-pub fn generate_whisper_subtitle(audio_file: &str, subtitle_file: &str) -> Result<(), SomaError> {
+pub fn generate_whisper_subtitle(audio_file: &str, subtitle_file: &str, model_size: &str, device: &str, compute_type: &str) -> Result<(), SomaError> {
+    let model = if model_size.is_empty() { "base" } else { model_size };
+    let dev = if device.is_empty() { "cpu" } else { device };
+    let ct = if compute_type.is_empty() { "int8" } else { compute_type };
     let status = std::process::Command::new("whisper")
         .args(&[
             audio_file,
+            "--model", model,
+            "--device", dev,
+            "--compute_type", ct,
             "--output_format", "srt",
-            // 字幕文件输出到 subtitle_file 所在目录
             "--output_dir", std::path::Path::new(subtitle_file).parent().unwrap_or(std::path::Path::new(".")).to_string_lossy().as_ref(),
         ])
         .status()

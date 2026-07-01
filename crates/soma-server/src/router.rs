@@ -4,7 +4,6 @@
 /// 将请求分发到对应的 handler 处理函数。
 
 use actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
-use tube::Error;
 use tube_web::{
     response::{get_error, get_success},
 };
@@ -42,6 +41,7 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
         "stream" => crate::handler::stream::distribute(&param).await,
         "config" => crate::handler::config::distribute(&param).await,
         "voices" => crate::handler::voice::distribute(&param).await,
+        "upload" => crate::handler::upload::distribute(&param).await,
         _ => Err(error!("请求方法{}.{}系统未提供。", param.module, param.method)),
     };
 

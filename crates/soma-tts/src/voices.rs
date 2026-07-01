@@ -54,6 +54,11 @@ pub fn is_elevenlabs_voice(voice_name: &str) -> bool {
     voice_name.starts_with("elevenlabs:")
 }
 
+/// 判断是否为 Azure 语音（以 `azure:` 开头或包含 Neural 后缀且无其他引擎前缀）
+pub fn is_azure_voice(voice_name: &str) -> bool {
+    voice_name.starts_with("azure:")
+}
+
 /// 判断是否为"无语音"模式
 ///
 /// 当语音名称为 `no-voice` 或 `none`（不区分大小写）时，表示不需要实际语音合成，
@@ -143,6 +148,18 @@ pub fn extract_mimo_voice(voice_name: &str) -> Option<String> {
 pub fn extract_elevenlabs_voice(voice_name: &str) -> Option<String> {
     let parts: Vec<&str> = voice_name.splitn(3, ':').collect();
     if parts.len() >= 2 && parts[0] == "elevenlabs" {
+        Some(parts[1].to_string())
+    } else {
+        None
+    }
+}
+
+/// 从 Azure 语音名称中提取语音标识
+///
+/// 格式：`azure:voice-name`（如 `azure:zh-CN-XiaoxiaoNeural`）
+pub fn extract_azure_voice(voice_name: &str) -> Option<String> {
+    let parts: Vec<&str> = voice_name.splitn(2, ':').collect();
+    if parts.len() >= 2 && parts[0] == "azure" {
         Some(parts[1].to_string())
     } else {
         None

@@ -11,8 +11,9 @@ export const useMaterialStore = defineStore('material', () => {
       const { listMusics } = await import('@/api/music')
       const result = await listMusics()
       musics.value = result.list
-    } catch {
+    } catch (e) {
       musics.value = []
+      console.error('Failed to fetch musics:', e)
     }
   }
 
@@ -21,8 +22,9 @@ export const useMaterialStore = defineStore('material', () => {
       const { listMaterials } = await import('@/api/material')
       const result = await listMaterials()
       materials.value = result.list
-    } catch {
+    } catch (e) {
       materials.value = []
+      console.error('Failed to fetch materials:', e)
     }
   }
 

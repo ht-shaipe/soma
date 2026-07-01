@@ -9,5 +9,14 @@ export function getDownloadUrl(taskId: string, index?: number) {
 }
 
 export function getStaticUrl(relativePath: string) {
-  return `/storage/${relativePath}`
+  const storagePrefixes = ['./storage/', 'storage/', './storage', 'storage']
+  let path = relativePath.replace(/\\/g, '/')
+  for (const prefix of storagePrefixes) {
+    if (path.startsWith(prefix)) {
+      path = path.slice(prefix.length)
+      break
+    }
+  }
+  path = path.replace(/^\//, '')
+  return `/storage/${path}`
 }

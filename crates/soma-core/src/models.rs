@@ -210,6 +210,16 @@ pub struct VideoParams {
     pub video_script_prompt: Option<String>,
     /// 自定义 LLM 系统提示词
     pub custom_system_prompt: Option<String>,
+    /// 是否使用自定义系统提示词
+    pub use_custom_system_prompt: Option<bool>,
+    /// 视频编码器名称（如 libx264, h264_videotoolbox, h264_nvenc），为空时使用全局配置
+    pub video_encoder: Option<String>,
+    /// 水印图片路径（叠加在视频右下角，半透明）
+    pub video_watermark: Option<String>,
+    /// 片头视频文件路径（拼接到最终视频最前面）
+    pub video_intro: Option<String>,
+    /// 片尾视频文件路径（拼接到最终视频最后面）
+    pub video_outro: Option<String>,
 }
 
 impl VideoParams {
@@ -269,6 +279,16 @@ impl VideoParams {
         self.n_threads.unwrap_or(2)
     }
 
+    /// 获取视频编码器名称，为空时返回 None（由调用方决定回退策略）
+    pub fn get_video_encoder(&self) -> Option<&str> {
+        self.video_encoder.as_deref()
+    }
+
+    /// 是否使用自定义系统提示词
+    pub fn get_use_custom_system_prompt(&self) -> bool {
+        self.use_custom_system_prompt.unwrap_or(false)
+    }
+
     /// 获取脚本分段数，限制在 1~10 之间，默认 1
     pub fn get_paragraph_number(&self) -> u32 {
         self.paragraph_number.unwrap_or(1).min(10).max(1)
@@ -308,8 +328,6 @@ pub struct TaskInfo {
     pub videos: Option<Vec<String>>,
     /// 最终合并后的视频文件路径列表
     pub combined_videos: Option<Vec<String>>,
-    /// 跨平台发布结果
-    pub cross_post_results: Option<Vec<serde_json::Value>>,
     /// 错误信息（任务失败时填充）
     pub error_message: Option<String>,
     /// 任务创建时间（UTC）
@@ -335,7 +353,6 @@ impl TaskInfo {
             materials: None,
             videos: None,
             combined_videos: None,
-            cross_post_results: None,
             error_message: None,
             created_at: now,
             updated_at: now,

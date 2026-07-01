@@ -36,7 +36,7 @@
       </div>
       <div class="form-row">
         <div class="form-label">{{ $t('subtitle.fontSize') }}</div>
-        <el-slider v-model="store.fontSize" :min="30" :max="100" show-input size="small" />
+        <el-slider v-model="store.fontSize" :min="8" :max="100" show-input size="small" />
       </div>
       <div class="form-row">
         <div class="form-label">{{ $t('subtitle.fontColor') }}</div>
@@ -69,20 +69,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useVideoParamsStore } from '@/stores/videoParams'
+import api, { extractData } from '@/api/index'
 
 const store = useVideoParamsStore()
 
-const fontOptions = ref([
+const fontOptions = ref<string[]>([
   'STHeitiMedium.ttc',
   'STHeitiLight.ttc',
   'PingFang.ttc',
   'Songti.ttc',
-  'Heiti.ttc',
   'Arial.ttf',
-  'Verdana.ttf',
   'NotoSansSC-Regular.ttf',
-  'NotoSansSC-Bold.ttf',
 ])
+
+async function fetchFonts() {
+  try {
+    const data = await api.post('/materials/fonts').then(extractData<{ list: { name: string }[] }>)
+    if (data.list && data.list.length > 0) {
+      fontOptions.value = data.list.map((f: { name: string }) => f.name)
+    }
+  } catch (e) {
+    console.error('Failed to fetch fonts:', e)
+  }
+}
+
+onMounted(() => {
+  fetchFonts()
+})
 </script>

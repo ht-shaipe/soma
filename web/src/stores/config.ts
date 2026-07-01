@@ -7,7 +7,7 @@ export const useConfigStore = defineStore('config', () => {
   const config = ref<AppConfig>({
     app: {
       name: 'Soma',
-      version: '1.0.0',
+      version: '0.1.0',
       host: '0.0.0.0',
       port: 8080,
       storage_path: './storage',
@@ -50,8 +50,8 @@ export const useConfigStore = defineStore('config', () => {
         config.value = { ...config.value, ...data }
         loaded.value = true
       }
-    } catch {
-      // 使用默认值
+    } catch (e) {
+      console.error('Failed to load config:', e)
     }
   }
 
@@ -59,7 +59,8 @@ export const useConfigStore = defineStore('config', () => {
     try {
       await saveConfig(config.value)
       return true
-    } catch {
+    } catch (e) {
+      console.error('Failed to save config:', e)
       return false
     }
   }

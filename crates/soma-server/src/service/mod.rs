@@ -7,3 +7,5 @@
 pub mod pipeline;
 /// LLM 服务 - 脚本生成、关键词提取、社交元数据生成
 pub mod llm;
+/// 跨平台发布服务 - Upload-Post API
+pub mod upload;

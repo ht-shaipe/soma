@@ -22,3 +22,5 @@ pub mod stream;
 pub mod config;
 /// 语音处理器 - TTS 语音列表
 pub mod voice;
+/// 发布处理器 - 跨平台视频发布
+pub mod upload;

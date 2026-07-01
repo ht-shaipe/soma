@@ -3,6 +3,7 @@
 //! 提供配置管理、数据模型、错误定义和工具函数等基础能力，
 //! 供上层 soma-service 等 crate 依赖使用。
 
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 
 /// 应用配置模块，包含 TOML 配置文件的结构定义与加载逻辑

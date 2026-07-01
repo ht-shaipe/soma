@@ -136,6 +136,22 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     // ===== 第6步：合成最终视频 =====
     let (final_videos, combined_videos) = generate_final_videos(task_id, params, &materials, &audio_file, &subtitle_path, &conf)?;
 
+    // ===== 第7步：自动跨平台发布（如果配置了） =====
+    let ui = &conf.app.ui;
+    if super::upload::is_configured(ui) && ui.upload_post_auto_upload.unwrap_or(false) {
+        if let Some(ref platforms) = ui.upload_post_platforms {
+            if !platforms.is_empty() && !final_videos.is_empty() {
+                let title = video_script.chars().take(100).collect::<String>();
+                let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Upload(e.to_string()))?;
+                if let Err(e) = rt.block_on(
+                    super::upload::upload_video(&final_videos[0], &title, platforms, ui, None)
+                ) {
+                    log::error!("自动发布失败: {:?}", e);
+                }
+            }
+        }
+    }
+
     // 全部完成，更新任务状态和数据
     state::update_task_data(task_id, &TaskUpdateData {
         state: Some(TaskStatus::Completed.as_i32()),
@@ -171,7 +187,11 @@ fn generate_script(_task_id: &str, params: &VideoParams) -> Result<String, SomaE
     let language = params.video_language.as_deref().unwrap_or("");
     let paragraph_number = params.get_paragraph_number();
     let prompt = params.video_script_prompt.as_deref().unwrap_or("");
-    let system_prompt = params.custom_system_prompt.as_deref().unwrap_or("");
+    let system_prompt = if params.get_use_custom_system_prompt() {
+        params.custom_system_prompt.as_deref().unwrap_or("")
+    } else {
+        ""
+    };
 
     let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Llm(e.to_string()))?;
     retry(5, || {
@@ -267,6 +287,22 @@ fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &crat
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
             rt.block_on(fut)
         })
+    } else if soma_tts::voices::is_gemini_voice(voice_name) {
+        let gemini_key = conf.app.app.gemini_api_key.as_deref().unwrap_or("");
+        let gemini_model = conf.app.app.gemini_model_name.as_deref().unwrap_or("gemini-2.5-flash-preview-tts");
+        let tts = soma_tts::gemini_tts::GeminiTts::new(gemini_key, "", gemini_model);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            rt.block_on(fut)
+        })
+    } else if soma_tts::voices::is_azure_voice(voice_name) {
+        let azure_key = conf.app.azure.speech_key.as_deref().unwrap_or("");
+        let azure_region = conf.app.azure.speech_region.as_deref().unwrap_or("eastasia");
+        let tts = soma_tts::azure_tts::AzureTts::new(azure_key, azure_region);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            rt.block_on(fut)
+        })
     } else {
         // 默认使用 EdgeTTS
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
@@ -307,13 +343,19 @@ fn generate_subtitle(task_id: &str, params: &VideoParams, script: &str, audio_fi
     let subtitle_provider = conf.app.get_subtitle_provider();
     if subtitle_provider == "whisper" {
         // Whisper 模式：先识别音频生成字幕，再用脚本文本校正
-        soma_tts::subtitle::generate_whisper_subtitle(audio_file, &subtitle_path)?;
+        let ws = &conf.app.whisper;
+        soma_tts::subtitle::generate_whisper_subtitle(
+            audio_file, &subtitle_path,
+            ws.model_size.as_deref().unwrap_or("base"),
+            ws.device.as_deref().unwrap_or("cpu"),
+            ws.compute_type.as_deref().unwrap_or("int8"),
+        )?;
         let mut cues = soma_tts::subtitle::file_to_subtitles(&subtitle_path);
         soma_tts::subtitle::correct_subtitle(&mut cues, script);
         soma_tts::subtitle::create_subtitle_file(&cues, &subtitle_path)?;
     } else {
         // Edge TTS 模式：根据文本和音频时长均匀分配字幕时间轴
-        let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), conf.app.get_video_codec());
+        let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()));
         let audio_dur = ffmpeg.get_audio_duration(audio_file)?;
         let cues = soma_tts::edge_tts::generate_subtitle_cues_from_text(script, audio_dur);
         soma_tts::subtitle::create_subtitle_file(&cues, &subtitle_path)?;
@@ -342,7 +384,7 @@ fn get_video_materials(task_id: &str, params: &VideoParams, terms: &[String], au
 
     if source == "local" {
         // 本地素材模式：通过 FFmpeg 预处理本地素材文件
-        let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), conf.app.get_video_codec());
+        let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()));
         let materials = params.video_materials.as_deref().unwrap_or(&[]);
         return ffmpeg.preprocess_local_materials(materials, clip_dur, &aspect);
     }
@@ -386,7 +428,7 @@ fn generate_final_videos(
     subtitle_path: &str,
     conf: &crate::Config,
 ) -> Result<(Vec<String>, Vec<String>), SomaError> {
-    let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), conf.app.get_video_codec());
+    let ffmpeg = soma_video::Ffmpeg::new(&conf.app.get_ffmpeg_binary(), params.get_n_threads(), params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()));
     let composer = soma_video::VideoComposer::new(ffmpeg);
         let aspect = params.get_video_aspect();
         let clip_dur = params.get_clip_duration();
@@ -423,10 +465,44 @@ fn generate_final_videos(
         // 步骤3：生成最终视频（合成视频 + 音频 + 字幕 + BGM）
         composer.generate_video(&combined_path, audio_file, subtitle_path, &final_path, &final_params)?;
 
+        // 步骤4：叠加水印（如果配置了）
+        let current_path = if let Some(ref wm) = params.video_watermark {
+            if !wm.is_empty() && std::path::Path::new(wm).exists() {
+                let wm_path = task_dir_path.join(format!("watermarked-{}.mp4", i)).to_string_lossy().to_string();
+                composer.ffmpeg().add_watermark(&final_path, wm, &wm_path)?;
+                wm_path
+            } else {
+                final_path.clone()
+            }
+        } else {
+            final_path.clone()
+        };
+
+        // 步骤5：拼接片头/片尾（如果配置了）
+        let final_path_with_intro_outro = if params.video_intro.is_some() || params.video_outro.is_some() {
+            let intro = params.video_intro.as_deref().unwrap_or("");
+            let outro = params.video_outro.as_deref().unwrap_or("");
+            let has_intro = !intro.is_empty() && std::path::Path::new(intro).exists();
+            let has_outro = !outro.is_empty() && std::path::Path::new(outro).exists();
+            if has_intro || has_outro {
+                let io_path = task_dir_path.join(format!("final-io-{}.mp4", i)).to_string_lossy().to_string();
+                let mut segments: Vec<&str> = Vec::new();
+                if has_intro { segments.push(intro); }
+                segments.push(&current_path);
+                if has_outro { segments.push(outro); }
+                composer.ffmpeg().concat_videos(&segments, &io_path)?;
+                io_path
+            } else {
+                current_path.clone()
+            }
+        } else {
+            current_path.clone()
+        };
+
         progress += (50 / video_count / 2).max(1);
         state::update_task(task_id, None, Some(progress));
 
-        final_videos.push(final_path);
+        final_videos.push(final_path_with_intro_outro);
         combined_videos.push(combined_path);
     }
 
@@ -459,5 +535,5 @@ where
             }
         }
     }
-    Err(last_err.unwrap())
+    Err(last_err.unwrap_or_else(|| SomaError::Llm("重试全部失败且无错误记录".into())))
 }

@@ -38,6 +38,9 @@ pub enum SomaError {
     /// HTTP 请求失败（网络连接、状态码异常等）
     #[error("HTTP 请求失败: {0}")]
     Http(String),
+    /// 跨平台发布失败
+    #[error("发布失败: {0}")]
+    Upload(String),
     /// IO 错误（文件读写、目录操作等），自动从 std::io::Error 转换
     #[error("IO 错误: {0}")]
     Io(#[from] std::io::Error),

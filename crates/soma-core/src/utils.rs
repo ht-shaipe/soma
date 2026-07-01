@@ -173,7 +173,7 @@ pub fn split_string_by_punctuations(s: &str) -> Vec<String> {
 /// 去除 Markdown 分隔线（连续3个以上的 -、*、_）、
 /// 过滤空行、移除下划线，使脚本文本更适合与字幕进行比对。
 pub fn normalize_script_for_subtitle_matching(script: &str) -> String {
-    let re = regex::Regex::new(r"[-*_]{3,}").unwrap();
+    let re = regex::Regex::new(r"[-*_]{3,}").expect("内建正则编译失败");
     let lines: Vec<String> = script
         .lines()
         .map(|l| l.trim())

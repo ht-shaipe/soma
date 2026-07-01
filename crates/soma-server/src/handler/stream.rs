@@ -4,7 +4,7 @@
 /// - "play" → 获取视频播放地址
 /// - "download" → 获取视频下载地址（当前与播放逻辑相同）
 
-use tube::{Error, Result, Value};
+use tube::{Result, Value};
 use tube_web::RequestParameter;
 use crate::state;
 
@@ -49,14 +49,24 @@ async fn stream_video(param: &RequestParameter) -> Result<Value> {
     };
 
     let video_path = &videos[idx];
+    let video_filename = std::path::Path::new(video_path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| format!("final-{}.mp4", idx + 1));
     let conf = crate::Config::get();
     let endpoint = conf.app.get_endpoint();
 
-    // 根据 endpoint 配置生成完整或相对的访问 URL
-    let url = if endpoint.is_empty() {
-        format!("/storage/tasks/{}/final-{}.mp4", task_id, idx + 1)
+    let storage_path = conf.app.get_storage_path();
+    let relative_path = if video_path.starts_with(storage_path) {
+        video_path.strip_prefix(storage_path).unwrap_or(video_path).trim_start_matches('/')
     } else {
-        format!("{}/storage/tasks/{}/final-{}.mp4", endpoint.trim_end_matches('/'), task_id, idx + 1)
+        &video_filename
+    };
+
+    let url = if endpoint.is_empty() {
+        format!("/storage/{}", relative_path)
+    } else {
+        format!("{}/storage/{}", endpoint.trim_end_matches('/'), relative_path)
     };
 
     Ok(value!({
@@ -67,7 +77,52 @@ async fn stream_video(param: &RequestParameter) -> Result<Value> {
 
 /// 下载视频
 ///
-/// 当前实现与播放相同，均返回视频文件的访问地址
+/// 与播放类似，但在响应中增加 filename 参数用于浏览器下载保存
 async fn download_video(param: &RequestParameter) -> Result<Value> {
-    stream_video(param).await
+    let task_id = param.value.get_def_string("taskId", "");
+    if task_id.is_empty() {
+        return Err(error!("taskId 不能为空"));
+    }
+
+    let task = state::get_task(&task_id).ok_or_else(|| error!("任务不存在: {}", task_id))?;
+
+    let video_index = param.value.get_i32("index", 0) as usize;
+    let videos = task.videos.as_deref().unwrap_or(&[]);
+    if videos.is_empty() {
+        return Err(error!("视频尚未生成"));
+    }
+
+    let idx = if video_index > 0 && video_index <= videos.len() {
+        video_index - 1
+    } else {
+        0
+    };
+
+    let video_path = &videos[idx];
+    let video_filename = std::path::Path::new(video_path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| format!("final-{}.mp4", idx + 1));
+    let conf = crate::Config::get();
+    let endpoint = conf.app.get_endpoint();
+
+    let storage_path = conf.app.get_storage_path();
+    let relative_path = if video_path.starts_with(storage_path) {
+        video_path.strip_prefix(storage_path).unwrap_or(video_path).trim_start_matches('/')
+    } else {
+        &video_filename
+    };
+
+    let url = if endpoint.is_empty() {
+        format!("/storage/{}", relative_path)
+    } else {
+        format!("{}/storage/{}", endpoint.trim_end_matches('/'), relative_path)
+    };
+
+    Ok(value!({
+        "url": url,
+        "path": video_path.clone(),
+        "filename": video_filename,
+        "download": true,
+    }))
 }

@@ -38,24 +38,29 @@ impl SomaTtsProvider for ElevenlabsTts {
         &self,
         text: &str,
         voice_id: &str,
-        _rate: f32,  // ElevenLabs API 不直接支持语速参数，此处忽略
+        rate: f32,
         output_path: &Path,
     ) -> Result<TtsResult, SomaError> {
-        // 检查 API 密钥是否已设置
         if self.api_key.is_empty() {
             return Err(SomaError::Tts("ElevenLabs API key not set".into()));
         }
 
-        // 确保输出目录存在
         if let Some(parent) = output_path.parent() {
             std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
         }
 
-        // 构造 ElevenLabs TTS API URL（voice_id 作为路径参数）
         let url = format!("https://api.elevenlabs.io/v1/text-to-speech/{}", voice_id);
+        // rate 偏移量映射到 stability: rate>1 → stability低(更快), rate<1 → stability高(更慢)
+        // stability 范围 0.0~1.0，默认 0.5
+        let stability = (0.5 + (1.0 - rate as f64) * 0.3).max(0.0).min(1.0);
+        let similarity_boost = 0.75;
         let payload = serde_json::json!({
             "text": text,
             "model_id": self.model_id,
+            "voice_settings": {
+                "stability": stability,
+                "similarity_boost": similarity_boost,
+            }
         });
 
         // 发送 HTTP POST 请求，使用 xi-api-key 头进行认证

@@ -2,7 +2,7 @@
   <aside class="app-sidebar">
     <div class="sidebar-logo">
       <span class="logo-icon">🤖</span>
-      <span>MPTurbo</span>
+      <span>Soma</span>
     </div>
     <el-menu
       :default-active="activeRoute"
@@ -23,6 +23,10 @@
         <el-icon><Setting /></el-icon>
         <span>{{ $t('nav.settings') }}</span>
       </el-menu-item>
+      <el-menu-item @click="$emit('open-guide')">
+        <el-icon><QuestionFilled /></el-icon>
+        <span>{{ $t('nav.guide') }}</span>
+      </el-menu-item>
     </el-menu>
   </aside>
 </template>
@@ -30,8 +34,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { VideoCamera, List, Setting } from '@element-plus/icons-vue'
+import { VideoCamera, List, Setting, QuestionFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
+
+defineEmits(['open-guide'])
 const activeRoute = computed(() => route.path)
 </script>

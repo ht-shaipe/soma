@@ -4,7 +4,7 @@
 //! MiMo API 以聊天补全接口形式提供 TTS 服务，音频数据以 Base64 编码返回。
 
 use async_trait::async_trait;
-use base64::{Engine, engine::general_purpose};
+use base64::Engine;
 use soma_core::error::SomaError;
 use crate::edge_tts::{generate_subtitle_cues_from_text, get_audio_duration};
 use crate::provider::{SomaTtsProvider, TtsResult};

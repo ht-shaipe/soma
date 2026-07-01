@@ -167,10 +167,8 @@ pub fn get_audio_duration(audio_path: &str) -> Result<f64, SomaError> {
 ///
 /// 返回字幕时间轴列表 [`SubtitleCue`]。
 pub fn generate_subtitle_cues_from_text(text: &str, audio_duration: f64) -> Vec<SubtitleCue> {
-    // 按标点符号分割文本为句子
     let sentences = utils::split_string_by_punctuations(text);
     if sentences.is_empty() {
-        // 无法分句时，整段文本作为一条字幕
         return vec![SubtitleCue {
             index: 1,
             start_ms: 0,
@@ -179,35 +177,61 @@ pub fn generate_subtitle_cues_from_text(text: &str, audio_duration: f64) -> Vec<
         }];
     }
 
-    // 计算总字符数，用于按比例分配时长
-    let total_chars: usize = sentences.iter().map(|s| s.chars().count()).sum();
+    let max_line_width: usize = 14;
+    let mut split_sentences: Vec<String> = Vec::new();
+    for sentence in &sentences {
+        if sentence.trim().is_empty() {
+            continue;
+        }
+        let width: usize = sentence.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum();
+        if width <= max_line_width * 2 {
+            split_sentences.push(sentence.clone());
+        } else {
+            let mut chunk = String::new();
+            let mut chunk_width: usize = 0;
+            for ch in sentence.chars() {
+                let cw = if ch.is_ascii() { 1 } else { 2 };
+                if chunk_width + cw > max_line_width * 2 && !chunk.is_empty() {
+                    split_sentences.push(chunk.trim().to_string());
+                    chunk.clear();
+                    chunk_width = 0;
+                }
+                chunk.push(ch);
+                chunk_width += cw;
+            }
+            if !chunk.trim().is_empty() {
+                split_sentences.push(chunk.trim().to_string());
+            }
+        }
+    }
+
+    if split_sentences.is_empty() {
+        return vec![];
+    }
+
+    let total_chars: usize = split_sentences.iter().map(|s| s.chars().count()).sum();
     if total_chars == 0 {
         return vec![];
     }
 
-    // 将音频时长转换为 100 纳秒单位，用于精确计算时间偏移
     let audio_duration_100ns = (audio_duration * 10_000_000.0) as u64;
     let mut cues = Vec::new();
     let mut current_offset: u64 = 0;
 
-    for (i, sentence) in sentences.iter().enumerate() {
+    for (i, sentence) in split_sentences.iter().enumerate() {
         if sentence.trim().is_empty() {
             continue;
         }
         let sentence_chars = sentence.chars().count();
-        // 最后一句取剩余时长，避免因四舍五入导致总时长不匹配
-        let sentence_duration = if i == sentences.len() - 1 {
+        let sentence_duration = if i == split_sentences.len() - 1 {
             audio_duration_100ns.saturating_sub(current_offset)
         } else {
-            // 按字符数比例分配时长，最少 1 个单位
             ((audio_duration_100ns as f64) * (sentence_chars as f64 / total_chars as f64)).max(1.0) as u64
         };
-        // 确保不超出音频总时长
         let sentence_end = (current_offset + sentence_duration).min(audio_duration_100ns);
 
         cues.push(SubtitleCue {
             index: (cues.len() + 1) as u32,
-            // 100ns 单位转换为毫秒
             start_ms: current_offset / 10_000,
             end_ms: sentence_end / 10_000,
             text: sentence.clone(),
@@ -224,11 +248,5 @@ pub fn generate_subtitle_cues_from_text(text: &str, audio_duration: f64) -> Vec<
 /// - `cues` - 字幕时间轴列表
 /// - `output_path` - SRT 文件输出路径
 pub fn create_subtitle_file(cues: &[SubtitleCue], output_path: &str) -> Result<(), SomaError> {
-    let mut content = String::new();
-    for cue in cues {
-        let start = utils::time_convert_seconds_to_hmsm(cue.start_ms as f64 / 1000.0);
-        let end = utils::time_convert_seconds_to_hmsm(cue.end_ms as f64 / 1000.0);
-        content.push_str(&format!("{}\n{} --> {}\n{}\n\n", cue.index, start, end, cue.text));
-    }
-    std::fs::write(output_path, content).map_err(SomaError::Io)
+    crate::subtitle::create_subtitle_file(cues, output_path)
 }

@@ -26,6 +26,11 @@ impl VideoComposer {
         Self { ffmpeg }
     }
 
+    /// 获取内部 Ffmpeg 实例的引用
+    pub fn ffmpeg(&self) -> &Ffmpeg {
+        &self.ffmpeg
+    }
+
     /// 将多个视频素材拼接为一段与音频时长匹配的视频
     ///
     /// 根据音频时长计算所需视频总时长，依次裁剪每个素材视频片段
@@ -57,12 +62,17 @@ impl VideoComposer {
         std::fs::create_dir_all(output_dir).map_err(SomaError::Io)?;
 
         let mut segments: Vec<(String, f64)> = Vec::new();
+        let mut accumulated: f64 = 0.0;
         for (i, video_path) in video_paths.iter().enumerate() {
+            if accumulated >= required_duration {
+                break;
+            }
             let clip_dur = self.ffmpeg.get_video_duration(video_path).unwrap_or(max_clip_duration as f64);
             let mut start: f64 = 0.0;
             let mut seg_idx: usize = 0;
-            while start < clip_dur {
-                let seg_dur = (max_clip_duration as f64).min(clip_dur - start);
+            while start < clip_dur && accumulated < required_duration {
+                let remaining = required_duration - accumulated;
+                let seg_dur = (max_clip_duration as f64).min(clip_dur - start).min(remaining);
                 if seg_dur <= 0.0 {
                     break;
                 }
@@ -70,6 +80,7 @@ impl VideoComposer {
                 self.ffmpeg.clip_and_resize(video_path, &clip_output, target_w, target_h, start, seg_dur)?;
                 segments.push((clip_output, seg_dur));
                 start += seg_dur;
+                accumulated += seg_dur;
                 seg_idx += 1;
             }
         }
@@ -78,13 +89,12 @@ impl VideoComposer {
         if total_seg_duration < required_duration && !segments.is_empty() {
             let base_count = segments.len();
             let mut idx = 0;
-            let mut accumulated = total_seg_duration;
             while accumulated < required_duration {
+                let remaining = required_duration - accumulated;
                 let (ref src_path, dur) = segments[idx % base_count];
-                let copy_path = output_dir.join(format!("temp-loop-{}.mp4", segments.len())).to_string_lossy().to_string();
-                std::fs::copy(src_path, &copy_path).map_err(SomaError::Io)?;
-                segments.push((copy_path, dur));
-                accumulated += dur;
+                let use_dur = dur.min(remaining);
+                segments.push((src_path.clone(), use_dur));
+                accumulated += use_dur;
                 idx += 1;
             }
         }
@@ -92,20 +102,24 @@ impl VideoComposer {
         // 对每个片段应用转场特效（none/shuffle 以外跳过）
         let transition_duration = 1.0;
         let ffmpeg_path = &self.ffmpeg.path;
+        let codec = &self.ffmpeg.codec;
         if transition_mode != "none" && !transition_mode.is_empty() {
             let mut transitioned = Vec::new();
             for (seg_i, (ref seg_path, seg_dur)) in segments.iter().enumerate() {
                 let trans_output = output_dir.join(format!("temp-trans-{}.mp4", seg_i)).to_string_lossy().to_string();
                 if transition_mode == "Shuffle" {
-                    crate::effects::apply_shuffle_transition(seg_path, &trans_output, transition_duration, ffmpeg_path)?;
+                    crate::effects::apply_shuffle_transition(seg_path, &trans_output, transition_duration, ffmpeg_path, codec)?;
                 } else {
-                    crate::effects::apply_transition(seg_path, &trans_output, transition_mode, transition_duration, ffmpeg_path, "left")?;
+                    crate::effects::apply_transition(seg_path, &trans_output, transition_mode, transition_duration, ffmpeg_path, "left", codec)?;
                 }
                 transitioned.push((trans_output, *seg_dur));
             }
             // 清理原始片段
+            let mut deleted: std::collections::HashSet<String> = std::collections::HashSet::new();
             for (p, _) in &segments {
-                let _ = std::fs::remove_file(p);
+                if deleted.insert(p.clone()) {
+                    let _ = std::fs::remove_file(p);
+                }
             }
             segments = transitioned;
         }
@@ -124,8 +138,11 @@ impl VideoComposer {
 
         self.ffmpeg.concat_clips(&clip_files, output_path)?;
 
+        let mut deleted: std::collections::HashSet<String> = std::collections::HashSet::new();
         for f in &clip_files {
-            let _ = std::fs::remove_file(f);
+            if deleted.insert(f.clone()) {
+                let _ = std::fs::remove_file(f);
+            }
         }
 
         Ok(())

@@ -7,10 +7,8 @@
 #[macro_use]
 extern crate tube;
 
-#[allow(unused_imports)]
 use tube::Error;
 
-// 引入 lazy_static 宏，用于定义全局静态变量（如配置缓存、任务存储、任务队列等）
 #[macro_use]
 extern crate lazy_static;
 
@@ -18,7 +16,7 @@ extern crate lazy_static;
 pub mod config;
 /// 请求处理器模块 - 各类 API 的具体处理逻辑
 pub mod handler;
-/// 流水线模块 - 6步视频生成流水线编排（当前为 todo 占位）
+/// 流水线模块 - 6步视频生成流水线编排
 pub mod pipeline;
 /// 路由模块 - API 请求分发与路由调度
 pub mod router;
@@ -26,6 +24,8 @@ pub mod router;
 pub mod service;
 /// 全局状态模块 - 任务存储（TASK_STORE）及 CRUD 操作
 pub mod state;
+/// 任务存储后端模块 - 内存/Redis 抽象
+pub mod store;
 /// 任务队列模块 - 并发/排队任务调度与执行
 pub mod task;
 

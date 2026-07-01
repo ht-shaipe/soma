@@ -68,6 +68,8 @@ pub struct AppSection {
 
     /// 通义千问 API 密钥
     pub qwen_api_key: Option<String>,
+    /// 通义千问 API 基础 URL
+    pub qwen_base_url: Option<String>,
     /// 通义千问模型名称
     pub qwen_model_name: Option<String>,
 
@@ -164,6 +166,43 @@ pub struct AppSection {
     /// ModelScope 模型名称
     pub modelscope_model_name: Option<String>,
 
+    /// 豆包（Doubao/火山引擎）API 密钥
+    pub doubao_api_key: Option<String>,
+    /// 豆包 API 基础 URL
+    pub doubao_base_url: Option<String>,
+    /// 豆包 模型名称
+    pub doubao_model_name: Option<String>,
+
+    /// 混元（Hunyuan/腾讯）API 密钥
+    pub hunyuan_api_key: Option<String>,
+    /// 混元 API 基础 URL
+    pub hunyuan_base_url: Option<String>,
+    /// 混元 模型名称
+    pub hunyuan_model_name: Option<String>,
+
+    /// 智谱（Zhipu/BigModel）API 密钥
+    pub zhipu_api_key: Option<String>,
+    /// 智谱 API 基础 URL
+    pub zhipu_base_url: Option<String>,
+    /// 智谱 模型名称
+    pub zhipu_model_name: Option<String>,
+
+    /// 文心（Wenxin/百度）API 密钥
+    pub wenxin_api_key: Option<String>,
+    /// 文心 API 基础 URL
+    pub wenxin_base_url: Option<String>,
+    /// 文心 模型名称
+    pub wenxin_model_name: Option<String>,
+    /// 文心 Secret Key（用于获取 access_token）
+    pub wenxin_secret_key: Option<String>,
+
+    /// 讯飞（Xunfei/Spark）API 密钥
+    pub xunfei_api_key: Option<String>,
+    /// 讯飞 API 基础 URL
+    pub xunfei_base_url: Option<String>,
+    /// 讯飞 模型名称
+    pub xunfei_model_name: Option<String>,
+
     /// Pollinations API 密钥
     pub pollinations_api_key: Option<String>,
     /// Pollinations 基础 URL
@@ -173,6 +212,9 @@ pub struct AppSection {
 
     /// LiteLLM 代理模型名称（通过 LiteLLM 代理统一调用多种 LLM）
     pub litellm_model_name: Option<String>,
+
+    /// Cloudflare Workers AI Account ID
+    pub cloudflare_account_id: Option<String>,
 
     /// 是否启用 G4F（免费 GPT 接口）
     pub enable_g4f: Option<bool>,

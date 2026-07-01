@@ -5,7 +5,9 @@
 use soma_core::error::SomaError;
 
 /// 为视频应用转场特效
-pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, duration: f64, ffmpeg_path: &str, side: &str) -> Result<(), SomaError> {
+///
+/// - `codec`: 视频编码器名称（如 "libx264"）
+pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, duration: f64, ffmpeg_path: &str, side: &str, codec: &str) -> Result<(), SomaError> {
     let vf = match transition {
         "FadeIn" => format!("fade=t=in:st=0:d={}", duration),
         "FadeOut" => {
@@ -14,9 +16,11 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
         }
         "SlideIn" => build_slide_in_filter(duration, side)?,
         "SlideOut" => build_slide_out_filter(input_path, duration, side, ffmpeg_path)?,
-        _ => return Ok(()),
+        _ => {
+            log::warn!("未识别的转场类型: {}, 跳过转场处理", transition);
+            return Ok(());
+        }
     };
-    // SlideIn 使用 filter_complex，其他使用 -vf
     if transition == "SlideIn" {
         let (w, h) = get_video_resolution(input_path, ffmpeg_path)?;
         let total_dur = get_video_duration(input_path, ffmpeg_path)?;
@@ -29,7 +33,7 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
                     build_slide_x_expr(duration, side, w, h, true),
                     build_slide_y_expr(duration, side, w, h, true)
                 ),
-                "-c:v", "libx264", "-an", "-pix_fmt", "yuv420p", output_path,
+                "-c:v", codec, "-an", "-pix_fmt", "yuv420p", output_path,
             ])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg slide_in failed: {}", e)))?;
@@ -38,7 +42,7 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
         }
     } else {
         let result = std::process::Command::new(ffmpeg_path)
-            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", "libx264", "-an", "-pix_fmt", "yuv420p", output_path])
+            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", codec, "-an", "-pix_fmt", "yuv420p", output_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", e)))?;
         if !result.status.success() {
@@ -49,19 +53,18 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
 }
 
 /// 随机选择一种转场效果并应用（Shuffle 模式）
-pub fn apply_shuffle_transition(input_path: &str, output_path: &str, duration: f64, ffmpeg_path: &str) -> Result<(), SomaError> {
+pub fn apply_shuffle_transition(input_path: &str, output_path: &str, duration: f64, ffmpeg_path: &str, codec: &str) -> Result<(), SomaError> {
     use rand::Rng;
     let mut rng = rand::rng();
     let transitions = ["FadeIn", "FadeOut", "SlideIn", "SlideOut"];
     let sides = ["left", "right", "top", "bottom"];
     let t_idx = rng.random_range(0..transitions.len());
     let s_idx = rng.random_range(0..sides.len());
-    apply_transition(input_path, output_path, transitions[t_idx], duration, ffmpeg_path, sides[s_idx])
+    apply_transition(input_path, output_path, transitions[t_idx], duration, ffmpeg_path, sides[s_idx], codec)
 }
 
-fn build_slide_in_filter(_duration: f64, _side: &str) -> Result<String, SomaError> {
-    // SlideIn 通过 filter_complex 处理，此处返回占位符（不会被 -vf 使用）
-    Ok("null".to_string())
+fn build_slide_in_filter(duration: f64, _side: &str) -> Result<String, SomaError> {
+    Ok(format!("fade=t=in:st=0:d={}", duration))
 }
 
 fn build_slide_out_filter(input_path: &str, duration: f64, side: &str, ffmpeg_path: &str) -> Result<String, SomaError> {
@@ -70,7 +73,6 @@ fn build_slide_out_filter(input_path: &str, duration: f64, side: &str, ffmpeg_pa
     let start_t = (total_dur - duration).max(0.0);
     let x_expr = build_slide_x_expr_slideout(duration, side, w, start_t);
     let y_expr = build_slide_y_expr_slideout(duration, side, h, start_t);
-    // 使用 filter_complex 方式
     Ok(format!(
         "color=c=black:s={}x{}:duration={:.3}[bg];[0:v]setpts=PTS-STARTPTS[fg];[bg][fg]overlay=x='{}':y='{}':shortest=1",
         w, h, total_dur, x_expr, y_expr

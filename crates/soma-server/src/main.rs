@@ -4,7 +4,7 @@
 /// 并启动 Actix Web HTTP 服务，挂载 CORS 中间件、静态文件服务和 API 路由。
 
 use actix_cors::Cors;
-use actix_web::{guard, middleware, web, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
 use actix_files as afs;
 use clap::Parser;
 
@@ -43,13 +43,26 @@ async fn main() -> std::io::Result<()> {
     let conf = match soma_server::Config::load(&conf_path) {
         Ok(c) => c,
         Err(e) => {
-            println!("配置加载失败 {}: {:?}", conf_path, e);
+            log::error!("配置加载失败 {}: {:?}", conf_path, e);
             soma_server::Config::default()
         }
     };
 
     // 将配置写入全局缓存，供其他模块随时读取
     soma_server::Config::set(conf.clone());
+
+    // 将配置中的代理设置写入环境变量，供 reqwest 等库自动读取
+    let proxy_map = conf.app.get_proxy_map();
+    if let Some(ref http_proxy) = proxy_map.get("http") {
+        if !http_proxy.is_empty() {
+            std::env::set_var("HTTP_PROXY", http_proxy);
+        }
+    }
+    if let Some(ref https_proxy) = proxy_map.get("https") {
+        if !https_proxy.is_empty() {
+            std::env::set_var("HTTPS_PROXY", https_proxy);
+        }
+    }
 
     // 初始化日志系统
     tube_web::logs::initialize_logging("");
@@ -68,7 +81,7 @@ async fn main() -> std::io::Result<()> {
 
     // 构建监听地址
     let ip = format!("{}:{}", conf.app.get_listen_host(), conf.app.get_listen_port());
-    println!("Soma server starting at {}", ip);
+    log::info!("Soma server starting at {}", ip);
 
     // 启动 HTTP 服务，使用闭包构建 App 实例
     let storage_path_clone = storage_path.clone();
@@ -87,7 +100,9 @@ async fn main() -> std::io::Result<()> {
             .service(
                 afs::Files::new("/storage", &storage_path_clone)
                     .show_files_listing()
-                    .redirect_to_slash_directory(),
+                    .redirect_to_slash_directory()
+                    .use_last_modified(true)
+                    .prefer_utf8(true),
             )
             // API 路由：所有 /api/v1/* 请求统一由 router::api_handler 分发
             .service(
@@ -108,6 +123,18 @@ async fn main() -> std::io::Result<()> {
                     .service(
                         web::resource("/musics/upload")
                             .route(web::post().to(soma_server::handler::music::upload_file)),
+                    )
+                    .service(
+                        web::resource("/audio/upload")
+                            .route(web::post().to(soma_server::handler::material::upload_audio)),
+                    )
+                    .service(
+                        web::resource("/voices/preview")
+                            .route(web::get().to(soma_server::handler::voice::preview_voice)),
+                    )
+                    .service(
+                        web::resource("/subtitles/preview")
+                            .route(web::get().to(soma_server::handler::voice::preview_subtitle)),
                     )
             )
     })

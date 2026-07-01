@@ -67,9 +67,9 @@ pub struct Ffmpeg {
     /// FFmpeg 可执行文件路径
     pub path: String,
     /// 编码使用的线程数
-    threads: u32,
+    pub threads: u32,
     /// 视频编码器名称（如 libx264、h264_nvenc 等）
-    codec: String,
+    pub codec: String,
 }
 
 /// 默认视频编码器：H.264 软编码
@@ -311,7 +311,7 @@ impl Ffmpeg {
         // 字幕参数，带默认值
         let subtitle_enabled = params.get_subtitle_enabled();
         let font_name = params.font_name.as_deref().unwrap_or("STHeitiMedium.ttc");
-        let font_size = params.font_size.unwrap_or(60);
+        let font_size = params.font_size.unwrap_or(16);
         let text_color = params.text_fore_color.as_deref().unwrap_or("#FFFFFF");
         let stroke_color = params.stroke_color.as_deref().unwrap_or("#000000");
         let stroke_width = params.stroke_width.unwrap_or(1.5);
@@ -357,10 +357,14 @@ impl Ffmpeg {
             //   Outline: 描边宽度
             //   Alignment: 对齐方式 2=底部居中, 5=上方居中, 6=上方左对齐, 8=顶部居中, 9=顶部左对齐
             //   MarginV: 垂直边距（像素）
-            let alignment = match subtitle_position {
-                "top" => 8,
-                "center" => 5,
-                _ => 2,
+            let (alignment, margin_v) = match subtitle_position {
+                "top" => (8, 30),
+                "center" => (5, 0),
+                "custom" => {
+                    let pos = params.custom_position.unwrap_or(70.0) as u32;
+                    (2, pos)
+                },
+                _ => (2, 30),
             };
             // 将 #RRGGBB 颜色转为 ASS 的 &H00BBGGRR 格式
             let ass_text_color = hex_to_ass_color(text_color);
@@ -388,12 +392,11 @@ impl Ffmpeg {
             };
 
             let style = format!(
-                "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},Alignment={},MarginV=20{}",
-                font_path_str.replace(':', "\\:"), font_size, ass_text_color, ass_stroke_color, stroke_width, alignment, bg_style
+                "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},Alignment={},MarginV={}{}",
+                font_path_str.replace('\\', "\\\\").replace(':', "\\:"), font_size, ass_text_color, ass_stroke_color, stroke_width, alignment, margin_v, bg_style
             );
-            // subtitles 滤镜：filename 需要转义冒号和反斜杠
             let escaped_sub = subtitle_path.replace('\\', "/").replace(':', "\\:");
-            let sub_filter = format!("subtitles='{}':force_style='{}'", escaped_sub, style);
+            let sub_filter = format!("subtitles={}:force_style='{}'", escaped_sub, style);
             cmd_args.push("-vf".to_string());
             cmd_args.push(sub_filter);
         }
@@ -576,6 +579,73 @@ impl Ffmpeg {
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg image_to_video failed: {}", stderr)));
+        }
+        Ok(())
+    }
+
+    /// 为视频叠加水印图片（右下角半透明）
+    ///
+    /// - `input_path`: 输入视频路径
+    /// - `watermark_path`: 水印图片路径
+    /// - `output_path`: 输出视频路径
+    pub fn add_watermark(&self, input_path: &str, watermark_path: &str, output_path: &str) -> Result<(), SomaError> {
+        let result = std::process::Command::new(&self.path)
+            .args(&[
+                "-y",
+                "-i", input_path,
+                "-i", watermark_path,
+                "-filter_complex", "[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[0:v][wm]overlay=W-w-10:H-h-10",
+                "-c:v", &self.codec,
+                "-pix_fmt", "yuv420p",
+                "-c:a", "copy",
+                output_path,
+            ])
+            .output()
+            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg add_watermark failed: {}", e)))?;
+        if !result.status.success() {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            return Err(SomaError::Ffmpeg(format!("ffmpeg add_watermark failed: {}", stderr)));
+        }
+        Ok(())
+    }
+
+    /// 拼接片头/片尾视频（将多段视频顺序拼接为一段）
+    ///
+    /// - `segments`: 视频文件路径列表（按顺序拼接）
+    /// - `output_path`: 输出视频路径
+    pub fn concat_videos(&self, segments: &[&str], output_path: &str) -> Result<(), SomaError> {
+        if segments.is_empty() {
+            return Err(SomaError::Ffmpeg("concat_videos: 空片段列表".into()));
+        }
+        if segments.len() == 1 {
+            std::fs::copy(segments[0], output_path)
+                .map_err(|e| SomaError::Ffmpeg(format!("复制视频失败: {}", e)))?;
+            return Ok(());
+        }
+        let tmp_dir = std::env::temp_dir().join("soma_concat");
+        std::fs::create_dir_all(&tmp_dir).ok();
+        let list_path = tmp_dir.join("concat_list.txt");
+        let mut list_content = String::new();
+        for seg in segments {
+            let escaped = seg.replace("'", "'\\''");
+            list_content.push_str(&format!("file '{}'\n", escaped));
+        }
+        std::fs::write(&list_path, &list_content)
+            .map_err(|e| SomaError::Ffmpeg(format!("写入 concat 列表失败: {}", e)))?;
+
+        let result = std::process::Command::new(&self.path)
+            .args(&[
+                "-y",
+                "-f", "concat", "-safe", "0",
+                "-i", list_path.to_str().unwrap_or(""),
+                "-c", "copy",
+                output_path,
+            ])
+            .output()
+            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", e)))?;
+        if !result.status.success() {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            return Err(SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", stderr)));
         }
         Ok(())
     }

@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
@@ -173,12 +173,16 @@ const providerGroups = ref([
       { label: 'Azure OpenAI', value: 'azure', defaultBaseUrl: '', defaultModel: 'gpt-4o-mini', needApiKey: true, tip: 'Format: https://{resource}.openai.azure.com' },
       { label: 'Google Gemini', value: 'gemini', defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta', defaultModel: 'gemini-pro', needApiKey: true },
       { label: 'Cloudflare Workers AI', value: 'cloudflare', defaultBaseUrl: 'https://api.cloudflare.com/client/v4/accounts', defaultModel: '@cf/meta/llama-3-8b-instruct', needApiKey: true, needAccountId: true },
-      { label: 'ERNIE (Baidu)', value: 'ernie', defaultBaseUrl: 'https://aip.baidubce.com', defaultModel: 'ernie-4.0-8k', needApiKey: true, needSecretKey: true },
       { label: 'Grok (xAI)', value: 'grok', defaultBaseUrl: 'https://api.x.ai/v1', defaultModel: 'grok-beta', needApiKey: true },
       { label: 'Pollinations AI', value: 'pollinations', defaultBaseUrl: 'https://text.pollinations.ai', defaultModel: 'openai', needApiKey: false },
       { label: 'LiteLLM', value: 'litellm', defaultBaseUrl: 'http://localhost:4000', defaultModel: 'gpt-4o-mini', needApiKey: true },
       { label: 'G4F', value: 'g4f', defaultBaseUrl: '', defaultModel: 'gpt-4o-mini', needApiKey: false },
       { label: 'MiMo (Xiaomi)', value: 'mimo', defaultBaseUrl: 'https://api.mimo.com/v1', defaultModel: 'mimo-chat', needApiKey: true },
+      { label: 'Doubao (Volcengine)', value: 'doubao', defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', defaultModel: 'doubao-pro-32k', needApiKey: true },
+      { label: 'Hunyuan (Tencent)', value: 'hunyuan', defaultBaseUrl: 'https://hunyuan.tencentcloudapi.com', defaultModel: 'hunyuan-turbo', needApiKey: true },
+      { label: 'Zhipu (BigModel)', value: 'zhipu', defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModel: 'glm-4-flash', needApiKey: true },
+      { label: 'Wenxin (Baidu)', value: 'wenxin', defaultBaseUrl: 'https://aip.baidubce.com', defaultModel: 'ernie-4.0-8k', needApiKey: true, needSecretKey: true },
+      { label: 'Xunfei (iFlytek)', value: 'xunfei', defaultBaseUrl: 'https://spark-api.xf-yun.com/v1', defaultModel: 'generalv3.5', needApiKey: true },
     ] as LlmProviderOption[],
   },
 ])
@@ -187,8 +191,8 @@ const llmProvider = ref(configStore.config.llm.provider)
 const llmApiKey = ref(configStore.config.llm.api_key)
 const llmBaseUrl = ref(configStore.config.llm.base_url)
 const llmModel = ref(configStore.config.llm.model)
-const llmSecretKey = ref('')
-const llmAccountId = ref('')
+const llmSecretKey = ref(configStore.config.llm.secret_key || '')
+const llmAccountId = ref(configStore.config.llm.account_id || '')
 
 const ttsProvider = ref(configStore.config.tts.provider)
 const azureSpeechKey = ref(configStore.config.tts.azure_speech_key || '')
@@ -206,6 +210,29 @@ const ffmpegPath = ref(configStore.config.ffmpeg.path)
 const ffmpegThreads = ref(configStore.config.ffmpeg.threads)
 const storagePath = ref(configStore.config.app.storage_path)
 const concurrentTasks = ref(configStore.config.app.concurrent_tasks)
+
+watch(() => configStore.config, (cfg) => {
+  llmProvider.value = cfg.llm.provider
+  llmApiKey.value = cfg.llm.api_key
+  llmBaseUrl.value = cfg.llm.base_url
+  llmModel.value = cfg.llm.model
+  llmSecretKey.value = cfg.llm.secret_key || ''
+  llmAccountId.value = cfg.llm.account_id || ''
+  ttsProvider.value = cfg.tts.provider
+  azureSpeechKey.value = cfg.tts.azure_speech_key || ''
+  azureSpeechRegion.value = cfg.tts.azure_speech_region || ''
+  siliconflowKey.value = cfg.tts.siliconflow_key || ''
+  elevenlabsKey.value = cfg.tts.elevenlabs_key || ''
+  elevenlabsModel.value = cfg.tts.elevenlabs_model || 'eleven_multilingual_v2'
+  mimoKey.value = cfg.tts.mimo_key || ''
+  pexelsApiKey.value = cfg.stock.pexels_api_key
+  pixabayApiKey.value = cfg.stock.pixabay_api_key
+  coverrApiKey.value = cfg.stock.coverr_api_key
+  ffmpegPath.value = cfg.ffmpeg.path
+  ffmpegThreads.value = cfg.ffmpeg.threads
+  storagePath.value = cfg.app.storage_path
+  concurrentTasks.value = cfg.app.concurrent_tasks
+}, { deep: true })
 
 const currentProviderInfo = computed(() => {
   for (const group of providerGroups.value) {
@@ -230,6 +257,8 @@ async function onSave() {
     api_key: llmApiKey.value,
     base_url: llmBaseUrl.value,
     model: llmModel.value,
+    secret_key: llmSecretKey.value,
+    account_id: llmAccountId.value,
   })
   configStore.updateTtsConfig({
     provider: ttsProvider.value,
@@ -257,7 +286,7 @@ async function onSave() {
   if (ok) {
     ElMessage.success(t('settings.saveSuccess'))
   } else {
-    ElMessage.error(t('settings.saveFailed') || 'Save failed')
+    ElMessage.error(t('settings.saveFailed'))
   }
 }
 </script>

@@ -8,8 +8,26 @@
 /// 同时包含 LLM 提供商配置读取和响应解析的辅助函数。
 
 use soma_core::error::SomaError;
-use ai_llm_kit::{LlmFactory, LlmProvider, LlmService};
+use ai_llm_kit::{LlmFactory, LlmProvider};
 use crate::Config;
+
+/// 编译正则表达式，失败时 panic 并给出明确错误信息
+macro_rules! regex_or_panic {
+    ($pat:expr) => {
+        regex::Regex::new($pat).expect(concat!("正则编译失败: ", $pat))
+    };
+}
+
+lazy_static! {
+    static ref RE_THINK: regex::Regex = regex_or_panic!(r"(?s)<think>.*?</think>");
+    static ref RE_THINKING: regex::Regex = regex_or_panic!(r"(?m)^.{0,5}(思考过程|思维过程|Reasoning|Thinking)[:：]\s*");
+    static ref RE_HEADING: regex::Regex = regex_or_panic!(r"(?m)^#{1,6}\s*");
+    static ref RE_BOLD: regex::Regex = regex_or_panic!(r"\*\*(.+?)\*\*");
+    static ref RE_ITALIC: regex::Regex = regex_or_panic!(r"\*(.+?)\*");
+    static ref RE_BLANK: regex::Regex = regex_or_panic!(r"\n{3,}");
+    static ref RE_CODE_FENCE_OPEN: regex::Regex = regex_or_panic!(r"(?s)^```[a-zA-Z0-9]*\s*");
+    static ref RE_CODE_FENCE_CLOSE: regex::Regex = regex_or_panic!(r"\s*```$");
+}
 
 /// 根据主题生成短视频脚本
 ///
@@ -265,30 +283,12 @@ fn fallback_social_metadata(subject: &str, script: &str, spec: &SocialPlatformSp
 /// 因为视频脚本不应包含这些格式符号。
 fn clean_llm_output(text: &str) -> String {
     let mut result = text.to_string();
-
-    // 移除 <think>...</think> 块（支持多行）
-    let think_re = regex::Regex::new(r"(?s)<think>.*?</think>").unwrap();
-    result = think_re.replace_all(&result, "").to_string();
-
-    // 移除行首的思维过程标记
-    let thinking_re = regex::Regex::new(r"(?m)^.{0,5}(思考过程|思维过程|Reasoning|Thinking)[:：]\s*").unwrap();
-    result = thinking_re.replace_all(&result, "").to_string();
-
-    // 清除 Markdown 格式标记
-    // 移除 # 标题标记
-    let heading_re = regex::Regex::new(r"(?m)^#{1,6}\s*").unwrap();
-    result = heading_re.replace_all(&result, "").to_string();
-
-    // 移除 **粗体** 和 *斜体* 标记
-    let bold_re = regex::Regex::new(r"\*\*(.+?)\*\*").unwrap();
-    result = bold_re.replace_all(&result, "$1").to_string();
-    let italic_re = regex::Regex::new(r"\*(.+?)\*").unwrap();
-    result = italic_re.replace_all(&result, "$1").to_string();
-
-    // 清理多余空行（连续2个以上空行压缩为1个）
-    let blank_re = regex::Regex::new(r"\n{3,}").unwrap();
-    result = blank_re.replace_all(&result, "\n\n").to_string();
-
+    result = RE_THINK.replace_all(&result, "").to_string();
+    result = RE_THINKING.replace_all(&result, "").to_string();
+    result = RE_HEADING.replace_all(&result, "").to_string();
+    result = RE_BOLD.replace_all(&result, "$1").to_string();
+    result = RE_ITALIC.replace_all(&result, "$1").to_string();
+    result = RE_BLANK.replace_all(&result, "\n\n").to_string();
     result.trim().to_string()
 }
 
@@ -308,7 +308,6 @@ fn get_provider_config(provider: &str, conf: &Config) -> Result<(LlmProvider, St
         "openai" => {
             let key = conf.app.app.openai_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini");
-            let base_url = conf.app.app.openai_base_url.as_deref().unwrap_or("");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "deepseek" => {
@@ -330,6 +329,11 @@ fn get_provider_config(provider: &str, conf: &Config) -> Result<(LlmProvider, St
             let key = "";
             let model = conf.app.app.ollama_model_name.as_deref().unwrap_or("llama3");
             Ok((LlmProvider::Ollama, key.to_string(), model.to_string()))
+        }
+        "minimax" => {
+            let key = conf.app.app.minimax_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.minimax_model_name.as_deref().unwrap_or("abab6.5s-chat");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "mimo" => {
             let key = conf.app.app.mimo_api_key.as_deref().unwrap_or("");
@@ -358,33 +362,73 @@ fn get_provider_config(provider: &str, conf: &Config) -> Result<(LlmProvider, St
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "doubao" => {
-            let key = conf.app.app.evolink_api_key.as_deref().unwrap_or("");
-            let model = conf.app.app.evolink_model_name.as_deref().unwrap_or("doubao-pro-32k");
+            let key = conf.app.app.doubao_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.doubao_model_name.as_deref().unwrap_or("doubao-pro-32k");
             Ok((LlmProvider::Doubao, key.to_string(), model.to_string()))
         }
         "hunyuan" => {
-            let key = conf.app.app.minimax_api_key.as_deref().unwrap_or("");
-            let model = conf.app.app.minimax_model_name.as_deref().unwrap_or("hunyuan-turbo");
+            let key = conf.app.app.hunyuan_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.hunyuan_model_name.as_deref().unwrap_or("hunyuan-turbo");
             Ok((LlmProvider::Hunyuan, key.to_string(), model.to_string()))
         }
         "zhipu" => {
-            let key = conf.app.app.aihubmix_api_key.as_deref().unwrap_or("");
-            let model = conf.app.app.aihubmix_model_name.as_deref().unwrap_or("glm-4-flash");
+            let key = conf.app.app.zhipu_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.zhipu_model_name.as_deref().unwrap_or("glm-4-flash");
             Ok((LlmProvider::Zhipu, key.to_string(), model.to_string()))
         }
         "wenxin" => {
-            let key = conf.app.app.aimlapi_api_key.as_deref().unwrap_or("");
-            let model = conf.app.app.aimlapi_model_name.as_deref().unwrap_or("ernie-4.0-8k");
+            let key = conf.app.app.wenxin_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.wenxin_model_name.as_deref().unwrap_or("ernie-4.0-8k");
             Ok((LlmProvider::Wenxin, key.to_string(), model.to_string()))
         }
         "xunfei" => {
-            let key = conf.app.app.modelscope_api_key.as_deref().unwrap_or("");
-            let model = conf.app.app.modelscope_model_name.as_deref().unwrap_or("generalv3.5");
+            let key = conf.app.app.xunfei_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.xunfei_model_name.as_deref().unwrap_or("generalv3.5");
             Ok((LlmProvider::Xunfei, key.to_string(), model.to_string()))
         }
         "oneapi" => {
             let key = conf.app.app.oneapi_api_key.as_deref().unwrap_or("");
             let model = conf.app.app.oneapi_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "aihubmix" => {
+            let key = conf.app.app.aihubmix_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.aihubmix_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "evolink" => {
+            let key = conf.app.app.evolink_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.evolink_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "aiml" | "aimlapi" => {
+            let key = conf.app.app.aimlapi_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.aimlapi_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "modelscope" => {
+            let key = conf.app.app.modelscope_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.modelscope_model_name.as_deref().unwrap_or("qwen-turbo");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "pollinations" => {
+            let key = conf.app.app.pollinations_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.pollinations_model_name.as_deref().unwrap_or("openai");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "g4f" => {
+            let key = "";
+            let model = conf.app.app.g4f_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "cloudflare" => {
+            let key = conf.app.app.openai_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.openai_model_name.as_deref().unwrap_or("@cf/meta/llama-3-8b-instruct");
+            Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
+        }
+        "litellm" => {
+            let key = conf.app.app.oneapi_api_key.as_deref().unwrap_or("");
+            let model = conf.app.app.litellm_model_name.as_deref().unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         _ => {
@@ -477,10 +521,8 @@ fn parse_terms_output(content: &str, amount: usize) -> Vec<String> {
 fn strip_code_fence(text: &str) -> String {
     let t = text.trim();
     if t.starts_with("```") {
-        let re = regex::Regex::new(r"(?s)^```[a-zA-Z0-9]*\s*").unwrap();
-        let t = re.replace(t, "").to_string();
-        let re2 = regex::Regex::new(r"\s*```$").unwrap();
-        re2.replace(&t, "").trim().to_string()
+        let t = RE_CODE_FENCE_OPEN.replace(t, "").to_string();
+        RE_CODE_FENCE_CLOSE.replace(&t, "").trim().to_string()
     } else {
         t.to_string()
     }

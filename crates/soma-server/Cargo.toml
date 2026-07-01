@@ -33,8 +33,16 @@ lazy_static = { workspace = true }
 tokio = { workspace = true }
 rand = { workspace = true }
 regex = "1"
+log = "0.4"
+percent-encoding = "2"
+reqwest = { version = "0.12", features = ["json", "multipart"] }
+redis = { version = "0.27", features = ["tokio-comp"], optional = true }
 
 tube = { workspace = true }
 tube_web = { workspace = true }
 tube_net = { workspace = true }
 tube_value = { workspace = true }
+
+[features]
+default = []
+redis = ["dep:redis"]

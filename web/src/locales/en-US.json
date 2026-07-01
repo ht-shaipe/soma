@@ -1,12 +1,13 @@
 {
   "app": {
-    "title": "MoneyPrinterTurbo",
+    "title": "Soma",
     "subtitle": "AI-powered short video auto-generation tool"
   },
   "nav": {
     "home": "Video Generation",
     "tasks": "Task List",
-    "settings": "Settings"
+    "settings": "Settings",
+    "guide": "Guide"
   },
   "script": {
     "title": "Script Settings",
@@ -29,6 +30,7 @@
   },
   "video": {
     "title": "Video Settings",
+    "subject": "Subject",
     "advancedSettings": "Advanced Video Settings",
     "videoSource": "Video Source",
     "pexels": "Pexels",
@@ -61,6 +63,17 @@
     "qsv": "Intel QSV",
     "videotoolbox": "macOS VideoToolbox"
   },
+  "social": {
+    "title": "Social Metadata",
+    "platform": "Platform",
+    "xiaohongshu": "Xiaohongshu (RED)",
+    "generate": "Generate",
+    "generating": "Generating...",
+    "needScript": "Please generate a script first",
+    "videoTitle": "Title",
+    "description": "Description",
+    "tags": "Tags"
+  },
   "audio": {
     "title": "Audio Settings",
     "ttsServer": "TTS Server",
@@ -82,13 +95,21 @@
     "randomBgm": "Random BGM",
     "customBgm": "Custom BGM",
     "customBgmFile": "BGM File Name",
+    "selectBgm": "Select BGM",
     "bgmVolume": "BGM Volume",
     "azureSpeechKey": "Azure Speech Key",
     "azureSpeechRegion": "Azure Speech Region",
     "siliconflowApiKey": "SiliconFlow API Key",
     "mimoApiKey": "MiMo API Key",
     "elevenlabsApiKey": "ElevenLabs API Key",
-    "elevenlabsModel": "ElevenLabs Model"
+    "elevenlabsModel": "ElevenLabs Model",
+    "geminiApiKey": "Gemini API Key",
+    "voiceListFailed": "Failed to load voice list",
+    "voicePreviewFailed": "Voice preview failed",
+    "previewText": "Hello, this is a voice preview test.",
+    "noVoicePreview": "Voice preview not supported",
+    "uploadSuccess": "Upload successful",
+    "uploadFailed": "Upload failed"
   },
   "subtitle": {
     "title": "Subtitle Settings",
@@ -142,6 +163,8 @@
     "video": "Video",
     "actions": "Actions",
     "viewDetail": "View Detail",
+    "detail": "Detail",
+    "detailTitle": "Task Detail",
     "delete": "Delete",
     "deleteConfirm": "Are you sure you want to delete this task?",
     "noTasks": "No tasks yet",
@@ -192,7 +215,87 @@
       "concurrentTasks": "Concurrent Tasks"
     },
     "save": "Save Configuration",
-    "saveSuccess": "Configuration saved successfully"
+    "saveSuccess": "Configuration saved successfully",
+    "saveFailed": "Failed to save configuration"
+  },
+  "guide": {
+    "title": "Getting Started Guide",
+    "prev": "Previous",
+    "next": "Next",
+    "start": "Get Started",
+    "yes": "Required",
+    "free": "Free",
+    "localInstall": "Local install",
+    "builtin": "Built-in",
+    "localUpload": "Local upload",
+    "dontShowAgain": "Don't show this guide again",
+    "col": {
+      "needKey": "Key Required",
+      "model": "Default Model",
+      "applyUrl": "Apply URL"
+    },
+    "flow": {
+      "script": "AI Script",
+      "tts": "Voice Synth",
+      "stock": "Stock Search",
+      "subtitle": "Subtitles",
+      "bgm": "BGM",
+      "compose": "Compose Video"
+    },
+    "step1": {
+      "short": "Welcome",
+      "title": "Welcome to Soma!",
+      "desc": "Soma is an AI-powered short video generator. Just enter a topic, and it automatically generates the script, voiceover, collects footage, adds subtitles, and composes the final video.",
+      "prereqTitle": "Make sure these dependencies are installed before running:"
+    },
+    "step2": {
+      "short": "LLM Setup",
+      "title": "Step 1: Configure an AI Model",
+      "desc": "Soma requires a Large Language Model (LLM) to generate video scripts and extract keywords. Here are 3 free options that need no API Key:",
+      "freeTitle": "💡 Free options: Choose Ollama (local) or Pollinations (online free) — no API Key needed!",
+      "tip": "After choosing an LLM, fill in the API Key and model name in Settings → LLM Configuration. Free options need no key."
+    },
+    "step3": {
+      "short": "Voice & Stock",
+      "title": "Step 2: Configure Voice & Stock Source",
+      "ttsDesc": "Edge TTS is used by default (free, no key needed), supporting Chinese/English/multi-language voices. For higher quality, configure a paid TTS:",
+      "stockTitle": "Stock Video Source",
+      "stockDesc": "Soma searches and downloads video clips from stock libraries. Apply for at least one free API key:"
+    },
+    "step4": {
+      "short": "Fill Config",
+      "title": "Step 3: Fill in Settings",
+      "desc": "After getting your API keys, configure Soma following these steps:",
+      "navSettings": "Click \"Settings\" in the sidebar",
+      "navSettingsDesc": "Go to the Settings page where all configuration is centralized.",
+      "setLlm": "Fill in LLM Configuration",
+      "setLlmDesc": "Select Provider → Enter API Key → Confirm model name (leave empty for default).",
+      "setStock": "Fill in Stock Source API Key",
+      "setStockDesc": "Enter at least one stock library API key (Pexels recommended, free to apply).",
+      "setTts": "(Optional) Configure TTS",
+      "setTtsDesc": "Default Edge TTS needs no config. For other TTS engines, fill in the corresponding API key.",
+      "save": "Click \"Save Configuration\"",
+      "saveDesc": "Config is saved to the backend and persists after restart.",
+      "homeTipTitle": "💡 You can also configure on the Home page",
+      "homeTip": "The \"API Key Management\" panel on the right side of the Home page lets you quickly add stock keys without going to Settings."
+    },
+    "step5": {
+      "short": "Generate",
+      "title": "Step 4: Generate Your First Video",
+      "desc": "Once configured, head back to the Home page and start creating:",
+      "inputTopic": "Enter a video topic",
+      "inputTopicDesc": "In \"Script Settings\", enter a topic like \"History of AI\", then click \"Generate Script & Keywords\".",
+      "genScript": "Generate script & keywords",
+      "genScriptDesc": "AI will generate a voiceover script and stock search keywords. You can manually edit after generation.",
+      "adjustParams": "Adjust video parameters",
+      "adjustParamsDesc": "Choose aspect ratio (9:16/16:9), voice, subtitle style, etc.",
+      "clickGenerate": "Click \"Generate Video\"",
+      "clickGenerateDesc": "Soma will automatically run: Script → Voiceover → Stock → Subtitles → Compose. Takes about 2-5 minutes.",
+      "waitResult": "Wait & Download",
+      "waitResultDesc": "Check progress in \"Task List\". Preview or download the finished video when complete.",
+      "readyTitle": "You're all set!",
+      "readySub": "You now know the basics of Soma. Start creating!"
+    }
   },
   "common": {
     "language": "Language",
@@ -208,6 +311,9 @@
     "noData": "No data",
     "upload": "Upload",
     "preview": "Preview",
-    "close": "Close"
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "log": "Log"
   }
 }

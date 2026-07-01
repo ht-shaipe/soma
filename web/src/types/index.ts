@@ -34,6 +34,9 @@ export interface VideoParams {
   video_encoder?: string
   custom_audio_file?: string
   video_materials?: MaterialInfo[]
+  video_watermark?: string
+  video_intro?: string
+  video_outro?: string
 }
 
 export interface MaterialInfo {
@@ -61,10 +64,13 @@ export interface TaskInfo {
   state: number
   progress: number
   script?: string
+  videoSubject?: string
+  videoScript?: string
   terms?: string[]
   audioFile?: string
   audioDuration?: number
   subtitlePath?: string
+  subtitleFile?: string
   materials?: string[]
   videos?: string[]
   combinedVideos?: string[]
@@ -136,6 +142,11 @@ export interface MusicInfo {
   size?: number
 }
 
+export interface FontInfo {
+  name: string
+  path: string
+}
+
 export interface AppConfig {
   app: {
     name: string
@@ -144,6 +155,20 @@ export interface AppConfig {
     port: number
     storage_path: string
     concurrent_tasks: number
+    max_queued_tasks?: number
+    video_source?: string
+    video_codec?: string
+    material_directory?: string
+    edge_tts_timeout?: number
+    endpoint?: string
+    ffmpeg_path?: string
+    imagemagick_path?: string
+    subtitle_provider?: string
+    enable_redis?: boolean
+    redis_host?: string
+    redis_port?: number
+    redis_db?: number
+    tls_verify?: boolean
   }
   llm: {
     provider: string
@@ -151,6 +176,8 @@ export interface AppConfig {
     api_key: string
     base_url: string
     api_version?: string
+    secret_key?: string
+    account_id?: string
   }
   tts: {
     provider: string
@@ -161,6 +188,7 @@ export interface AppConfig {
     elevenlabs_key?: string
     elevenlabs_model?: string
     mimo_key?: string
+    gemini_key?: string
   }
   stock: {
     pexels_api_key: string
@@ -174,6 +202,22 @@ export interface AppConfig {
   whisper: {
     provider: string
     model: string
+    device?: string
+    compute_type?: string
     endpoint?: string
+  }
+  proxy?: {
+    http?: string
+    https?: string
+  }
+  ui?: {
+    hide_log?: boolean
+    subtitle_position?: string
+    custom_position?: number
+    upload_post_enabled?: boolean
+    upload_post_api_key?: string
+    upload_post_username?: string
+    upload_post_platforms?: string[]
+    upload_post_auto_upload?: boolean
   }
 }

@@ -1,12 +1,13 @@
 {
   "app": {
-    "title": "MoneyPrinterTurbo",
+    "title": "Soma",
     "subtitle": "AI驱动的短视频自动生成工具"
   },
   "nav": {
     "home": "视频生成",
     "tasks": "任务列表",
-    "settings": "系统设置"
+    "settings": "系统设置",
+    "guide": "使用指南"
   },
   "script": {
     "title": "文案设置",
@@ -29,6 +30,7 @@
   },
   "video": {
     "title": "视频设置",
+    "subject": "主题",
     "advancedSettings": "高级视频设置",
     "videoSource": "素材来源",
     "pexels": "Pexels",
@@ -61,6 +63,17 @@
     "qsv": "Intel QSV",
     "videotoolbox": "macOS VideoToolbox"
   },
+  "social": {
+    "title": "社交元数据",
+    "platform": "平台",
+    "xiaohongshu": "小红书",
+    "generate": "生成",
+    "generating": "生成中...",
+    "needScript": "请先生成脚本",
+    "videoTitle": "标题",
+    "description": "描述",
+    "tags": "标签"
+  },
   "audio": {
     "title": "音频设置",
     "ttsServer": "TTS 语音服务",
@@ -82,13 +95,21 @@
     "randomBgm": "随机背景音乐",
     "customBgm": "自定义背景音乐",
     "customBgmFile": "背景音乐文件名",
+    "selectBgm": "选择背景音乐",
     "bgmVolume": "背景音乐音量",
     "azureSpeechKey": "Azure Speech Key",
     "azureSpeechRegion": "Azure Speech Region",
     "siliconflowApiKey": "SiliconFlow API Key",
     "mimoApiKey": "MiMo API Key",
     "elevenlabsApiKey": "ElevenLabs API Key",
-    "elevenlabsModel": "ElevenLabs Model"
+    "elevenlabsModel": "ElevenLabs Model",
+    "geminiApiKey": "Gemini API Key",
+    "voiceListFailed": "语音列表加载失败",
+    "voicePreviewFailed": "语音预览失败",
+    "previewText": "你好，这是一段语音预览测试。",
+    "noVoicePreview": "当前语音不支持预览",
+    "uploadSuccess": "上传成功",
+    "uploadFailed": "上传失败"
   },
   "subtitle": {
     "title": "字幕设置",
@@ -142,6 +163,8 @@
     "video": "视频",
     "actions": "操作",
     "viewDetail": "查看详情",
+    "detail": "详情",
+    "detailTitle": "任务详情",
     "delete": "删除",
     "deleteConfirm": "确定要删除此任务吗？",
     "noTasks": "暂无任务",
@@ -192,7 +215,87 @@
       "concurrentTasks": "并发任务数"
     },
     "save": "保存配置",
-    "saveSuccess": "配置保存成功"
+    "saveSuccess": "配置保存成功",
+    "saveFailed": "配置保存失败"
+  },
+  "guide": {
+    "title": "新手引导",
+    "prev": "上一步",
+    "next": "下一步",
+    "start": "开始使用",
+    "yes": "需要",
+    "free": "免费",
+    "localInstall": "本地安装",
+    "builtin": "内置服务",
+    "localUpload": "本地上传",
+    "dontShowAgain": "不再显示此引导",
+    "col": {
+      "needKey": "需要Key",
+      "model": "默认模型",
+      "applyUrl": "申请地址"
+    },
+    "flow": {
+      "script": "AI生成脚本",
+      "tts": "语音合成",
+      "stock": "素材搜索",
+      "subtitle": "字幕生成",
+      "bgm": "背景音乐",
+      "compose": "视频合成"
+    },
+    "step1": {
+      "short": "欢迎",
+      "title": "欢迎使用 Soma！",
+      "desc": "Soma 是一个 AI 驱动的短视频自动生成工具。只需输入一个主题，即可自动完成脚本撰写、配音、素材采集、字幕合成与视频拼接，一键生成成品视频。",
+      "prereqTitle": "运行前请确保已安装以下依赖："
+    },
+    "step2": {
+      "short": "配置 LLM",
+      "title": "第 1 步：配置 AI 大模型",
+      "desc": "Soma 需要一个大语言模型（LLM）来生成视频脚本和提取关键词。推荐以下三种免费方案，无需申请 API Key：",
+      "freeTitle": "💡 免费方案：选择 Ollama（本地运行）或 Pollinations（在线免费），无需任何 API Key 即可开始使用！",
+      "tip": "选择 LLM 后，在「系统设置 → LLM 配置」中填入对应的 API Key 和模型名称。免费方案无需填 Key。"
+    },
+    "step3": {
+      "short": "配音 & 素材",
+      "title": "第 2 步：配置语音 & 素材源",
+      "ttsDesc": "默认使用 Edge TTS（免费，无需 Key），支持中文/英文/多语种语音。如需更高质量可配置付费 TTS：",
+      "stockTitle": "素材视频源",
+      "stockDesc": "Soma 从素材库搜索并下载视频片段。推荐至少申请一个免费 Key："
+    },
+    "step4": {
+      "short": "填写配置",
+      "title": "第 3 步：在设置页填写配置",
+      "desc": "获取到 API Key 后，按以下步骤配置 Soma：",
+      "navSettings": "点击左侧导航栏「系统设置」",
+      "navSettingsDesc": "进入设置页面，所有配置集中在此。",
+      "setLlm": "填写 LLM 配置",
+      "setLlmDesc": "选择 Provider → 填入 API Key → 确认模型名称（可留空使用默认值）。",
+      "setStock": "填写素材源 API Key",
+      "setStockDesc": "至少填写一个素材库的 API Key（推荐 Pexels，免费申请）。",
+      "setTts": "（可选）配置 TTS",
+      "setTtsDesc": "默认 Edge TTS 无需配置。如需其他 TTS 引擎，填写对应的 API Key。",
+      "save": "点击「保存配置」",
+      "saveDesc": "配置会保存到后端，重启后依然生效。",
+      "homeTipTitle": "💡 也可以在首页配置",
+      "homeTip": "首页右侧的「API Key 管理」面板也可以快速添加素材源 Key，无需跳转到设置页。"
+    },
+    "step5": {
+      "short": "生成视频",
+      "title": "第 4 步：生成你的第一个视频",
+      "desc": "配置完成后，回到首页开始创作：",
+      "inputTopic": "输入视频主题",
+      "inputTopicDesc": "在「文案设置」中输入主题，如「人工智能的发展历程」，点击「生成视频文案和关键词」。",
+      "genScript": "生成脚本 & 关键词",
+      "genScriptDesc": "AI 会自动生成视频旁白脚本和素材搜索关键词，你可以在生成后手动修改。",
+      "adjustParams": "调整视频参数",
+      "adjustParamsDesc": "选择画幅比例（竖屏9:16/横屏16:9）、配音语音、字幕样式等。",
+      "clickGenerate": "点击「生成视频」",
+      "clickGenerateDesc": "Soma 将自动执行：脚本→配音→素材→字幕→合成，全程约 2-5 分钟。",
+      "waitResult": "等待完成 & 下载",
+      "waitResultDesc": "在「任务列表」中查看进度，完成后可在线预览或下载成品视频。",
+      "readyTitle": "准备就绪！",
+      "readySub": "你已经了解 Soma 的基本用法，开始创作吧！"
+    }
   },
   "common": {
     "language": "语言",
@@ -208,6 +311,9 @@
     "noData": "暂无数据",
     "upload": "上传",
     "preview": "预览",
-    "close": "关闭"
+    "close": "关闭",
+    "copy": "复制",
+    "copied": "已复制",
+    "log": "日志"
   }
 }

@@ -7,7 +7,7 @@
 use actix_multipart::Multipart;
 use actix_web::HttpResponse;
 use futures::StreamExt;
-use tube::{Error, Result, Value};
+use tube::{Result, Value};
 use tube_web::RequestParameter;
 use soma_core::utils;
 

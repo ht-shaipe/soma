@@ -5,7 +5,6 @@
 
 use async_trait::async_trait;
 use soma_core::error::SomaError;
-use soma_core::models::SubtitleCue;
 use crate::edge_tts::generate_subtitle_cues_from_text;
 use crate::provider::{SomaTtsProvider, TtsResult};
 use std::path::Path;
@@ -45,16 +44,18 @@ impl SomaTtsProvider for SiliconflowTts {
         let gain = (rate - 1.0).max(-10.0).min(10.0);
         let url = "https://api.siliconflow.cn/v1/audio/speech";
 
-        // 构造 SiliconFlow TTS API 请求体
+        let (model, voice_id) = crate::voices::extract_siliconflow_voice(voice)
+            .unwrap_or(("FunAudioLLM/CosyVoice2-0.5B".into(), voice.to_string()));
+
         let payload = serde_json::json!({
-            "model": "FunAudioLLM/CosyVoice2-0.5B",  // 使用 CosyVoice2 模型
+            "model": model,
             "input": text,
-            "voice": voice,
-            "response_format": "mp3",   // 输出 MP3 格式
-            "sample_rate": 32000,       // 采样率 32kHz
-            "stream": false,            // 非流式返回完整音频
-            "speed": rate,              // 语速倍率
-            "gain": gain,               // 音频增益
+            "voice": voice_id,
+            "response_format": "mp3",
+            "sample_rate": 32000,
+            "stream": false,
+            "speed": rate,
+            "gain": gain,
         });
 
         // 发送 HTTP POST 请求到 SiliconFlow API

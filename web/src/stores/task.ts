@@ -37,6 +37,7 @@ export const useTaskStore = defineStore('task', () => {
       tasks.value = result.list
     } catch {
       tasks.value = []
+      console.error('Failed to fetch tasks')
     }
   }
 

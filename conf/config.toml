@@ -1,36 +1,63 @@
 [app]
-name = "soma"
-version = "0.1.0"
+video_source = "pexels"
+edge_tts_timeout = 0.0
+tls_verify = true
+pexels_api_keys = [""]
+pixabay_api_keys = [""]
+coverr_api_keys = [""]
+llm_provider = "deepseek"
+openai_api_key = ""
+openai_base_url = "https://api.openai.com/v1"
+openai_model_name = "gpt-4o-mini"
+deepseek_api_key = ""
+deepseek_base_url = "https://api.deepseek.com/v1"
+deepseek_model_name = "deepseek-v4-pro"
+gemini_api_key = ""
+mimo_api_key = ""
+subtitle_provider = "edge-tts"
+imagemagick_path = ""
+ffmpeg_path = "ffmpeg"
+video_codec = "libx264"
+endpoint = ""
+material_directory = ""
+enable_redis = false
+redis_host = "127.0.0.1"
+redis_port = 6379
+redis_db = 0
+max_concurrent_tasks = 2
+max_queued_tasks = 100
+name = "Soma"
 host = "0.0.0.0"
 port = 8080
 storage_path = "./storage"
-concurrent_tasks = 2
-
-[llm]
-provider = "deepseek"
-model = "deepseek-chat"
-api_key = ""
-base_url = "https://api.deepseek.com"
-api_version = ""
-
-[tts]
-provider = "edge"
-voice_name = "zh-CN-XiaoxiaoNeural"
-azure_speech_key = ""
-azure_speech_region = ""
-siliconflow_key = ""
-elevenlabs_key = ""
-
-[stock]
-pexels_api_key = ""
-pixabay_api_key = ""
-coverr_api_key = ""
-
-[ffmpeg]
-path = "ffmpeg"
-threads = 4
+concurrent_tasks = 4
 
 [whisper]
-provider = "edge"
-model = ""
-endpoint = ""
+model_size = "base"
+device = "cpu"
+compute_type = "int8"
+
+[proxy]
+http = ""
+https = ""
+
+[azure]
+speech_key = ""
+speech_region = ""
+
+[siliconflow]
+api_key = ""
+
+[elevenlabs]
+api_key = ""
+model_id = "eleven_multilingual_v2"
+
+[ui]
+hide_log = false
+subtitle_position = "bottom"
+custom_position = 70.0
+upload_post_enabled = false
+upload_post_api_key = ""
+upload_post_username = ""
+upload_post_platforms = []
+upload_post_auto_upload = false

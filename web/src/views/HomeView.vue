@@ -10,6 +10,7 @@
       </el-col>
       <el-col :xs="24" :sm="24" :md="8" :lg="8">
         <SubtitleSettingsPanel />
+        <SocialMetadataPanel />
         <ApiKeyManager />
       </el-col>
     </el-row>
@@ -43,6 +44,7 @@ import ScriptPanel from '@/components/ScriptPanel.vue'
 import VideoSettingsPanel from '@/components/VideoSettingsPanel.vue'
 import AudioSettingsPanel from '@/components/AudioSettingsPanel.vue'
 import SubtitleSettingsPanel from '@/components/SubtitleSettingsPanel.vue'
+import SocialMetadataPanel from '@/components/SocialMetadataPanel.vue'
 import ApiKeyManager from '@/components/ApiKeyManager.vue'
 import TaskProgress from '@/components/TaskProgress.vue'
 import LogOutput from '@/components/LogOutput.vue'

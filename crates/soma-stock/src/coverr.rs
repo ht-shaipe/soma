@@ -42,16 +42,14 @@ impl SomaStockProvider for Coverr {
     ///
     /// # 返回
     /// 符合条件的素材信息列表，每个视频包含 MP4 下载链接
-    async fn search(&self, keyword: &str, _video_aspect: &VideoAspect, min_duration: u32) -> Result<Vec<MaterialInfo>, SomaError> {
+    async fn search(&self, keyword: &str, video_aspect: &VideoAspect, min_duration: u32) -> Result<Vec<MaterialInfo>, SomaError> {
         let api_key = get_api_key(&self.api_keys)?;
         let client = reqwest::Client::new();
-        // 构造 Coverr 视频搜索 API 请求 URL
         let url = format!(
             "https://api.coverr.co/videos?query={}&page_size=20&urls=true&sort=popular",
             urlencoding::encode(keyword),
         );
 
-        // 发起带 Bearer Token 认证的 HTTP 请求
         let resp = client
             .get(&url)
             .header("Authorization", format!("Bearer {}", api_key))
@@ -60,26 +58,35 @@ impl SomaStockProvider for Coverr {
             .await
             .map_err(|e| SomaError::Http(e.to_string()))?;
 
-        // 解析 JSON 响应体
         let body: serde_json::Value = resp.json().await.map_err(|e| SomaError::Http(e.to_string()))?;
-        // 提取 hits 数组，无数据时返回空列表
         let hits = body.get("hits")
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
 
+        let (target_w, target_h) = video_aspect.to_resolution();
         let mut items = Vec::new();
         for v in hits {
-            // Coverr 的 duration 字段可能是数字或字符串格式，需兼容两种类型
             let duration = v.get("duration")
                 .and_then(|d| d.as_f64())
                 .or_else(|| v.get("duration").and_then(|d| d.as_str()).and_then(|s| s.parse::<f64>().ok()))
                 .unwrap_or(0.0);
-            // 过滤掉时长不足的视频
             if (duration as u32) < min_duration {
                 continue;
             }
-            // 从 urls 对象中提取 MP4 下载链接
+
+            // 尝试从响应中获取分辨率信息进行后置过滤
+            let video_w = v.get("width").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
+            let video_h = v.get("height").and_then(|h| h.as_u64()).unwrap_or(0) as u32;
+            if video_w > 0 && video_h > 0 {
+                let video_aspect_ratio = (video_w as f64) / (video_h as f64);
+                let target_ratio = (target_w as f64) / (target_h as f64);
+                // 允许 10% 的宽高比偏差
+                if (video_aspect_ratio - target_ratio).abs() / target_ratio > 0.1 {
+                    continue;
+                }
+            }
+
             let mp4_url = v.get("urls")
                 .and_then(|u| u.get("mp4_download"))
                 .and_then(|u| u.as_str());

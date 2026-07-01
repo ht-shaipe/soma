@@ -7,7 +7,7 @@
       </el-button>
     </div>
 
-    <el-table :data="taskStore.tasks" stripe style="width: 100%" empty-text="No tasks">
+    <el-table :data="taskStore.tasks" stripe style="width: 100%" :empty-text="$t('task.noTasks')">
       <el-table-column prop="taskId" :label="$t('task.taskId')" width="280">
         <template #default="{ row }">
           <el-text size="small" truncated>{{ row.taskId }}</el-text>
@@ -47,8 +47,12 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column :label="$t('task.actions')" width="120" fixed="right">
+      <el-table-column :label="$t('task.actions')" width="180" fixed="right">
         <template #default="{ row }">
+          <el-button type="primary" size="small" text @click="onViewDetail(row)">
+            <el-icon><View /></el-icon>
+            {{ $t('task.detail') }}
+          </el-button>
           <el-button type="danger" size="small" text @click="onDeleteTask(row)">
             <el-icon><Delete /></el-icon>
             {{ $t('task.delete') }}
@@ -56,15 +60,51 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-drawer v-model="detailVisible" :title="$t('task.detailTitle')" size="500px">
+      <template v-if="detailTask">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item :label="$t('task.taskId')">{{ detailTask.taskId }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('task.status')">
+            <TaskStatusTag :state="detailTask.state" />
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('task.progress')">
+            <el-progress :percentage="detailTask.progress" :status="getProgressStatus(detailTask.state)" />
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('task.createdAt')">{{ formatDate(detailTask.createdAt) }}</el-descriptions-item>
+          <el-descriptions-item v-if="detailTask.videoSubject" :label="$t('video.subject')">{{ detailTask.videoSubject }}</el-descriptions-item>
+          <el-descriptions-item v-if="detailTask.videoScript" :label="$t('script.title')">
+            <div style="max-height: 200px; overflow-y: auto; white-space: pre-wrap;">{{ detailTask.videoScript }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detailTask.audioFile" :label="$t('audio.title')">
+            <audio controls :src="getStaticUrl(detailTask.audioFile)" style="width: 100%" />
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detailTask.subtitleFile" :label="$t('subtitle.title')">{{ detailTask.subtitleFile }}</el-descriptions-item>
+        </el-descriptions>
+        <div v-if="detailTask.combinedVideos && detailTask.combinedVideos.length > 0" style="margin-top: 16px;">
+          <div style="font-weight: bold; margin-bottom: 8px;">{{ $t('task.video') }}</div>
+          <video
+            v-for="v in detailTask.combinedVideos"
+            :key="v"
+            controls
+            :src="getStaticUrl(v)"
+            style="width: 100%; margin-bottom: 8px;"
+          />
+        </div>
+        <div v-if="detailTask.errorMessage" style="margin-top: 16px;">
+          <el-alert :title="detailTask.errorMessage" type="error" show-icon :closable="false" />
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, VideoPlay, Delete } from '@element-plus/icons-vue'
+import { Refresh, VideoPlay, Delete, View } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
-import { TaskStateCode, isTaskCompleted, isTaskFailed } from '@/types'
+import { TaskStateCode } from '@/types'
 import type { TaskInfo } from '@/types'
 import { getStaticUrl } from '@/api/stream'
 import TaskStatusTag from '@/components/TaskStatusTag.vue'
@@ -72,6 +112,8 @@ import { useI18n } from 'vue-i18n'
 
 const taskStore = useTaskStore()
 const { t } = useI18n()
+const detailVisible = ref(false)
+const detailTask = ref<TaskInfo | null>(null)
 
 onMounted(() => {
   taskStore.fetchTasks()
@@ -110,5 +152,10 @@ function onPlayVideo(row: TaskInfo) {
   if (row.combinedVideos && row.combinedVideos.length > 0) {
     window.open(getStaticUrl(row.combinedVideos[0]), '_blank')
   }
+}
+
+function onViewDetail(row: TaskInfo) {
+  detailTask.value = row
+  detailVisible.value = true
 }
 </script>

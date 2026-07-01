@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import type { VideoParams } from '@/types'
+
+const TTS_DEFAULT_VOICES: Record<string, string> = {
+  'edge-tts': 'zh-CN-XiaoxiaoNeural-Female',
+  'azure-v2': 'azure:zh-CN-XiaoxiaoNeural',
+  'siliconflow': 'siliconflow:FunAudioLLM/CosyVoice2-0.5B:alice',
+  'gemini': 'gemini:Zephyr',
+  'mimo': 'mimo:almara',
+  'elevenlabs': 'elevenlabs:21m00Tcm4TlvDq8ikWAM:Rachel',
+  'none': 'no-voice',
+}
 
 export const useVideoParamsStore = defineStore('videoParams', () => {
   const videoSubject = ref('')
@@ -24,9 +34,17 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
 
   const ttsServer = ref('edge-tts')
   const voiceName = ref('zh-CN-XiaoxiaoNeural-Female')
+
+  watch(ttsServer, (newServer) => {
+    const defaultVoice = TTS_DEFAULT_VOICES[newServer]
+    if (defaultVoice) {
+      voiceName.value = defaultVoice
+    }
+  })
   const voiceVolume = ref(1.0)
   const voiceRate = ref(1.0)
   const customAudioFile = ref<File | null>(null)
+  const customAudioFileName = ref('')
   const bgmType = ref('none')
   const bgmFile = ref('')
   const bgmVolume = ref(0.2)
@@ -35,13 +53,16 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
   const subtitlePosition = ref('bottom')
   const customSubtitlePosition = ref(70)
   const fontName = ref('STHeitiMedium.ttc')
-  const fontSize = ref(60)
+  const fontSize = ref(16)
   const textForeColor = ref('#FFFFFF')
   const strokeColor = ref('#000000')
   const strokeWidth = ref(1.5)
-  const subtitleBackgroundEnabled = ref(true)
+  const subtitleBackgroundEnabled = ref(false)
   const subtitleBackgroundColor = ref('#000000')
   const roundedSubtitleBackground = ref(false)
+  const videoWatermark = ref('')
+  const videoIntro = ref('')
+  const videoOutro = ref('')
 
   function toVideoParams(): VideoParams {
     return {
@@ -64,7 +85,10 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
       voice_name: voiceName.value,
       voice_volume: voiceVolume.value,
       voice_rate: voiceRate.value,
-      custom_audio_file: customAudioFile.value ? customAudioFile.value.name : undefined,
+      custom_audio_file: customAudioFileName.value || (customAudioFile.value ? customAudioFile.value.name : undefined),
+      video_materials: videoSource.value === 'local' && localVideoMaterials.value.length > 0
+        ? localVideoMaterials.value.map(f => ({ name: f.name, path: f.name, provider: 'local' }))
+        : undefined,
       bgm_type: bgmType.value,
       bgm_file: bgmFile.value || undefined,
       bgm_volume: bgmVolume.value,
@@ -78,6 +102,9 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
       stroke_width: strokeWidth.value,
       text_background_color: subtitleBackgroundEnabled.value ? subtitleBackgroundColor.value : false,
       rounded_subtitle_background: roundedSubtitleBackground.value,
+      video_watermark: videoWatermark.value || undefined,
+      video_intro: videoIntro.value || undefined,
+      video_outro: videoOutro.value || undefined,
     }
   }
 
@@ -92,11 +119,12 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
     matchMaterialsToScript,
     videoSource, videoConcatMode, videoTransitionMode, videoAspect,
     videoClipDuration, videoCount, videoEncoder, localVideoMaterials,
-    ttsServer, voiceName, voiceVolume, voiceRate, customAudioFile,
+    ttsServer, voiceName, voiceVolume, voiceRate, customAudioFile, customAudioFileName,
     bgmType, bgmFile, bgmVolume,
     subtitleEnabled, subtitlePosition, customSubtitlePosition,
     fontName, fontSize, textForeColor, strokeColor, strokeWidth,
     subtitleBackgroundEnabled, subtitleBackgroundColor, roundedSubtitleBackground,
+    videoWatermark, videoIntro, videoOutro,
     toVideoParams, resetScript,
   }
 })

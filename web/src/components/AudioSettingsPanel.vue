@@ -18,31 +18,35 @@
     <VoiceSelector v-if="store.ttsServer !== 'none'" />
     <div v-if="store.ttsServer === 'azure-v2'" class="form-row">
       <div class="form-label">{{ $t('audio.azureSpeechKey') }}</div>
-      <el-input v-model="azureSpeechKey" type="password" show-password />
+      <el-input v-model="azureSpeechKey" type="password" show-password @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer === 'azure-v2'" class="form-row">
       <div class="form-label">{{ $t('audio.azureSpeechRegion') }}</div>
-      <el-input v-model="azureSpeechRegion" />
+      <el-input v-model="azureSpeechRegion" @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer === 'siliconflow'" class="form-row">
       <div class="form-label">{{ $t('audio.siliconflowApiKey') }}</div>
-      <el-input v-model="siliconflowKey" type="password" show-password />
+      <el-input v-model="siliconflowKey" type="password" show-password @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer === 'mimo'" class="form-row">
       <div class="form-label">{{ $t('audio.mimoApiKey') }}</div>
-      <el-input v-model="mimoKey" type="password" show-password />
+      <el-input v-model="mimoKey" type="password" show-password @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer === 'elevenlabs'" class="form-row">
       <div class="form-label">{{ $t('audio.elevenlabsApiKey') }}</div>
-      <el-input v-model="elevenlabsKey" type="password" show-password />
+      <el-input v-model="elevenlabsKey" type="password" show-password @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer === 'elevenlabs'" class="form-row">
       <div class="form-label">{{ $t('audio.elevenlabsModel') }}</div>
-      <el-select v-model="elevenlabsModel" style="width: 100%">
+      <el-select v-model="elevenlabsModel" style="width: 100%" @change="onSaveTtsConfig">
         <el-option label="eleven_multilingual_v2" value="eleven_multilingual_v2" />
         <el-option label="eleven_flash_v2_5" value="eleven_flash_v2_5" />
         <el-option label="eleven_v3" value="eleven_v3" />
       </el-select>
+    </div>
+    <div v-if="store.ttsServer === 'gemini'" class="form-row">
+      <div class="form-label">{{ $t('audio.geminiApiKey') }}</div>
+      <el-input v-model="geminiKey" type="password" show-password @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer !== 'none'" class="form-row">
       <div class="form-label">{{ $t('audio.speechVolume') }}</div>
@@ -59,10 +63,13 @@
     <div class="form-row">
       <div class="form-label">{{ $t('audio.customAudio') }}</div>
       <el-upload
-        :auto-upload="false"
+        :auto-upload="true"
+        :action="'/api/v1/audio/upload'"
         :accept="'.mp3,.wav,.m4a,.aac,.flac,.ogg'"
         :limit="1"
-        :on-change="onAudioChange"
+        :on-success="onAudioUploadSuccess"
+        :on-error="onAudioUploadError"
+        name="file"
       >
         <el-button size="small">
           <el-icon><Upload /></el-icon>
@@ -78,24 +85,70 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { UploadFile } from 'element-plus'
+import { ref, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { useVideoParamsStore } from '@/stores/videoParams'
+import { useConfigStore } from '@/stores/config'
+import { useI18n } from 'vue-i18n'
 import VoiceSelector from './VoiceSelector.vue'
 import BgmSelector from './BgmSelector.vue'
 
 const store = useVideoParamsStore()
+const configStore = useConfigStore()
+const { t } = useI18n()
+
 const azureSpeechKey = ref('')
 const azureSpeechRegion = ref('')
 const siliconflowKey = ref('')
 const mimoKey = ref('')
 const elevenlabsKey = ref('')
 const elevenlabsModel = ref('eleven_multilingual_v2')
+const geminiKey = ref('')
 
-function onAudioChange(file: UploadFile) {
-  if (file.raw) {
-    store.customAudioFile = file.raw
+function loadTtsKeys() {
+  const tts = configStore.config.tts
+  azureSpeechKey.value = tts.azure_speech_key || ''
+  azureSpeechRegion.value = tts.azure_speech_region || ''
+  siliconflowKey.value = tts.siliconflow_key || ''
+  mimoKey.value = tts.mimo_key || ''
+  elevenlabsKey.value = tts.elevenlabs_key || ''
+  elevenlabsModel.value = tts.elevenlabs_model || 'eleven_multilingual_v2'
+  geminiKey.value = tts.gemini_key || ''
+}
+
+function onSaveTtsConfig() {
+  configStore.updateTtsConfig({
+    azure_speech_key: azureSpeechKey.value,
+    azure_speech_region: azureSpeechRegion.value,
+    siliconflow_key: siliconflowKey.value,
+    mimo_key: mimoKey.value,
+    elevenlabs_key: elevenlabsKey.value,
+    elevenlabs_model: elevenlabsModel.value,
+    gemini_key: geminiKey.value,
+  })
+  configStore.save()
+}
+
+onMounted(() => {
+  if (configStore.loaded) {
+    loadTtsKeys()
   }
+})
+
+watch(() => configStore.loaded, (val) => {
+  if (val) loadTtsKeys()
+})
+
+function onAudioUploadSuccess(response: { data?: { name?: string; path?: string } }) {
+  const name = response.data?.name || response.data?.path || ''
+  if (name) {
+    store.customAudioFileName = name
+    ElMessage.success(t('audio.uploadSuccess'))
+  }
+}
+
+function onAudioUploadError() {
+  ElMessage.error(t('audio.uploadFailed'))
 }
 </script>
