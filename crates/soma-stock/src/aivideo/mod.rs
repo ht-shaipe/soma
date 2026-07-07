@@ -15,7 +15,7 @@ pub mod zhipu;
 pub mod kling;
 pub mod minimax;
 
-pub use ai_llm_kit::multimodal::aspect_to_size;
+pub use ai_llm_kit::multi_modal::aspect_to_size;
 
 /// AI 视频生成请求参数
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ pub trait AiVideoProvider: Send + Sync {
 
 /// 通用视频下载（委托 ai-llm-kit）
 pub async fn download_video_common(url: &str, save_path: &str) -> Result<String, SomaError> {
-    ai_llm_kit::multimodal::download_video_common(url, save_path).await
+    ai_llm_kit::multi_modal::download_video_common(url, save_path).await
         .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))
 }
 

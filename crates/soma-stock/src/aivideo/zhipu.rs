@@ -1,22 +1,22 @@
 //! 智谱 CogVideoX 视频生成适配器（桥接层）
 //!
-//! 委托 ai-llm-kit 的 ZhipuMultimodal 实现，Soma 侧仅做类型转换。
+//! 委托 ai-llm-kit 的 ZhipuMultiModal 实现，Soma 侧仅做类型转换。
 
 use async_trait::async_trait;
-use ai_llm_kit::multimodal::{LlmMultimodalService, MultimodalGenerationExt, VideoGenerationParams, download_video_common};
+use ai_llm_kit::multi_modal::{LlmMultiModalService, MultiModalGenerationExt, VideoGenerationParams, download_video_common};
 use ai_llm_kit::zpu::ZhipuAI;
 use soma_core::error::SomaError;
 use super::{AiVideoProvider, VideoGenParams, VideoGenStatus};
 
 pub struct ZhipuVideo {
-    multimodal: Box<dyn LlmMultimodalService>,
+    multi_modal: Box<dyn LlmMultiModalService>,
     model: String,
 }
 
 impl ZhipuVideo {
     pub fn new(api_key: &str, model: &str) -> Self {
         Self {
-            multimodal: ZhipuAI::new(api_key).multimodal(),
+            multi_modal: ZhipuAI::new(api_key).multi_modal(),
             model: model.to_string(),
         }
     }
@@ -37,7 +37,7 @@ impl AiVideoProvider for ZhipuVideo {
             aspect_ratio: Some(params.aspect_ratio.clone()),
             prompt_optimizer: None,
         };
-        let result = self.multimodal.generate_video(&mm_params).await
+        let result = self.multi_modal.generate_video(&mm_params).await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
         if result.task_id.is_empty() {
             return Err(SomaError::VideoGen("智谱返回空任务ID，可能被限流或参数错误".into()));
@@ -46,7 +46,7 @@ impl AiVideoProvider for ZhipuVideo {
     }
 
     async fn query_task(&self, task_id: &str) -> Result<VideoGenStatus, SomaError> {
-        let result = self.multimodal.query_video_task(task_id).await
+        let result = self.multi_modal.query_video_task(task_id).await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
         if result.is_success() {
             Ok(VideoGenStatus::Success { video_urls: result.video_urls })

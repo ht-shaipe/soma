@@ -1,22 +1,22 @@
 //! 可灵 Kling 视频生成适配器（桥接层）
 //!
-//! 委托 ai-llm-kit 的 KlingMultimodal 实现，Soma 侧仅做类型转换。
+//! 委托 ai-llm-kit 的 KlingMultiModal 实现，Soma 侧仅做类型转换。
 
 use async_trait::async_trait;
-use ai_llm_kit::multimodal::{LlmMultimodalService, MultimodalGenerationExt, VideoGenerationParams, download_video_common};
+use ai_llm_kit::multi_modal::{LlmMultiModalService, MultiModalGenerationExt, VideoGenerationParams, download_video_common};
 use ai_llm_kit::kling::Kling;
 use soma_core::error::SomaError;
 use super::{AiVideoProvider, VideoGenParams, VideoGenStatus};
 
 pub struct KlingVideo {
-    multimodal: Box<dyn LlmMultimodalService>,
+    multi_modal: Box<dyn LlmMultiModalService>,
     model: String,
 }
 
 impl KlingVideo {
     pub fn new(access_key: &str, secret_key: &str, model: &str) -> Self {
         Self {
-            multimodal: Kling::new(access_key, secret_key).multimodal(),
+            multi_modal: Kling::new(access_key, secret_key).multi_modal(),
             model: model.to_string(),
         }
     }
@@ -37,7 +37,7 @@ impl AiVideoProvider for KlingVideo {
             aspect_ratio: Some(params.aspect_ratio.clone()),
             prompt_optimizer: None,
         };
-        let result = self.multimodal.generate_video(&mm_params).await
+        let result = self.multi_modal.generate_video(&mm_params).await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
         if result.task_id.is_empty() {
             return Err(SomaError::VideoGen("可灵返回空任务ID，可能被限流或参数错误".into()));
@@ -46,7 +46,7 @@ impl AiVideoProvider for KlingVideo {
     }
 
     async fn query_task(&self, task_id: &str) -> Result<VideoGenStatus, SomaError> {
-        let result = self.multimodal.query_video_task(task_id).await
+        let result = self.multi_modal.query_video_task(task_id).await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
         if result.is_success() {
             Ok(VideoGenStatus::Success { video_urls: result.video_urls })
