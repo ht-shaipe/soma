@@ -37,8 +37,14 @@
     "pixabay": "Pixabay",
     "coverr": "Coverr",
     "local": "Local Files",
+    "cogvideox": "Zhipu CogVideoX",
+    "kling": "Kling AI",
+    "minimax": "MiniMax Hailuo",
     "uploadLocalFiles": "Upload Local Files",
     "uploadTip": "Supports mp4/mov/avi/flv/mkv/jpg/jpeg/png",
+    "portraitImage": "Portrait Image (Talking Head)",
+    "uploadPortrait": "Upload Portrait",
+    "portraitTip": "Upload a portrait image to automatically use AI image-to-video mode for talking head video",
     "concatMode": "Concat Mode",
     "sequential": "Sequential",
     "random": "Random",
@@ -157,6 +163,9 @@
     "refresh": "Refresh",
     "taskId": "Task ID",
     "topic": "Topic",
+    "subject": "Subject",
+    "script": "Script",
+    "aspect": "Aspect",
     "status": "Status",
     "progress": "Progress",
     "createdAt": "Created At",
@@ -168,14 +177,21 @@
     "delete": "Delete",
     "deleteConfirm": "Are you sure you want to delete this task?",
     "noTasks": "No tasks yet",
+    "continueEdit": "Continue Edit",
     "playVideo": "Play Video",
     "downloadVideo": "Download Video",
     "statusPending": "Pending",
+    "statusDraft": "Draft",
+    "statusQueued": "Queued",
+    "statusPaused": "Paused",
+    "statusIntent": "Intent Parsing",
     "statusScript": "Generating Script",
     "statusTerms": "Extracting Keywords",
+    "statusStoryboard": "Generating Storyboard",
     "statusAudio": "Synthesizing Audio",
     "statusSubtitle": "Generating Subtitles",
     "statusMaterials": "Processing Materials",
+    "statusCompose": "Compositing Video",
     "statusVideo": "Compositing Video",
     "statusCompleted": "Completed",
     "statusFailed": "Failed"
@@ -206,6 +222,21 @@
       "pexelsKey": "Pexels API Key",
       "pixabayKey": "Pixabay API Key",
       "coverrKey": "Coverr API Key"
+    },
+    "aivideo": {
+      "title": "AI Video Generation",
+      "hint": "Video generation models can directly produce video clips from text/images. If not configured, Soma still works with stock libraries. Recommended: Zhipu CogVideoX (flash model is free).",
+      "zhipu": "Zhipu CogVideoX",
+      "zhipuApiKey": "Zhipu API Key",
+      "zhipuModel": "Zhipu Model",
+      "kling": "Kling AI",
+      "klingAccessKey": "Kling Access Key",
+      "klingSecretKey": "Kling Secret Key",
+      "klingModel": "Kling Model",
+      "minimax": "MiniMax Hailuo",
+      "minimaxApiKey": "MiniMax API Key",
+      "minimaxModel": "MiniMax Model",
+      "timeout": "Generation Timeout (sec)"
     },
     "system": {
       "title": "System Configuration",
@@ -238,6 +269,7 @@
       "script": "AI Script",
       "tts": "Voice Synth",
       "stock": "Stock Search",
+      "aivideo": "AI Video Gen",
       "subtitle": "Subtitles",
       "bgm": "BGM",
       "compose": "Compose Video"
@@ -256,11 +288,14 @@
       "tip": "After choosing an LLM, fill in the API Key and model name in Settings → LLM Configuration. Free options need no key."
     },
     "step3": {
-      "short": "Voice & Stock",
-      "title": "Step 2: Configure Voice & Stock Source",
+      "short": "Voice & Stock & VideoAI",
+      "title": "Step 2: Configure Voice, Stock Source & Video Gen AI",
       "ttsDesc": "Edge TTS is used by default (free, no key needed), supporting Chinese/English/multi-language voices. For higher quality, configure a paid TTS:",
       "stockTitle": "Stock Video Source",
-      "stockDesc": "Soma searches and downloads video clips from stock libraries. Apply for at least one free API key:"
+      "stockDesc": "Soma searches and downloads video clips from stock libraries. Apply for at least one free API key:",
+      "aivideoTitle": "AI Video Generation (Optional)",
+      "aivideoDesc": "Video generation models can directly produce video clips from text/images, different from the \"stock search & stitch\" mode. If not configured, Soma still works with stock libraries.",
+      "aivideoFreeTip": "💡 Recommended: Zhipu CogVideoX — flash model is completely free, with the most mature API!"
     },
     "step4": {
       "short": "Fill Config",
@@ -274,6 +309,8 @@
       "setStockDesc": "Enter at least one stock library API key (Pexels recommended, free to apply).",
       "setTts": "(Optional) Configure TTS",
       "setTtsDesc": "Default Edge TTS needs no config. For other TTS engines, fill in the corresponding API key.",
+      "setAiVideo": "(Optional) Configure AI Video Generation",
+      "setAiVideoDesc": "In the \"AI Video Generation\" card, expand the provider panel, fill in the API Key and select a model. Recommended: Zhipu CogVideoX (flash model is free).",
       "save": "Click \"Save Configuration\"",
       "saveDesc": "Config is saved to the backend and persists after restart.",
       "homeTipTitle": "💡 You can also configure on the Home page",
@@ -297,6 +334,114 @@
       "readySub": "You now know the basics of Soma. Start creating!"
     }
   },
+  "wizard": {
+    "prev": "Previous",
+    "next": "Next",
+    "step1": {
+      "short": "Intent",
+      "title": "① Intent Parsing",
+      "desc": "Enter a natural language description, AI parses your creative intent and extracts structured parameters like style and mood",
+      "intent": "Creative Intent",
+      "intentPlaceholder": "e.g., Make a short video about spring",
+      "style": "Style",
+      "styleAesthetic": "Aesthetic & Healing",
+      "styleDocumentary": "Documentary",
+      "styleVlog": "Vlog Style",
+      "styleNews": "News Style",
+      "styleTutorial": "Tutorial",
+      "mood": "Mood",
+      "moodWarm": "Warm & Hopeful",
+      "moodEnergetic": "Energetic",
+      "moodCalm": "Calm & Serene",
+      "moodDramatic": "Dramatic",
+      "moodHumorous": "Humorous",
+      "aspect": "Aspect Ratio",
+      "audience": "Target Audience",
+      "audiencePlaceholder": "e.g., Young adults, Parents, Tech enthusiasts",
+      "parsingIntent": "AI is parsing your creative intent...",
+      "intentParsed": "Intent parsed, parameters auto-filled"
+    },
+    "step2": {
+      "short": "Script",
+      "title": "② Story / Script Generation",
+      "desc": "AI creates a complete narration script with timeline and emotional beats, or write your own",
+      "generatingScript": "AI is generating script and keywords..."
+    },
+    "step3": {
+      "short": "Storyboard",
+      "title": "③ Storyboard / Scene Breakdown",
+      "desc": "Break the script into scenes and shots, set clip duration, concat order and transitions",
+      "clipDuration": "Clip Duration",
+      "generatingStoryboard": "AI is generating storyboard and visual prompts...",
+      "storyboardPreview": "Storyboard Preview",
+      "scenes": "scenes"
+    },
+    "step4": {
+      "short": "Prompts",
+      "title": "④ Prompt Engineering",
+      "desc": "Choose video source and visual style, AI generates precise visual/audio prompts for each scene",
+      "generate": "AI Generate Prompts",
+      "generating": "Generating prompts..."
+    },
+    "step5": {
+      "short": "Assets",
+      "title": "⑤ Asset Generation",
+      "desc": "Confirm search keywords and matching strategy, manage stock source API keys",
+      "keywordPreview": "Search Keywords Preview",
+      "fetchingMaterials": "Searching and downloading materials, please wait...",
+      "materialsFetched": "Materials fetched successfully, {count} files",
+      "materialsFetchFailed": "Material fetch failed, you can retry during generation"
+    },
+    "step6": {
+      "short": "Audio",
+      "title": "⑥ Audio Configuration",
+      "desc": "Configure TTS voiceover and background music. Click Next to auto-generate audio",
+      "tts": "TTS Service",
+      "generatingAudio": "Generating audio...",
+      "audioPreview": "Audio Preview",
+      "audioGenerated": "Audio generated successfully"
+    },
+    "step7": {
+      "short": "Subtitle",
+      "title": "⑦ Subtitle Configuration",
+      "desc": "Configure subtitle style, font, color and position"
+    },
+    "step8": {
+      "short": "Compose",
+      "title": "⑧ Composition & Output",
+      "desc": "Review all settings, click Generate, and FFmpeg will compose video with audio and subtitles"
+    },
+    "step9": {
+      "short": "Publish",
+      "title": "⑨ Multi-Platform Publish",
+      "desc": "Select target platforms, auto-generate publish title, description and tags, then publish to social media",
+      "publishTitle": "Publish Title",
+      "publishTitlePlaceholder": "Set a title for the video",
+      "publishDesc": "Description",
+      "publishDescPlaceholder": "Write a description for the video",
+      "publishTags": "Hashtags",
+      "publishTagsPlaceholder": "Separate tags with spaces, e.g. #spring #healing #shortvideo",
+      "publishNow": "Publish Now",
+      "publishing": "Publishing...",
+      "publishSuccess": "Published successfully!",
+      "publishFailed": "Publish failed",
+      "selectPlatform": "Please select at least one platform",
+      "hintDouyin": "9:16 portrait, 15-60s optimal",
+      "hintWeixin": "9:16 portrait, 1-30 min supported",
+      "hintXiaohongshu": "9:16 portrait, 15s-5min",
+      "hintBilibili": "16:9 landscape recommended, mid-long video",
+      "hintTiktok": "9:16 portrait, 15-60s optimal",
+      "hintYoutube": "9:16 portrait, up to 60s",
+      "hintInstagram": "9:16 portrait, 15-90s",
+      "hintFacebook": "9:16 portrait, up to 60s"
+    },
+    "validate": {
+      "subjectRequired": "Please enter a video subject",
+      "scriptRequired": "Please generate a script or enter one manually",
+      "localMaterialsRequired": "Please upload local material files",
+      "termsRequired": "Please generate keywords or enter search terms manually"
+    }
+  },
   "common": {
     "language": "Language",
     "ok": "OK",
@@ -314,6 +459,11 @@
     "close": "Close",
     "copy": "Copy",
     "copied": "Copied",
+    "remove": "Remove",
     "log": "Log"
+  },
+  "portrait": {
+    "imageOnly": "Please upload an image file",
+    "imageSizeLimit": "Image size cannot exceed 5MB"
   }
 }

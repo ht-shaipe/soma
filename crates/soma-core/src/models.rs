@@ -8,14 +8,20 @@ use chrono::{DateTime, Utc};
 
 /// 任务状态枚举
 ///
-/// 数值与数据库/接口中的状态码对应：-1=失败，1=完成，4=处理中
+/// 数值与数据库/接口中的状态码对应：-1=失败，0=草稿，1=完成，4=处理中
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
     /// 任务失败
     Failed = -1,
+    /// 任务草稿（配置阶段，尚未开始执行）
+    Draft = 0,
     /// 任务完成
     Completed = 1,
+    /// 排队等待中
+    Queued = 2,
+    /// 任务暂停
+    Paused = 3,
     /// 任务处理中
     Processing = 4,
 }
@@ -25,7 +31,10 @@ impl TaskStatus {
     pub fn from_i32(v: i32) -> Self {
         match v {
             -1 => TaskStatus::Failed,
+            0 => TaskStatus::Draft,
             1 => TaskStatus::Completed,
+            2 => TaskStatus::Queued,
+            3 => TaskStatus::Paused,
             _ => TaskStatus::Processing,
         }
     }
@@ -34,7 +43,10 @@ impl TaskStatus {
     pub fn as_i32(&self) -> i32 {
         match self {
             TaskStatus::Failed => -1,
+            TaskStatus::Draft => 0,
             TaskStatus::Completed => 1,
+            TaskStatus::Queued => 2,
+            TaskStatus::Paused => 3,
             TaskStatus::Processing => 4,
         }
     }
@@ -119,6 +131,38 @@ impl VideoAspect {
             VideoAspect::Square => "square",
         }
     }
+}
+
+/// 分镜脚本的单个场景
+///
+/// 对应设计文档③分镜脚本中的完整镜头制作指令。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoryboardScene {
+    /// 场景编号（从 1 开始）
+    pub scene_id: u32,
+    /// 该镜头时长（秒）
+    #[serde(default)]
+    pub duration: Option<u32>,
+    /// 此镜头对应的旁白文本
+    pub narration: String,
+    /// 画面中文描述（用于预览和理解）
+    #[serde(default)]
+    pub visual_desc: Option<String>,
+    /// 画面英文提示词（用于 AI 视频生成或素材搜索）
+    /// 结构公式：主体描述 + 环境/场景 + 光线/色彩 + 风格/质量 + 镜头参数
+    pub visual_prompt: String,
+    /// 镜头运动方式：push_in / pull_out / pan_left / pan_right / tilt_up / tilt_down / static / zoom / tracking / aerial / close_up
+    #[serde(default)]
+    pub camera_movement: Option<String>,
+    /// 与下一场景的转场方式：cut / fade / dissolve / slide / zoom
+    #[serde(default)]
+    pub transition: Option<String>,
+    /// 字幕叠加文本（若与旁白不同时使用，如"春 · 起始"等装饰性字幕）
+    #[serde(default)]
+    pub text_overlay: Option<String>,
+    /// 情绪基调：如"温暖、宁静"、"紧张、悬疑"等
+    #[serde(default)]
+    pub mood: Option<String>,
 }
 
 /// 素材信息，记录单个视频素材的来源和属性
@@ -220,6 +264,14 @@ pub struct VideoParams {
     pub video_intro: Option<String>,
     /// 片尾视频文件路径（拼接到最终视频最后面）
     pub video_outro: Option<String>,
+    /// 人像图片路径或 URL（用于口播视频生成，图生视频模式）
+    pub portrait_image: Option<String>,
+    /// 意图解析 - 风格
+    pub intent_style: Option<String>,
+    /// 意图解析 - 情绪基调
+    pub intent_mood: Option<String>,
+    /// 意图解析 - 目标受众
+    pub intent_audience: Option<String>,
 }
 
 impl VideoParams {
@@ -316,6 +368,8 @@ pub struct TaskInfo {
     pub script: Option<String>,
     /// 脚本各段对应的搜索关键词
     pub terms: Option<Vec<String>>,
+    /// 分镜脚本场景列表
+    pub storyboard: Option<Vec<StoryboardScene>>,
     /// 生成的语音文件路径
     pub audio_file: Option<String>,
     /// 语音时长（秒）
@@ -339,14 +393,20 @@ pub struct TaskInfo {
 impl TaskInfo {
     /// 创建新任务，初始状态为 Processing、进度 0
     pub fn new(task_id: String, params: VideoParams) -> Self {
+        Self::with_status(task_id, params, TaskStatus::Processing)
+    }
+
+    /// 创建新任务，指定初始状态
+    pub fn with_status(task_id: String, params: VideoParams, status: TaskStatus) -> Self {
         let now = Utc::now();
         Self {
             task_id,
             params,
-            state: TaskStatus::Processing.as_i32(),
+            state: status.as_i32(),
             progress: 0,
             script: None,
             terms: None,
+            storyboard: None,
             audio_file: None,
             audio_duration: None,
             subtitle_path: None,

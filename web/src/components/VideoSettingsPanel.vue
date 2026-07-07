@@ -9,9 +9,13 @@
         <el-option :label="$t('video.pexels')" value="pexels" />
         <el-option :label="$t('video.pixabay')" value="pixabay" />
         <el-option :label="$t('video.coverr')" value="coverr" />
+        <el-option :label="$t('video.cogvideox')" value="cogvideox" />
+        <el-option :label="$t('video.kling')" value="kling" />
+        <el-option :label="$t('video.minimax')" value="minimax" />
         <el-option :label="$t('video.local')" value="local" />
       </el-select>
     </div>
+    <PortraitUploader v-if="store.videoSource !== 'local'" />
     <LocalFileUploader v-if="store.videoSource === 'local'" />
     <div class="form-row">
       <div class="form-label">{{ $t('video.concatMode') }}</div>
@@ -63,6 +67,7 @@
 import { useVideoParamsStore } from '@/stores/videoParams'
 import LocalFileUploader from './LocalFileUploader.vue'
 import VideoAdvancedSettings from './VideoAdvancedSettings.vue'
+import PortraitUploader from './PortraitUploader.vue'
 
 const store = useVideoParamsStore()
 </script>

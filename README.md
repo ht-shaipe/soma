@@ -7,6 +7,7 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 - **AI 脚本生成**：支持 DeepSeek、OpenAI、Qwen、Gemini、Moonshot、Grok、Ollama 等 25+ 种 LLM 提供商
 - **智能语音合成 (TTS)**：Edge TTS、SiliconFlow、MiMo、ElevenLabs、Azure 多引擎配音，支持中/英/多语种语音
 - **素材自动采集**：对接 Pexels、Pixabay、Coverr 素材库，按关键词自动搜索并下载视频片段
+- **AI 视频生成**：支持智谱 CogVideoX（免费）、快手可灵 Kling、MiniMax 海螺 Hailuo 等视频生成大模型，直接生成视频片段
 - **视频合成**：基于 FFmpeg 实现视频裁剪、拼接、字幕叠加、音轨混音（配音 + 背景音乐）
 - **灵活配置**：支持多种画幅比例（16:9 / 9:16 / 1:1）、拼接模式、字幕样式自定义
 - **任务管理**：异步任务队列，支持并发任务处理、进度跟踪与状态查询
@@ -21,6 +22,7 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 | 视频处理 | FFmpeg |
 | 语音合成 | Edge TTS / SiliconFlow / ElevenLabs / Azure / MiMo |
 | AI 模型 | DeepSeek / OpenAI / Qwen / Gemini 等 25+ 提供商 |
+| 视频生成 | 智谱 CogVideoX / 快手可灵 Kling / MiniMax Hailuo |
 
 ## 项目结构
 
@@ -83,6 +85,33 @@ Soma 核心功能需要两类 API Key：
 
 > 也可以使用本地素材（`video_source = "local"`），无需 Key
 
+#### 3.3 视频生成大模型 API Key（AI 原生视频，可选）
+
+> 视频生成大模型可根据文字/图片直接生成视频片段，区别于「素材搜索拼接」模式。不配置时仍可通过素材库合成视频。
+
+| 推荐方案 | 是否免费 | 申请地址 | Soma 配置项 |
+|---------|---------|---------|------------|
+| **智谱 CogVideoX** | ✅ flash 模型免费 | https://open.bigmodel.cn | `zhipu_video_api_key` |
+| **快手 可灵 Kling** | 付费 | https://platform.kuaishou.com | `kling_access_key` + `kling_secret_key` |
+| **MiniMax 海螺 Hailuo** | 注册送额度 | https://platform.minimaxi.com | `minimax_video_api_key` |
+
+**智谱 Key 申请**（推荐，有免费模型）：
+1. 访问 https://open.bigmodel.cn → 手机号注册 → 新用户赠送额度
+2. 登录后进入 https://open.bigmodel.cn/usercenter/api-keys → 创建 API Key
+3. 复制 Key，填入 `zhipu_video_api_key`，默认模型 `cogvideox-flash` 免费使用
+
+**可灵 Key 申请**：
+1. 访问 https://platform.kuaishou.com → 注册并完成开发者实名认证
+2. 创建应用 → 获取 Access Key 和 Secret Key
+3. 分别填入 `kling_access_key` 和 `kling_secret_key`
+
+**MiniMax Key 申请**：
+1. 访问 https://platform.minimaxi.com → 注册账号（新用户送额度）
+2. 控制台 → API Keys → 创建 Key
+3. 填入 `minimax_video_api_key`
+
+> 详见 [conf/CONFIG_GUIDE.md 第五章](conf/CONFIG_GUIDE.md)
+
 ### 第 4 步：编辑配置
 
 ```bash
@@ -128,6 +157,28 @@ voice_name = "zh-CN-XiaoxiaoNeural"
 
 [stock]
 pexels_api_key = "你从 Pexels 申请的 Key"
+```
+
+#### 方案 D：AI 视频生成模式（用大模型直接生成视频片段）
+
+```toml
+[llm]
+provider = "deepseek"
+api_key = "sk-xxx"
+model = "deepseek-chat"
+base_url = "https://api.deepseek.com"
+
+[tts]
+provider = "edge"
+voice_name = "zh-CN-XiaoxiaoNeural"
+
+[stock]
+pexels_api_key = "你从 Pexels 申请的 Key"
+
+# 视频生成大模型（可选，替代或补充素材拼接）
+zhipu_video_api_key = "你的智谱 Key"   # https://open.bigmodel.cn 免费申请
+zhipu_video_model = "cogvideox-flash"  # 免费；付费可选 cogvideox-3 / viduq1-*
+video_gen_timeout = 300                 # 生成超时（秒）
 ```
 
 ### 第 5 步：启动后端
@@ -189,9 +240,14 @@ npm run dev
        ├─────────────────────┐
        ▼                     ▼
 ┌──────────────┐   ┌───────────────┐
-│ 3. TTS 配音   │   │ 4. 素材搜索下载 │
-└──────┬───────┘   └───────┬───────┘
-       │                   │
+│ 3. TTS 配音   │   │ 4. 素材获取     │
+└──────┬───────┘   │  ┌──────────┐ │
+       │           │  │ 素材库搜索 │ │  Pexels/Pixabay/Coverr
+       │           │  └──────────┘ │
+       │           │  ┌──────────┐ │
+       │           │  │ AI视频生成 │ │  智谱/可灵/MiniMax
+       │           │  └──────────┘ │
+       │           └───────┬───────┘
        └─────────┬─────────┘
                  ▼
        ┌──────────────┐
@@ -254,16 +310,22 @@ CMD ["soma-server"]
 用户输入主题
     │
     ▼
-┌─────────────┐    ┌──────────────┐    ┌───────────────┐
-│  LLM 脚本生成 │───▶│  TTS 语音合成  │───▶│  素材搜索下载   │
-└─────────────┘    └──────────────┘    └───────────────┘
-                                              │
-              ┌───────────────┐               │
-              │  字幕 + 视频合成  │◀──────────────┘
-              └───────┬───────┘
-                      │
-                      ▼
-                 成品视频输出
+┌─────────────┐    ┌──────────────┐    ┌────────────────────┐
+│  LLM 脚本生成 │───▶│  TTS 语音合成  │───▶│  视频素材获取        │
+└─────────────┘    └──────────────┘    │  ┌────────────────┐│
+                                       │  │ 素材库搜索下载   ││
+                                       │  └────────────────┘│
+                                       │  ┌────────────────┐│
+                                       │  │ AI视频大模型生成 ││
+                                       │  └────────────────┘│
+                                       └─────────┬──────────┘
+                                                 │
+               ┌───────────────┐                 │
+               │  字幕 + 视频合成  │◀────────────────┘
+               └───────┬───────┘
+                       │
+                       ▼
+                  成品视频输出
 ```
 
 ## API 接口
@@ -310,7 +372,7 @@ CMD ["soma-server"]
 
 ## 配置完整参考
 
-详见 [conf/CONFIG_GUIDE.md](conf/CONFIG_GUIDE.md) — 包含所有 25+ LLM 供应商、7 种 TTS 引擎、3 个素材库的配置方法与 API Key 申请地址。
+详见 [conf/CONFIG_GUIDE.md](conf/CONFIG_GUIDE.md) — 包含所有 25+ LLM 供应商、7 种 TTS 引擎、3 个素材库、3 个视频生成大模型的配置方法与 API Key 申请地址。
 
 ## License
 

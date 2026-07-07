@@ -37,8 +37,14 @@
     "pixabay": "Pixabay",
     "coverr": "Coverr",
     "local": "本地文件",
+    "cogvideox": "智谱 CogVideoX",
+    "kling": "可灵 Kling",
+    "minimax": "MiniMax 海螺",
     "uploadLocalFiles": "上传本地素材",
     "uploadTip": "支持 mp4/mov/avi/flv/mkv/jpg/jpeg/png 格式",
+    "portraitImage": "人像图片（口播模式）",
+    "uploadPortrait": "上传人像",
+    "portraitTip": "上传人像图片后，将自动使用AI图生视频模式生成口播视频",
     "concatMode": "拼接模式",
     "sequential": "顺序拼接",
     "random": "随机拼接",
@@ -157,6 +163,9 @@
     "refresh": "刷新",
     "taskId": "任务ID",
     "topic": "主题",
+    "subject": "主题",
+    "script": "文案",
+    "aspect": "比例",
     "status": "状态",
     "progress": "进度",
     "createdAt": "创建时间",
@@ -168,14 +177,21 @@
     "delete": "删除",
     "deleteConfirm": "确定要删除此任务吗？",
     "noTasks": "暂无任务",
+    "continueEdit": "继续编辑",
     "playVideo": "播放视频",
     "downloadVideo": "下载视频",
     "statusPending": "等待中",
+    "statusDraft": "草稿",
+    "statusQueued": "排队中",
+    "statusPaused": "已暂停",
+    "statusIntent": "需求理解",
     "statusScript": "生成文案",
     "statusTerms": "提取关键词",
+    "statusStoryboard": "分镜脚本",
     "statusAudio": "语音合成",
     "statusSubtitle": "字幕生成",
     "statusMaterials": "素材处理",
+    "statusCompose": "视频合成",
     "statusVideo": "视频合成",
     "statusCompleted": "已完成",
     "statusFailed": "失败"
@@ -206,6 +222,21 @@
       "pexelsKey": "Pexels API Key",
       "pixabayKey": "Pixabay API Key",
       "coverrKey": "Coverr API Key"
+    },
+    "aivideo": {
+      "title": "AI 视频生成",
+      "hint": "视频生成大模型可根据文字/图片直接生成视频片段，不配置时仍可通过素材库合成视频。推荐智谱 CogVideoX（flash 模型免费）。",
+      "zhipu": "智谱 CogVideoX",
+      "zhipuApiKey": "智谱 API Key",
+      "zhipuModel": "智谱模型",
+      "kling": "可灵 Kling",
+      "klingAccessKey": "可灵 Access Key",
+      "klingSecretKey": "可灵 Secret Key",
+      "klingModel": "可灵模型",
+      "minimax": "MiniMax 海螺",
+      "minimaxApiKey": "MiniMax API Key",
+      "minimaxModel": "MiniMax 模型",
+      "timeout": "生成超时(秒)"
     },
     "system": {
       "title": "系统配置",
@@ -238,6 +269,7 @@
       "script": "AI生成脚本",
       "tts": "语音合成",
       "stock": "素材搜索",
+      "aivideo": "AI视频生成",
       "subtitle": "字幕生成",
       "bgm": "背景音乐",
       "compose": "视频合成"
@@ -256,11 +288,14 @@
       "tip": "选择 LLM 后，在「系统设置 → LLM 配置」中填入对应的 API Key 和模型名称。免费方案无需填 Key。"
     },
     "step3": {
-      "short": "配音 & 素材",
-      "title": "第 2 步：配置语音 & 素材源",
+      "short": "配音 & 素材 & 视频AI",
+      "title": "第 2 步：配置语音、素材源 & 视频生成AI",
       "ttsDesc": "默认使用 Edge TTS（免费，无需 Key），支持中文/英文/多语种语音。如需更高质量可配置付费 TTS：",
       "stockTitle": "素材视频源",
-      "stockDesc": "Soma 从素材库搜索并下载视频片段。推荐至少申请一个免费 Key："
+      "stockDesc": "Soma 从素材库搜索并下载视频片段。推荐至少申请一个免费 Key：",
+      "aivideoTitle": "AI 视频生成（可选）",
+      "aivideoDesc": "视频生成大模型可根据文字/图片直接生成视频片段，区别于「素材搜索拼接」模式。不配置时仍可通过素材库合成视频。",
+      "aivideoFreeTip": "💡 推荐智谱 CogVideoX：flash 模型完全免费，API 文档最完善！"
     },
     "step4": {
       "short": "填写配置",
@@ -274,6 +309,8 @@
       "setStockDesc": "至少填写一个素材库的 API Key（推荐 Pexels，免费申请）。",
       "setTts": "（可选）配置 TTS",
       "setTtsDesc": "默认 Edge TTS 无需配置。如需其他 TTS 引擎，填写对应的 API Key。",
+      "setAiVideo": "（可选）配置 AI 视频生成",
+      "setAiVideoDesc": "在「AI 视频生成」卡片中，展开对应供应商折叠面板，填写 API Key 并选择模型。推荐智谱 CogVideoX（flash 模型免费）。",
       "save": "点击「保存配置」",
       "saveDesc": "配置会保存到后端，重启后依然生效。",
       "homeTipTitle": "💡 也可以在首页配置",
@@ -297,6 +334,114 @@
       "readySub": "你已经了解 Soma 的基本用法，开始创作吧！"
     }
   },
+  "wizard": {
+    "prev": "上一步",
+    "next": "下一步",
+    "step1": {
+      "short": "需求理解",
+      "title": "① 需求理解",
+      "desc": "输入一句自然语言描述，AI 自动解析创作意图，提取风格、情绪等结构化参数",
+      "intent": "创作意图",
+      "intentPlaceholder": "例如：做一个关于春天的短视频",
+      "style": "风格",
+      "styleAesthetic": "唯美治愈",
+      "styleDocumentary": "纪录叙事",
+      "styleVlog": "Vlog 体",
+      "styleNews": "新闻体",
+      "styleTutorial": "教程体",
+      "mood": "情绪基调",
+      "moodWarm": "温暖希望",
+      "moodEnergetic": "活力动感",
+      "moodCalm": "宁静淡雅",
+      "moodDramatic": "戏剧张力",
+      "moodHumorous": "幽默轻松",
+      "aspect": "画幅比例",
+      "audience": "目标受众",
+      "audiencePlaceholder": "例如：年轻人、母婴人群、科技爱好者",
+      "parsingIntent": "AI 正在解析创作意图...",
+      "intentParsed": "创作意图已解析，参数已自动填充"
+    },
+    "step2": {
+      "short": "文案剧情",
+      "title": "② 文案 / 剧情生成",
+      "desc": "AI 基于需求创作完整旁白文案，按时间线标注情绪节奏点，你也可以手动编辑",
+      "generatingScript": "AI 正在生成文案和关键词..."
+    },
+    "step3": {
+      "short": "分镜脚本",
+      "title": "③ 分镜脚本生成",
+      "desc": "将文案拆解为场景镜头，设置每个镜头的时长、拼接顺序和转场效果",
+      "clipDuration": "镜头时长",
+      "generatingStoryboard": "AI 正在生成分镜脚本和视觉提示词...",
+      "storyboardPreview": "分镜预览",
+      "scenes": "个场景"
+    },
+    "step4": {
+      "short": "提示词",
+      "title": "④ 提示词生成",
+      "desc": "选择素材来源和视觉风格，AI 将为每个分镜生成精确的视觉/音频提示词",
+      "generate": "AI 生成提示词",
+      "generating": "正在生成提示词..."
+    },
+    "step5": {
+      "short": "素材生成",
+      "title": "⑤ 素材生成",
+      "desc": "确认素材搜索关键词与匹配策略，管理素材源 API Key",
+      "keywordPreview": "搜索关键词预览",
+      "fetchingMaterials": "正在搜索并下载素材，请稍候...",
+      "materialsFetched": "素材获取完成，共 {count} 个文件",
+      "materialsFetchFailed": "素材获取失败，您可以稍后在生成时重试"
+    },
+    "step6": {
+      "short": "音频",
+      "title": "⑥ 音频配置",
+      "desc": "配置 TTS 配音和背景音乐，点击下一步将自动生成音频",
+      "tts": "TTS 服务",
+      "generatingAudio": "正在生成音频...",
+      "audioPreview": "音频预览",
+      "audioGenerated": "音频生成成功"
+    },
+    "step7": {
+      "short": "字幕",
+      "title": "⑦ 字幕配置",
+      "desc": "配置字幕样式、字体、颜色和位置"
+    },
+    "step8": {
+      "short": "合成输出",
+      "title": "⑧ 合成输出",
+      "desc": "确认所有配置，点击生成按钮，FFmpeg 将自动拼接视频、叠加音频与字幕"
+    },
+    "step9": {
+      "short": "发布",
+      "title": "⑨ 多平台发布",
+      "desc": "选择目标平台，一键生成发布标题、描述和标签，发布到社交媒体",
+      "publishTitle": "发布标题",
+      "publishTitlePlaceholder": "为视频设置发布标题",
+      "publishDesc": "发布描述",
+      "publishDescPlaceholder": "为视频设置发布描述文案",
+      "publishTags": "话题标签",
+      "publishTagsPlaceholder": "多个标签用空格分隔，如 #春天 #治愈 #短视频",
+      "publishNow": "一键发布",
+      "publishing": "发布中...",
+      "publishSuccess": "发布成功！",
+      "publishFailed": "发布失败",
+      "selectPlatform": "请至少选择一个发布平台",
+      "hintDouyin": "竖屏9:16，15-60秒最佳",
+      "hintWeixin": "竖屏9:16，支持1-30分钟",
+      "hintXiaohongshu": "竖屏9:16，15秒-5分钟",
+      "hintBilibili": "横屏16:9推荐，支持中长视频",
+      "hintTiktok": "竖屏9:16，15-60秒最佳",
+      "hintYoutube": "竖屏9:16，60秒以内",
+      "hintInstagram": "竖屏9:16，15-90秒",
+      "hintFacebook": "竖屏9:16，60秒以内"
+    },
+    "validate": {
+      "subjectRequired": "请输入视频主题",
+      "scriptRequired": "请先完成文案生成或手动输入脚本文案",
+      "localMaterialsRequired": "请上传本地素材文件",
+      "termsRequired": "请先完成关键词生成或手动输入搜索关键词"
+    }
+  },
   "common": {
     "language": "语言",
     "ok": "确定",
@@ -314,6 +459,11 @@
     "close": "关闭",
     "copy": "复制",
     "copied": "已复制",
+    "remove": "移除",
     "log": "日志"
+  },
+  "portrait": {
+    "imageOnly": "请上传图片文件",
+    "imageSizeLimit": "图片大小不能超过 5MB"
   }
 }

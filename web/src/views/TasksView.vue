@@ -8,19 +8,29 @@
     </div>
 
     <el-table :data="taskStore.tasks" stripe style="width: 100%" :empty-text="$t('task.noTasks')">
-      <el-table-column prop="taskId" :label="$t('task.taskId')" width="280">
+      <el-table-column prop="taskId" :label="$t('task.taskId')" width="220">
         <template #default="{ row }">
           <el-text size="small" truncated>{{ row.taskId }}</el-text>
         </template>
       </el-table-column>
-      <el-table-column prop="script" :label="$t('task.topic')" min-width="120">
+      <el-table-column :label="$t('task.subject')" min-width="140">
         <template #default="{ row }">
-          {{ row.script ? row.script.substring(0, 50) + '...' : '—' }}
+          <el-text truncated>{{ row.params?.video_subject || '—' }}</el-text>
+        </template>
+      </el-table-column>
+      <el-table-column :label="$t('task.script')" min-width="120">
+        <template #default="{ row }">
+          <el-text truncated>{{ row.script ? row.script.substring(0, 50) + '...' : '—' }}</el-text>
+        </template>
+      </el-table-column>
+      <el-table-column :label="$t('task.aspect')" width="80" align="center">
+        <template #default="{ row }">
+          {{ row.params?.video_aspect || '—' }}
         </template>
       </el-table-column>
       <el-table-column prop="state" :label="$t('task.status')" width="140">
         <template #default="{ row }">
-          <TaskStatusTag :state="row.state" />
+          <TaskStatusTag :state="row.state" :progress="row.progress" />
         </template>
       </el-table-column>
       <el-table-column prop="progress" :label="$t('task.progress')" width="100">
@@ -28,12 +38,12 @@
           <el-progress :percentage="row.progress" :status="getProgressStatus(row.state)" :stroke-width="10" />
         </template>
       </el-table-column>
-      <el-table-column prop="createdAt" :label="$t('task.createdAt')" width="180">
+      <el-table-column prop="createdAt" :label="$t('task.createdAt')" width="170">
         <template #default="{ row }">
           {{ formatDate(row.createdAt) }}
         </template>
       </el-table-column>
-      <el-table-column :label="$t('task.video')" width="80">
+      <el-table-column :label="$t('task.video')" width="70" align="center">
         <template #default="{ row }">
           <el-button
             v-if="row.combinedVideos && row.combinedVideos.length > 0"
@@ -47,8 +57,12 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column :label="$t('task.actions')" width="180" fixed="right">
+      <el-table-column :label="$t('task.actions')" width="240" fixed="right">
         <template #default="{ row }">
+          <el-button v-if="isTaskDraft(row)" type="warning" size="small" text @click="onContinueEdit(row)">
+            <el-icon><Edit /></el-icon>
+            {{ $t('task.continueEdit') }}
+          </el-button>
           <el-button type="primary" size="small" text @click="onViewDetail(row)">
             <el-icon><View /></el-icon>
             {{ $t('task.detail') }}
@@ -102,15 +116,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, VideoPlay, Delete, View } from '@element-plus/icons-vue'
+import { Refresh, VideoPlay, Delete, View, Edit } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
-import { TaskStateCode } from '@/types'
+import { TaskStateCode, isTaskDraft } from '@/types'
 import type { TaskInfo } from '@/types'
 import { getStaticUrl } from '@/api/stream'
 import TaskStatusTag from '@/components/TaskStatusTag.vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 const taskStore = useTaskStore()
+const router = useRouter()
 const { t } = useI18n()
 const detailVisible = ref(false)
 const detailTask = ref<TaskInfo | null>(null)
@@ -157,5 +173,10 @@ function onPlayVideo(row: TaskInfo) {
 function onViewDetail(row: TaskInfo) {
   detailTask.value = row
   detailVisible.value = true
+}
+
+function onContinueEdit(row: TaskInfo) {
+  taskStore.resumeDraft(row.taskId)
+  router.push({ name: 'home', query: { resume: row.taskId } })
 }
 </script>

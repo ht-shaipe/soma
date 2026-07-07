@@ -68,6 +68,13 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
     }))
 }
 
+pub async fn distribute_portraits(param: &RequestParameter) -> Result<Value> {
+    match param.method.to_lowercase().as_str() {
+        "upload" => Err(error!("人像上传请使用 /api/v1/portraits/upload 接口（multipart/form-data）")),
+        _ => Err(error!("不支持的方法: portraits.{}", param.method)),
+    }
+}
+
 /// 处理素材文件上传（multipart/form-data）
 pub async fn upload_file(mut payload: Multipart) -> HttpResponse {
     let material_dir = utils::storage_dir("materials", true);
@@ -145,6 +152,53 @@ pub async fn upload_audio(mut payload: Multipart) -> HttpResponse {
     let result = value!({
         "name": saved_name.clone(),
         "path": audio_dir.join(&saved_name).to_string_lossy().to_string(),
+    });
+    let resp = tube_web::response::get_success(&result);
+    resp.unwrap_or(HttpResponse::Ok().finish())
+}
+
+/// 处理人像图片上传（multipart/form-data）
+pub async fn upload_portrait(mut payload: Multipart) -> HttpResponse {
+    let portrait_dir = utils::storage_dir("portraits", true);
+    std::fs::create_dir_all(&portrait_dir).ok();
+
+    let mut saved_name = String::new();
+
+    while let Some(Ok(mut field)) = payload.next().await {
+        let filename = match field.content_disposition() {
+            Some(cd) => cd.get_filename().unwrap_or("unknown").to_string(),
+            None => "unknown".to_string(),
+        };
+
+        if filename.is_empty() {
+            continue;
+        }
+
+        let ext = std::path::Path::new(&filename)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("png");
+        let hash = utils::md5(&filename);
+        let safe_name = format!("portrait-{}.{}", hash, ext);
+        let dest_path = portrait_dir.join(&safe_name);
+        let mut body = Vec::new();
+        while let Some(Ok(chunk)) = field.next().await {
+            body.extend_from_slice(&chunk);
+        }
+
+        if std::fs::write(&dest_path, &body).is_ok() {
+            saved_name = safe_name;
+        }
+    }
+
+    if saved_name.is_empty() {
+        let resp = tube_web::response::get_error(error!("未接收到上传文件"));
+        return resp.unwrap_or(HttpResponse::BadRequest().finish());
+    }
+
+    let result = value!({
+        "name": saved_name.clone(),
+        "path": portrait_dir.join(&saved_name).to_string_lossy().to_string(),
     });
     let resp = tube_web::response::get_success(&result);
     resp.unwrap_or(HttpResponse::Ok().finish())

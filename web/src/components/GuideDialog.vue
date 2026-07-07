@@ -30,7 +30,12 @@
               <div class="flow-arrow">→</div>
               <div class="flow-item warning">🎬 {{ $t('guide.flow.stock') }}</div>
             </div>
-            <div class="flow-row" style="margin-top: 12px">
+            <div class="flow-row" style="margin-top: 8px; justify-content: center">
+              <div class="flow-arrow" style="margin-right: 4px">↗</div>
+              <div class="flow-item aivideo">🎥 {{ $t('guide.flow.aivideo') }}</div>
+              <div class="flow-arrow" style="margin-left: 4px">↘</div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px">
               <div class="flow-item info">📄 {{ $t('guide.flow.subtitle') }}</div>
               <div class="flow-arrow">+</div>
               <div class="flow-item danger">🎵 {{ $t('guide.flow.bgm') }}</div>
@@ -122,6 +127,29 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <h4 style="margin: 16px 0 8px">🎥 {{ $t('guide.step3.aivideoTitle') }}</h4>
+          <p class="step-desc">{{ $t('guide.step3.aivideoDesc') }}</p>
+          <el-alert type="success" :closable="false" show-icon style="margin-bottom: 12px">
+            <template #title>{{ $t('guide.step3.aivideoFreeTip') }}</template>
+          </el-alert>
+          <el-table :data="aivideoProviders" stripe size="small" class="provider-table">
+            <el-table-column prop="name" label="Provider" width="150" />
+            <el-table-column prop="needKey" :label="$t('guide.col.needKey')" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.needKey ? 'danger' : 'success'" size="small">
+                  {{ row.needKey ? $t('guide.yes') : $t('guide.free') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="freeModel" :label="$t('guide.col.model')" width="160" />
+            <el-table-column :label="$t('guide.col.applyUrl')">
+              <template #default="{ row }">
+                <a v-if="row.url" :href="row.url" target="_blank" class="guide-link">{{ row.urlText }}</a>
+                <span v-else>—</span>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
 
         <!-- Step 4: Settings walkthrough -->
@@ -145,6 +173,10 @@
             <el-timeline-item type="primary" :hollow="false">
               <strong>{{ $t('guide.step4.setTts') }}</strong>
               <p>{{ $t('guide.step4.setTtsDesc') }}</p>
+            </el-timeline-item>
+            <el-timeline-item type="primary" :hollow="false">
+              <strong>{{ $t('guide.step4.setAiVideo') }}</strong>
+              <p>{{ $t('guide.step4.setAiVideoDesc') }}</p>
             </el-timeline-item>
             <el-timeline-item type="success" :hollow="false">
               <strong>{{ $t('guide.step4.save') }}</strong>
@@ -248,6 +280,12 @@ const stockProviders = computed(() => [
   { name: t('video.local'), needKey: false, url: '', urlText: '' },
 ])
 
+const aivideoProviders = computed(() => [
+  { name: 'Zhipu CogVideoX', needKey: false, freeModel: 'cogvideox-flash (免费)', url: 'https://open.bigmodel.cn', urlText: 'open.bigmodel.cn' },
+  { name: 'Kling (Kuaishou)', needKey: true, freeModel: 'kling-v2-master', url: 'https://platform.kuaishou.com', urlText: 'platform.kuaishou.com' },
+  { name: 'MiniMax Hailuo', needKey: true, freeModel: 'MiniMax-Hailuo-2.3', url: 'https://platform.minimaxi.com', urlText: 'platform.minimaxi.com' },
+])
+
 function open() {
   activeStep.value = 0
   dontShowAgain.value = false
@@ -331,6 +369,7 @@ defineExpose({ open, shouldShowOnFirstUse })
 .flow-item.warning { background: #e6a23c; }
 .flow-item.info    { background: #909399; }
 .flow-item.danger  { background: #f56c6c; }
+.flow-item.aivideo { background: #9b59b6; }
 
 .flow-arrow {
   font-size: 18px;

@@ -110,6 +110,82 @@
         </el-card>
 
         <el-card class="panel-card" shadow="hover">
+          <template #header>{{ $t('settings.aivideo.title') }}</template>
+          <el-alert
+            type="info"
+            :closable="false"
+            style="margin-bottom: 12px"
+          >
+            <template #title>{{ $t('settings.aivideo.hint') }}</template>
+          </el-alert>
+          <el-collapse>
+            <el-collapse-item :title="$t('settings.aivideo.zhipu')" name="zhipu">
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.zhipuApiKey') }}</div>
+                <el-input v-model="zhipuVideoApiKey" type="password" show-password />
+              </div>
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.zhipuModel') }}</div>
+                <el-select v-model="zhipuVideoModel" style="width: 100%">
+                  <el-option-group label="CogVideoX">
+                    <el-option label="cogvideox-flash (Free)" value="cogvideox-flash" />
+                    <el-option label="cogvideox-3 (1元/次, 4K)" value="cogvideox-3" />
+                  </el-option-group>
+                  <el-option-group label="Vidu2 (720P)">
+                    <el-option label="vidu2-image (图生视频)" value="vidu2-image" />
+                    <el-option label="vidu2-start-end (首尾帧)" value="vidu2-start-end" />
+                    <el-option label="vidu2-reference (参考生视频)" value="vidu2-reference" />
+                  </el-option-group>
+                  <el-option-group label="ViduQ1 (1080P)">
+                    <el-option label="viduq1-text (文生视频)" value="viduq1-text" />
+                    <el-option label="viduq1-image (图生视频)" value="viduq1-image" />
+                    <el-option label="viduq1-start-end (首尾帧)" value="viduq1-start-end" />
+                  </el-option-group>
+                </el-select>
+              </div>
+            </el-collapse-item>
+            <el-collapse-item :title="$t('settings.aivideo.kling')" name="kling">
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.klingAccessKey') }}</div>
+                <el-input v-model="klingAccessKey" type="password" show-password />
+              </div>
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.klingSecretKey') }}</div>
+                <el-input v-model="klingSecretKey" type="password" show-password />
+              </div>
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.klingModel') }}</div>
+                <el-select v-model="klingVideoModel" style="width: 100%">
+                  <el-option label="kling-v1" value="kling-v1" />
+                  <el-option label="kling-v1-pro" value="kling-v1-pro" />
+                  <el-option label="kling-v2-master" value="kling-v2-master" />
+                </el-select>
+              </div>
+            </el-collapse-item>
+            <el-collapse-item :title="$t('settings.aivideo.minimax')" name="minimax">
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.minimaxApiKey') }}</div>
+                <el-input v-model="minimaxVideoApiKey" type="password" show-password />
+              </div>
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.aivideo.minimaxModel') }}</div>
+                <el-select v-model="minimaxVideoModel" style="width: 100%">
+                  <el-option label="MiniMax-Hailuo-2.3" value="MiniMax-Hailuo-2.3" />
+                  <el-option label="T2V-01 (文生视频)" value="T2V-01" />
+                  <el-option label="I2V-01 (图生视频)" value="I2V-01" />
+                  <el-option label="video-01-live2d (角色动画)" value="video-01-live2d" />
+                  <el-option label="S2V-01 (主体参考)" value="S2V-01" />
+                </el-select>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+          <div class="form-row" style="margin-top: 12px">
+            <div class="form-label">{{ $t('settings.aivideo.timeout') }}</div>
+            <el-input-number v-model="videoGenTimeout" :min="60" :max="900" :step="30" style="width: 100%" />
+          </div>
+        </el-card>
+
+        <el-card class="panel-card" shadow="hover">
           <template #header>{{ $t('settings.system.title') }}</template>
           <div class="form-row">
             <div class="form-label">{{ $t('settings.system.ffmpegPath') }}</div>
@@ -206,6 +282,15 @@ const pexelsApiKey = ref(configStore.config.stock.pexels_api_key)
 const pixabayApiKey = ref(configStore.config.stock.pixabay_api_key)
 const coverrApiKey = ref(configStore.config.stock.coverr_api_key)
 
+const zhipuVideoApiKey = ref(configStore.config.aivideo?.zhipu_video_api_key || '')
+const zhipuVideoModel = ref(configStore.config.aivideo?.zhipu_video_model || 'cogvideox-flash')
+const klingAccessKey = ref(configStore.config.aivideo?.kling_access_key || '')
+const klingSecretKey = ref(configStore.config.aivideo?.kling_secret_key || '')
+const klingVideoModel = ref(configStore.config.aivideo?.kling_video_model || 'kling-v2-master')
+const minimaxVideoApiKey = ref(configStore.config.aivideo?.minimax_video_api_key || '')
+const minimaxVideoModel = ref(configStore.config.aivideo?.minimax_video_model || 'MiniMax-Hailuo-2.3')
+const videoGenTimeout = ref(configStore.config.aivideo?.video_gen_timeout || 300)
+
 const ffmpegPath = ref(configStore.config.ffmpeg.path)
 const ffmpegThreads = ref(configStore.config.ffmpeg.threads)
 const storagePath = ref(configStore.config.app.storage_path)
@@ -228,6 +313,14 @@ watch(() => configStore.config, (cfg) => {
   pexelsApiKey.value = cfg.stock.pexels_api_key
   pixabayApiKey.value = cfg.stock.pixabay_api_key
   coverrApiKey.value = cfg.stock.coverr_api_key
+  zhipuVideoApiKey.value = cfg.aivideo?.zhipu_video_api_key || ''
+  zhipuVideoModel.value = cfg.aivideo?.zhipu_video_model || 'cogvideox-flash'
+  klingAccessKey.value = cfg.aivideo?.kling_access_key || ''
+  klingSecretKey.value = cfg.aivideo?.kling_secret_key || ''
+  klingVideoModel.value = cfg.aivideo?.kling_video_model || 'kling-v2-master'
+  minimaxVideoApiKey.value = cfg.aivideo?.minimax_video_api_key || ''
+  minimaxVideoModel.value = cfg.aivideo?.minimax_video_model || 'MiniMax-Hailuo-2.3'
+  videoGenTimeout.value = cfg.aivideo?.video_gen_timeout || 300
   ffmpegPath.value = cfg.ffmpeg.path
   ffmpegThreads.value = cfg.ffmpeg.threads
   storagePath.value = cfg.app.storage_path
@@ -273,6 +366,16 @@ async function onSave() {
     pexels_api_key: pexelsApiKey.value,
     pixabay_api_key: pixabayApiKey.value,
     coverr_api_key: coverrApiKey.value,
+  })
+  configStore.updateAiVideoConfig({
+    zhipu_video_api_key: zhipuVideoApiKey.value,
+    zhipu_video_model: zhipuVideoModel.value,
+    kling_access_key: klingAccessKey.value,
+    kling_secret_key: klingSecretKey.value,
+    kling_video_model: klingVideoModel.value,
+    minimax_video_api_key: minimaxVideoApiKey.value,
+    minimax_video_model: minimaxVideoModel.value,
+    video_gen_timeout: videoGenTimeout.value,
   })
   configStore.updateFfmpegConfig({
     path: ffmpegPath.value,

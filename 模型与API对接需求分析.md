@@ -287,7 +287,108 @@ deepseek_model_name = "deepseek-chat"
 
 ---
 
-## 七、与 Soma 项目对比
+## 八、视频生成大模型（新增，AI 原生视频生成）
+
+> 2026-07 新增：除素材搜索拼接模式外，Soma 现已支持通过视频生成大模型直接生成视频片段。
+> 以下为三大已对接供应商的 Key 申请说明。
+
+### 8.1 智谱 CogVideoX（推荐首选，有免费模型）
+
+| 模型 | 能力 | 时长 | 分辨率 | 价格 |
+|------|------|------|--------|------|
+| `cogvideox-flash` | 文生视频 | — | — | **免费** |
+| `cogvideox-3` | 文生视频/图生视频/首尾帧 | 5s, 10s | 最高 4K | 1 元/次 |
+| `vidu2-image` | 图生视频 | 4s | 720P | 1.25 元/次 |
+| `vidu2-start-end` | 首尾帧 | 4s | 720P | 1.25 元/次 |
+| `vidu2-reference` | 参考生视频 | 4s | 720P | 2.5 元/次 |
+| `viduq1-text` | 文生视频 | 5s | 1080P | 2.5 元/次 |
+| `viduq1-image` | 图生视频 | 5s | 1080P | 2.5 元/次 |
+| `viduq1-start-end` | 首尾帧 | 5s | 1080P | 2.5 元/次 |
+
+**Key 申请步骤**：
+
+1. 访问 https://open.bigmodel.cn ，注册账号（手机号）
+2. 新用户注册赠送免费额度
+3. 登录后进入 API Keys 页面：https://open.bigmodel.cn/usercenter/api-keys
+4. 点击「创建 API Key」并复制保存（仅显示一次）
+5. 填入 Soma 配置：`zhipu_video_api_key = "your-key"`
+6. 默认模型 `cogvideox-flash` 免费；付费模型需充值
+
+**Soma 配置**：
+```toml
+zhipu_video_api_key = "your-zhipu-api-key"
+zhipu_video_model = "cogvideox-flash"
+```
+
+---
+
+### 8.2 快手 可灵 Kling
+
+| 模型 | 能力 | 时长 | 分辨率 | 价格（参考） |
+|------|------|------|--------|------------|
+| `kling-v1` | 文生视频/图生视频 | 5s/10s | 720P/1080P | 0.5-1 元/次 |
+| `kling-v1-pro` | 高品质文生视频 | 5s/10s | 1080P | 2-3 元/次 |
+| `kling-v2-master` | 最新模型 | 5s/10s | 1080P | 2-3 元/次 |
+
+**Key 申请步骤**：
+
+1. 访问 https://platform.kuaishou.com ，注册快手开放平台账号
+2. 完成开发者认证（需实名认证）
+3. 创建应用，获取 Access Key 和 Secret Key
+4. 填入 Soma 配置：`kling_access_key` 和 `kling_secret_key`
+
+**Soma 配置**：
+```toml
+kling_access_key = "your-access-key"
+kling_secret_key = "your-secret-key"
+kling_video_model = "kling-v2-master"
+```
+
+---
+
+### 8.3 MiniMax 海螺 Hailuo
+
+| 模型 | 能力 | 时长 | 分辨率 | 价格（参考） |
+|------|------|------|--------|------------|
+| `MiniMax-Hailuo-2.3` | 文生视频 | 5s | 1080P | 0.5-1 元/次 |
+| `T2V-01` | 文生视频 | 5s | 1080P | 0.5-1 元/次 |
+| `I2V-01` | 图生视频 | 5s | 1080P | 0.8-1.5 元/次 |
+| `video-01-live2d` | 图生视频/角色动画 | — | 2D 动画 | 1-2 元/次 |
+| `S2V-01` | 主体参考生视频 | — | — | 1-2 元/次 |
+
+**Key 申请步骤**：
+
+1. 访问 https://platform.minimaxi.com ，注册账号
+2. 新用户注册后有赠送额度
+3. 在控制台「API Keys」页面创建 Key
+4. 填入 Soma 配置：`minimax_video_api_key`
+
+**Soma 配置**：
+```toml
+minimax_video_api_key = "your-minimax-video-api-key"
+minimax_video_model = "MiniMax-Hailuo-2.3"
+```
+
+---
+
+### 视频生成模型对比
+
+| 维度 | 智谱 CogVideoX | 可灵 Kling | MiniMax Hailuo |
+|------|---------------|-----------|----------------|
+| 免费模型 | ✅ cogvideox-flash | ❌ | ❌ |
+| 文生视频 | ✅ | ✅ | ✅ |
+| 图生视频 | ✅ | ✅ | ✅ |
+| 首尾帧 | ✅ | — | — |
+| 最高分辨率 | 4K | 1080P | 1080P |
+| 最长时长 | 10s | 10s | 5s |
+| API 成熟度 | ★★★★★ | ★★★ | ★★★ |
+| 起步价格 | 免费 | 0.5 元/次 | 0.5 元/次 |
+
+> **推荐**：优先使用智谱（免费 + API 最完善），可灵和 MiniMax 作为备选。
+
+---
+
+## 九、与 Soma 项目对比
 
 | 维度 | MoneyPrinterTurbo | Soma |
 |------|-------------------|------|
@@ -295,9 +396,10 @@ deepseek_model_name = "deepseek-chat"
 | LLM 提供商数量 | 20+ | 7+（通过 ai-llm-kit） |
 | TTS 引擎 | 7种（Edge/Azure V2/SiliconFlow/Gemini/MiMo/ElevenLabs/静音） | 4种（Edge/SiliconFlow/MiMo/ElevenLabs） |
 | 素材库 | 3种（Pexels/Pixabay/Coverr） | 3种（Pexels/Pixabay/Coverr） |
+| 视频生成大模型 | 不支持 | 3种（智谱CogVideoX/可灵Kling/MiniMax Hailuo） |
 | 字幕方式 | Edge时间戳 / Whisper本地模型 | Edge时间戳 / Whisper |
 | 跨平台发布 | 支持（Upload-Post） | 不支持 |
 | WebUI | Streamlit | Vue 3 + Element Plus |
 | 视频处理 | MoviePy 2.x + Pillow | FFmpeg 直接调用 |
 
-两者所需对接的模型和服务基本一致，核心都是 **1个LLM + 1个TTS + 1个素材库**。
+两者所需对接的模型和服务基本一致，核心都是 **1个LLM + 1个TTS + 1个素材库**。Soma 额外支持 **AI 原生视频生成**（智谱/可灵/MiniMax），可替代或补充素材拼接模式。

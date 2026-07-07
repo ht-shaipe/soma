@@ -268,6 +268,24 @@ pub struct AppSection {
     pub storage_path: Option<String>,
     /// 并发任务数（旧字段，建议使用 max_concurrent_tasks）
     pub concurrent_tasks: Option<usize>,
+
+    // ── AI 视频生成 ──
+    /// 智谱 AI 视频生成 API 密钥
+    pub zhipu_video_api_key: Option<String>,
+    /// 智谱 AI 视频生成模型名称
+    pub zhipu_video_model: Option<String>,
+    /// 可灵 Access Key
+    pub kling_access_key: Option<String>,
+    /// 可灵 Secret Key
+    pub kling_secret_key: Option<String>,
+    /// 可灵视频生成模型名称
+    pub kling_video_model: Option<String>,
+    /// MiniMax 视频生成 API 密钥
+    pub minimax_video_api_key: Option<String>,
+    /// MiniMax 视频生成模型名称
+    pub minimax_video_model: Option<String>,
+    /// AI 视频生成超时时间（秒），默认 300
+    pub video_gen_timeout: Option<u64>,
 }
 
 /// Whisper 语音识别模型配置

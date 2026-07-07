@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { TaskInfo, VideoParams } from '@/types'
-import { isTaskCompleted, isTaskFailed, getTaskStepLabel } from '@/types'
-import { createVideo, listTasks, getTask, deleteTask } from '@/api/video'
+import type { TaskInfo, VideoParams, StoryboardScene } from '@/types'
+import { isTaskCompleted, isTaskFailed, isTaskDraft, getTaskStepLabel } from '@/types'
+import { createVideo, createDraftTask, updateTaskConfig, startDraftTask, listTasks, getTask, deleteTask, fetchMaterials } from '@/api/video'
 
 export const useTaskStore = defineStore('task', () => {
   const tasks = ref<TaskInfo[]>([])
   const currentTask = ref<TaskInfo | null>(null)
+  const draftTaskId = ref('')
   const isGenerating = ref(false)
   const logs = ref<string[]>([])
   const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
@@ -15,14 +16,14 @@ export const useTaskStore = defineStore('task', () => {
     if (!currentTask.value) return []
     const stepLabel = getTaskStepLabel(currentTask.value)
     const steps = [
+      { key: 'Intent', label: 'Intent' },
       { key: 'Script', label: 'Script' },
-      { key: 'Terms', label: 'Keywords' },
-      { key: 'Audio', label: 'Audio' },
-      { key: 'Subtitle', label: 'Subtitle' },
+      { key: 'Storyboard', label: 'Storyboard' },
       { key: 'Materials', label: 'Materials' },
-      { key: 'Video', label: 'Video' },
+      { key: 'Audio', label: 'Audio' },
+      { key: 'Compose', label: 'Compose' },
     ]
-    const order = ['Script', 'Terms', 'Audio', 'Subtitle', 'Materials', 'Video', 'Completed', 'Failed']
+    const order = ['Intent', 'Script', 'Storyboard', 'Materials', 'Audio', 'Compose', 'Completed', 'Failed']
     const currentIndex = order.indexOf(stepLabel)
     return steps.map((s, i) => ({
       ...s,
@@ -45,7 +46,8 @@ export const useTaskStore = defineStore('task', () => {
     isGenerating.value = true
     logs.value = []
     try {
-      const task = await createVideo(params)
+      const result = await createVideo(params)
+      const task = await getTask(result.taskId)
       currentTask.value = task
       startPolling()
       return task
@@ -100,9 +102,71 @@ export const useTaskStore = defineStore('task', () => {
     logs.value.push(message)
   }
 
+  async function initDraftTask(params: VideoParams) {
+    if (draftTaskId.value) return draftTaskId.value
+    try {
+      const result = await createDraftTask(params)
+      draftTaskId.value = result.taskId
+      return result.taskId
+    } catch (e) {
+      logs.value.push(`Draft creation error: ${e instanceof Error ? e.message : String(e)}`)
+      return ''
+    }
+  }
+
+  async function saveStepConfig(stepParams: Partial<VideoParams> & {
+    script?: string
+    terms?: string[]
+    storyboard?: StoryboardScene[]
+  }) {
+    if (!draftTaskId.value) return
+    try {
+      await updateTaskConfig(draftTaskId.value, stepParams)
+    } catch (e) {
+      logs.value.push(`Config save error: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  async function launchFromDraft() {
+    if (!draftTaskId.value) return
+    isGenerating.value = true
+    logs.value = []
+    try {
+      const result = await startDraftTask(draftTaskId.value)
+      const task = await getTask(result.taskId)
+      currentTask.value = task
+      startPolling()
+      return task
+    } catch (e) {
+      logs.value.push(`Error: ${e instanceof Error ? e.message : String(e)}`)
+      isGenerating.value = false
+      throw e
+    }
+  }
+
+  function resetDraft() {
+    draftTaskId.value = ''
+  }
+
+  async function fetchDraftMaterials() {
+    if (!draftTaskId.value) return
+    try {
+      const result = await fetchMaterials(draftTaskId.value)
+      return result
+    } catch (e) {
+      logs.value.push(`Materials fetch error: ${e instanceof Error ? e.message : String(e)}`)
+      return undefined
+    }
+  }
+
+  function resumeDraft(taskId: string) {
+    draftTaskId.value = taskId
+  }
+
   return {
     tasks,
     currentTask,
+    draftTaskId,
     isGenerating,
     logs,
     pipelineSteps,
@@ -111,5 +175,11 @@ export const useTaskStore = defineStore('task', () => {
     stopPolling,
     removeTask,
     addLog,
+    initDraftTask,
+    saveStepConfig,
+    launchFromDraft,
+    resetDraft,
+    fetchDraftMaterials,
+    resumeDraft,
   }
 })

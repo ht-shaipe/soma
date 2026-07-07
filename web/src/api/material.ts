@@ -12,3 +12,11 @@ export function uploadMaterial(file: File) {
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then(extractData<MaterialInfo>)
 }
+
+export function uploadPortrait(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/portraits/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(extractData<{ name: string; path: string }>)
+}

@@ -68,6 +68,16 @@ async fn get_config(_param: &RequestParameter) -> Result<Value> {
             "pixabay_api_key": app.pixabay_api_keys.as_ref().and_then(|v| v.first()).unwrap_or(&String::new()).clone(),
             "coverr_api_key": app.coverr_api_keys.as_ref().and_then(|v| v.first()).unwrap_or(&String::new()).clone(),
         },
+        "aivideo": {
+            "zhipu_video_api_key": app.zhipu_video_api_key.as_deref().unwrap_or(""),
+            "zhipu_video_model": app.zhipu_video_model.as_deref().unwrap_or("cogvideox-flash"),
+            "kling_access_key": app.kling_access_key.as_deref().unwrap_or(""),
+            "kling_secret_key": app.kling_secret_key.as_deref().unwrap_or(""),
+            "kling_video_model": app.kling_video_model.as_deref().unwrap_or("kling-v2-master"),
+            "minimax_video_api_key": app.minimax_video_api_key.as_deref().unwrap_or(""),
+            "minimax_video_model": app.minimax_video_model.as_deref().unwrap_or("MiniMax-Hailuo-2.3"),
+            "video_gen_timeout": app.video_gen_timeout.unwrap_or(300),
+        },
         "ffmpeg": {
             "path": app.ffmpeg_path.as_deref().unwrap_or("ffmpeg"),
             "threads": conf.app.app.concurrent_tasks.unwrap_or(4) as u32,
@@ -229,6 +239,34 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
         }
         if let Some(key) = v.get("coverr_api_key").and_then(|k| k.as_str()) {
             app.coverr_api_keys = Some(vec![key.to_string()]);
+        }
+    }
+
+    if let Some(v) = param.value.get("aivideo") {
+        let app = &mut conf.app.app;
+        if let Some(key) = v.get("zhipu_video_api_key").and_then(|k| k.as_str()) {
+            app.zhipu_video_api_key = Some(key.to_string());
+        }
+        if let Some(model) = v.get("zhipu_video_model").and_then(|m| m.as_str()) {
+            app.zhipu_video_model = Some(model.to_string());
+        }
+        if let Some(key) = v.get("kling_access_key").and_then(|k| k.as_str()) {
+            app.kling_access_key = Some(key.to_string());
+        }
+        if let Some(key) = v.get("kling_secret_key").and_then(|k| k.as_str()) {
+            app.kling_secret_key = Some(key.to_string());
+        }
+        if let Some(model) = v.get("kling_video_model").and_then(|m| m.as_str()) {
+            app.kling_video_model = Some(model.to_string());
+        }
+        if let Some(key) = v.get("minimax_video_api_key").and_then(|k| k.as_str()) {
+            app.minimax_video_api_key = Some(key.to_string());
+        }
+        if let Some(model) = v.get("minimax_video_model").and_then(|m| m.as_str()) {
+            app.minimax_video_model = Some(model.to_string());
+        }
+        if let Some(timeout) = v.get("video_gen_timeout").and_then(|t| t.as_u64()) {
+            app.video_gen_timeout = Some(timeout);
         }
     }
 

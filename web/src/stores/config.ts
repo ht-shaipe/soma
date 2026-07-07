@@ -28,6 +28,16 @@ export const useConfigStore = defineStore('config', () => {
       pixabay_api_key: '',
       coverr_api_key: '',
     },
+    aivideo: {
+      zhipu_video_api_key: '',
+      zhipu_video_model: 'cogvideox-flash',
+      kling_access_key: '',
+      kling_secret_key: '',
+      kling_video_model: 'kling-v2-master',
+      minimax_video_api_key: '',
+      minimax_video_model: 'MiniMax-Hailuo-2.3',
+      video_gen_timeout: 300,
+    },
     ffmpeg: {
       path: 'ffmpeg',
       threads: 2,
@@ -85,6 +95,13 @@ export const useConfigStore = defineStore('config', () => {
     Object.assign(config.value.app, payload)
   }
 
+  function updateAiVideoConfig(payload: Partial<AppConfig['aivideo']>) {
+    if (!config.value.aivideo) {
+      config.value.aivideo = {}
+    }
+    Object.assign(config.value.aivideo, payload)
+  }
+
   return {
     config,
     loaded,
@@ -98,5 +115,6 @@ export const useConfigStore = defineStore('config', () => {
     updateStockConfig,
     updateFfmpegConfig,
     updateAppConfig,
+    updateAiVideoConfig,
   }
 })

@@ -1,7 +1,8 @@
 /// 任务存储抽象模块
 ///
-/// 提供 TaskStore trait，支持内存和 Redis 两种后端实现。
-/// 内存后端为默认实现，Redis 后端需启用 `redis` feature。
+/// 提供 TaskStore trait，支持内存、Redis 和 SQLite 三种后端实现。
+/// SQLite 后端为默认实现，任务数据持久化到本地数据库文件。
+/// Redis 后端需启用 `redis` feature。
 
 use soma_core::models::TaskInfo;
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ pub trait TaskStore: Send + Sync {
     fn delete(&self, task_id: &str) -> bool;
 }
 
-/// 内存任务存储（默认实现）
+/// 内存任务存储
 pub struct InMemoryTaskStore {
     store: Mutex<HashMap<String, TaskInfo>>,
 }
@@ -68,6 +69,150 @@ impl TaskStore for InMemoryTaskStore {
             e.into_inner()
         });
         store.remove(task_id).is_some()
+    }
+}
+
+/// SQLite 任务存储（持久化）
+pub struct SqliteTaskStore {
+    conn: Mutex<rusqlite::Connection>,
+}
+
+impl SqliteTaskStore {
+    pub fn new(db_path: &str) -> Result<Self, String> {
+        let conn = rusqlite::Connection::open(db_path)
+            .map_err(|e| format!("SQLite 打开失败 {}: {}", db_path, e))?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+            .map_err(|e| format!("SQLite PRAGMA 设置失败: {}", e))?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                task_id TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                state INTEGER NOT NULL,
+                progress INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )",
+            [],
+        ).map_err(|e| format!("SQLite 建表失败: {}", e))?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_state ON tasks(state)",
+            [],
+        ).map_err(|e| format!("SQLite 建索引失败: {}", e))?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at)",
+            [],
+        ).map_err(|e| format!("SQLite 建索引失败: {}", e))?;
+        Ok(Self { conn: Mutex::new(conn) })
+    }
+
+    fn task_to_row(task: &TaskInfo) -> (String, i32, u32, String, String) {
+        let data = serde_json::to_string(task).unwrap_or_else(|e| {
+            log::error!("任务序列化失败 {}: {}", task.task_id, e);
+            "{}".to_string()
+        });
+        let created_at = task.created_at.to_rfc3339();
+        let updated_at = task.updated_at.to_rfc3339();
+        (data, task.state, task.progress, created_at, updated_at)
+    }
+
+    fn row_to_task(data: &str) -> Option<TaskInfo> {
+        serde_json::from_str(data).map_err(|e| {
+            log::error!("任务反序列化失败: {}", e);
+            e
+        }).ok()
+    }
+}
+
+impl TaskStore for SqliteTaskStore {
+    fn create(&self, task: TaskInfo) {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::error!("SqliteTaskStore Mutex 中毒: {}", e); return; }
+        };
+        let (data, state, progress, created_at, updated_at) = Self::task_to_row(&task);
+        if let Err(e) = conn.execute(
+            "INSERT OR REPLACE INTO tasks (task_id, data, state, progress, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![task.task_id, data, state, progress, created_at, updated_at],
+        ) {
+            log::error!("SQLite 创建任务失败 {}: {}", task.task_id, e);
+        }
+    }
+
+    fn get(&self, task_id: &str) -> Option<TaskInfo> {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::error!("SqliteTaskStore Mutex 中毒: {}", e); return None; }
+        };
+        let mut stmt = conn.prepare("SELECT data FROM tasks WHERE task_id = ?1").ok()?;
+        let data: String = stmt.query_row(rusqlite::params![task_id], |row| row.get(0)).ok()?;
+        Self::row_to_task(&data)
+    }
+
+    fn get_all(&self) -> Vec<TaskInfo> {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::error!("SqliteTaskStore Mutex 中毒: {}", e); return vec![]; }
+        };
+        let mut stmt = match conn.prepare("SELECT data FROM tasks ORDER BY updated_at DESC") {
+            Ok(s) => s,
+            Err(e) => { log::error!("SQLite 查询任务失败: {}", e); return vec![]; }
+        };
+        let rows = stmt.query_map([], |row| {
+            let data: String = row.get(0)?;
+            Ok(data)
+        });
+        let mut tasks = Vec::new();
+        match rows {
+            Ok(iter) => {
+                for row in iter {
+                    if let Ok(data) = row {
+                        if let Some(task) = Self::row_to_task(&data) {
+                            tasks.push(task);
+                        }
+                    }
+                }
+            }
+            Err(e) => log::error!("SQLite 遍历任务失败: {}", e),
+        }
+        tasks
+    }
+
+    fn update(&self, task_id: &str, f: Box<dyn FnOnce(&mut TaskInfo) + Send>) {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::error!("SqliteTaskStore Mutex 中毒: {}", e); return; }
+        };
+        let mut stmt = match conn.prepare("SELECT data FROM tasks WHERE task_id = ?1") {
+            Ok(s) => s,
+            Err(e) => { log::error!("SQLite 查询任务失败: {}", e); return; }
+        };
+        let data: String = match stmt.query_row(rusqlite::params![task_id], |row| row.get(0)) {
+            Ok(d) => d,
+            Err(e) => { log::error!("SQLite 获取任务 {} 失败: {}", task_id, e); return; }
+        };
+        let mut task = match Self::row_to_task(&data) {
+            Some(t) => t,
+            None => return,
+        };
+        f(&mut task);
+        let (new_data, state, progress, _, updated_at) = Self::task_to_row(&task);
+        if let Err(e) = conn.execute(
+            "UPDATE tasks SET data = ?1, state = ?2, progress = ?3, updated_at = ?4 WHERE task_id = ?5",
+            rusqlite::params![new_data, state, progress, updated_at, task_id],
+        ) {
+            log::error!("SQLite 更新任务 {} 失败: {}", task_id, e);
+        }
+    }
+
+    fn delete(&self, task_id: &str) -> bool {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::error!("SqliteTaskStore Mutex 中毒: {}", e); return false; }
+        };
+        match conn.execute("DELETE FROM tasks WHERE task_id = ?1", rusqlite::params![task_id]) {
+            Ok(n) => n > 0,
+            Err(e) => { log::error!("SQLite 删除任务 {} 失败: {}", task_id, e); false }
+        }
     }
 }
 

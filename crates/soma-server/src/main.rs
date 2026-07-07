@@ -79,6 +79,10 @@ async fn main() -> std::io::Result<()> {
     std::fs::create_dir_all(soma_core::utils::storage_dir("fonts", true)).ok();
     std::fs::create_dir_all(soma_core::utils::storage_dir("cache_videos", true)).ok();
 
+    // 初始化 SQLite 持久化任务存储
+    let db_path = format!("{}/tasks.db", storage_path);
+    soma_server::state::init_sqlite_store(&db_path);
+
     // 构建监听地址
     let ip = format!("{}:{}", conf.app.get_listen_host(), conf.app.get_listen_port());
     log::info!("Soma server starting at {}", ip);
@@ -107,15 +111,8 @@ async fn main() -> std::io::Result<()> {
             // API 路由：所有 /api/v1/* 请求统一由 router::api_handler 分发
             .service(
                 web::scope("/api/v1")
-                    .service(
-                        web::resource("/{cls}")
-                            .route(web::to(soma_server::router::api_handler)),
-                    )
-                    .service(
-                        web::resource("/{cls}/{tail:.*}")
-                            .route(web::to(soma_server::router::api_handler)),
-                    )
                     // 文件上传接口（multipart/form-data，不走统一分发）
+                    // 注意：具体路径必须在通配符路由之前注册，否则会被通配符拦截
                     .service(
                         web::resource("/materials/upload")
                             .route(web::post().to(soma_server::handler::material::upload_file)),
@@ -129,12 +126,25 @@ async fn main() -> std::io::Result<()> {
                             .route(web::post().to(soma_server::handler::material::upload_audio)),
                     )
                     .service(
+                        web::resource("/portraits/upload")
+                            .route(web::post().to(soma_server::handler::material::upload_portrait)),
+                    )
+                    .service(
                         web::resource("/voices/preview")
                             .route(web::get().to(soma_server::handler::voice::preview_voice)),
                     )
                     .service(
                         web::resource("/subtitles/preview")
                             .route(web::get().to(soma_server::handler::voice::preview_subtitle)),
+                    )
+                    // API 路由：所有 /api/v1/* 请求统一由 router::api_handler 分发
+                    .service(
+                        web::resource("/{cls}")
+                            .route(web::to(soma_server::router::api_handler)),
+                    )
+                    .service(
+                        web::resource("/{cls}/{tail:.*}")
+                            .route(web::to(soma_server::router::api_handler)),
                     )
             )
     })

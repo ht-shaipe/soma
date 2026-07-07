@@ -76,11 +76,13 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useVideoParamsStore } from '@/stores/videoParams'
+import { useTaskStore } from '@/stores/task'
 import { useI18n } from 'vue-i18n'
 import ScriptAdvancedSettings from './ScriptAdvancedSettings.vue'
 import { generateScript, generateTerms } from '@/api/llm'
 
 const store = useVideoParamsStore()
+const taskStore = useTaskStore()
 const { t } = useI18n()
 const generatingScript = ref(false)
 const generatingTerms = ref(false)
@@ -98,9 +100,24 @@ async function onGenerateScriptAndKeywords() {
       store.paragraphNumber,
       store.videoScriptPrompt || undefined,
       store.useCustomSystemPrompt ? store.customSystemPrompt : undefined,
-      store.useCustomSystemPrompt
+      store.useCustomSystemPrompt,
+      {
+        intentStyle: store.intentStyle || undefined,
+        intentMood: store.intentMood || undefined,
+        intentAudience: store.intentAudience || undefined,
+      }
     )
     if (result.script) store.videoScript = result.script
+    if (result.terms && result.terms.length > 0) store.videoTerms = result.terms.join(',')
+    if (taskStore.draftTaskId) {
+      const saveData: Record<string, unknown> = {
+        video_script: result.script || store.videoScript,
+        video_terms: result.terms && result.terms.length > 0 ? result.terms : undefined,
+      }
+      if (result.script) saveData.script = result.script
+      if (result.terms && result.terms.length > 0) saveData.terms = result.terms
+      await taskStore.saveStepConfig(saveData as any)
+    }
     ElMessage.success(t('common.success'))
   } catch (e) {
     ElMessage.error(`${t('common.error')}: ${e instanceof Error ? e.message : String(e)}`)
@@ -118,9 +135,16 @@ async function onGenerateKeywords() {
   try {
     const result = await generateTerms(
       store.videoScript,
+      store.videoSubject || undefined,
       store.videoLanguage !== 'auto' ? store.videoLanguage : undefined
     )
     if (result.terms) store.videoTerms = result.terms.join(',')
+    if (taskStore.draftTaskId && result.terms) {
+      await taskStore.saveStepConfig({
+        video_terms: result.terms,
+        terms: result.terms,
+      } as any)
+    }
     ElMessage.success(t('common.success'))
   } catch (e) {
     ElMessage.error(`${t('common.error')}: ${e instanceof Error ? e.message : String(e)}`)

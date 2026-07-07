@@ -37,6 +37,7 @@ export interface VideoParams {
   video_watermark?: string
   video_intro?: string
   video_outro?: string
+  portrait_image?: string
 }
 
 export interface MaterialInfo {
@@ -53,7 +54,10 @@ export interface MaterialInfo {
 
 export const TaskStateCode = {
   Failed: -1,
+  Draft: 0,
   Completed: 1,
+  Queued: 2,
+  Paused: 3,
   Processing: 4,
 } as const
 
@@ -67,6 +71,8 @@ export interface TaskInfo {
   videoSubject?: string
   videoScript?: string
   terms?: string[]
+  params?: VideoParams
+  storyboard?: StoryboardScene[]
   audioFile?: string
   audioDuration?: number
   subtitlePath?: string
@@ -87,6 +93,18 @@ export function isTaskFailed(task: TaskInfo): boolean {
   return task.state === TaskStateCode.Failed
 }
 
+export function isTaskDraft(task: TaskInfo): boolean {
+  return task.state === TaskStateCode.Draft
+}
+
+export function isTaskQueued(task: TaskInfo): boolean {
+  return task.state === TaskStateCode.Queued
+}
+
+export function isTaskPaused(task: TaskInfo): boolean {
+  return task.state === TaskStateCode.Paused
+}
+
 export function isTaskProcessing(task: TaskInfo): boolean {
   return task.state === TaskStateCode.Processing
 }
@@ -94,13 +112,16 @@ export function isTaskProcessing(task: TaskInfo): boolean {
 export function getTaskStepLabel(task: TaskInfo): string {
   if (isTaskFailed(task)) return 'Failed'
   if (isTaskCompleted(task)) return 'Completed'
+  if (isTaskQueued(task)) return 'Queued'
+  if (isTaskPaused(task)) return 'Paused'
+  if (isTaskDraft(task)) return 'Draft'
   const p = task.progress
-  if (p < 10) return 'Script'
-  if (p < 20) return 'Terms'
-  if (p < 40) return 'Audio'
-  if (p < 60) return 'Subtitle'
-  if (p < 80) return 'Materials'
-  if (p < 100) return 'Video'
+  if (p < 5) return 'Intent'
+  if (p < 15) return 'Script'
+  if (p < 30) return 'Storyboard'
+  if (p < 55) return 'Materials'
+  if (p < 70) return 'Audio'
+  if (p < 100) return 'Compose'
   return 'Completed'
 }
 
@@ -109,6 +130,18 @@ export interface SubtitleCue {
   startMs: number
   endMs: number
   text: string
+}
+
+export interface StoryboardScene {
+  scene_id: number
+  duration?: number
+  narration: string
+  visual_desc?: string
+  visual_prompt: string
+  camera_movement?: string
+  transition?: string
+  text_overlay?: string
+  mood?: string
 }
 
 export interface ApiResponse<T = unknown> {
@@ -194,6 +227,16 @@ export interface AppConfig {
     pexels_api_key: string
     pixabay_api_key: string
     coverr_api_key: string
+  }
+  aivideo?: {
+    zhipu_video_api_key?: string
+    zhipu_video_model?: string
+    kling_access_key?: string
+    kling_secret_key?: string
+    kling_video_model?: string
+    minimax_video_api_key?: string
+    minimax_video_model?: string
+    video_gen_timeout?: number
   }
   ffmpeg: {
     path: string

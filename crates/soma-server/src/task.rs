@@ -62,8 +62,12 @@ impl TaskQueue {
             std::thread::spawn(move || {
                 let result = service::pipeline::run_task(&tid, &p, &sa);
                 if let Err(e) = result {
-                    log!("task {} failed: {:?}", tid, e);
-                    state::update_task(&tid, Some(TaskStatus::Failed.as_i32()), None);
+                    log::error!("task {} failed: {:?}", tid, e);
+                    state::update_task_data(&tid, &state::TaskUpdateData {
+                        state: Some(TaskStatus::Failed.as_i32()),
+                        error_message: Some(format!("{:?}", e)),
+                        ..Default::default()
+                    });
                 }
                 lock_queue().task_done();
             });
@@ -95,8 +99,12 @@ impl TaskQueue {
                 std::thread::spawn(move || {
                     let result = service::pipeline::run_task(&tid, &p, &sa);
                     if let Err(e) = result {
-                        log!("task {} failed: {:?}", tid, e);
-                        state::update_task(&tid, Some(TaskStatus::Failed.as_i32()), None);
+                        log::error!("task {} failed: {:?}", tid, e);
+                        state::update_task_data(&tid, &state::TaskUpdateData {
+                            state: Some(TaskStatus::Failed.as_i32()),
+                            error_message: Some(format!("{:?}", e)),
+                            ..Default::default()
+                        });
                     }
                     lock_queue().task_done();
                 });

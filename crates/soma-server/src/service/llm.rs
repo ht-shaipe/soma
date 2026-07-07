@@ -8,6 +8,7 @@
 /// 同时包含 LLM 提供商配置读取和响应解析的辅助函数。
 
 use soma_core::error::SomaError;
+use soma_core::models::StoryboardScene;
 use ai_llm_kit::{LlmFactory, LlmProvider};
 use crate::Config;
 
@@ -29,24 +30,14 @@ lazy_static! {
     static ref RE_CODE_FENCE_CLOSE: regex::Regex = regex_or_panic!(r"\s*```$");
 }
 
-/// 根据主题生成短视频脚本
+/// 根据主题生成短视频脚本，同时提取素材搜索关键词
 ///
-/// 调用 LLM API，根据给定的主题、语言、段落数等参数生成适合短视频的脚本内容。
-/// 支持自定义 system_prompt 和 user_prompt，也提供默认的提示词模板。
-///
-/// 参数：
-/// - `provider`: LLM 提供商名称（如 "openai"、"deepseek"、"qwen" 等）
-/// - `subject`: 视频主题
-/// - `language`: 脚本语言（为空则默认中文）
-/// - `paragraph_number`: 段落数量
-/// - `prompt`: 自定义用户提示词（为空使用默认模板）
-/// - `system_prompt`: 自定义系统提示词（为空使用默认模板）
-/// - `conf`: 全局配置引用
-///
-/// 返回：生成的脚本文本内容，或 LLM 调用错误
+/// 对应设计文档②文案/剧情生成。一次 LLM 调用同时完成脚本撰写和关键词提取，
+/// 避免两次串行调用导致超时。关键词以 JSON 数组形式附在脚本之后。
 pub async fn generate_script(
     provider: &str,
     subject: &str,
+    intent: &serde_json::Value,
     language: &str,
     paragraph_number: u32,
     prompt: &str,
@@ -56,15 +47,24 @@ pub async fn generate_script(
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
     let llm = LlmFactory::create(llm_provider, &api_key);
 
+    let intent_desc = format!(
+        "主题：{}\n风格：{}\n情感基调：{}\n目标受众：{}\n时长建议：{}\n目标平台：{}",
+        intent.get("theme").and_then(|v| v.as_str()).unwrap_or(subject),
+        intent.get("style").and_then(|v| v.as_str()).unwrap_or(""),
+        intent.get("mood").and_then(|v| v.as_str()).unwrap_or(""),
+        intent.get("audience").and_then(|v| v.as_str()).unwrap_or(""),
+        intent.get("duration").and_then(|v| v.as_str()).unwrap_or("30s"),
+        intent.get("platform").and_then(|v| v.as_str()).unwrap_or(""),
+    );
+
     let sys_msg = if system_prompt.is_empty() {
         format!(
-            "你是一个短视频脚本撰写专家。请根据给定的主题，撰写一段适合短视频的脚本。\
-             要求：\n\
-             1. 语言为{}\n\
-             2. 段落数为{}段\n\
-             3. 内容要吸引人，有节奏感\n\
-             4. 不要包含任何格式标记、标题、序号等\n\
-             5. 只输出脚本内容本身",
+            "你是短视频脚本撰写专家。根据创作参数撰写短视频脚本，并提取素材搜索关键词。\n\
+             输出两部分，用 ===KEYWORDS=== 分隔：\n\
+             第一部分：脚本，按时间线标注 [开始s-结束s] 旁白文本\n\
+             第二部分：5个英文搜索关键词，逗号分隔，适合Pexels/Pixabay搜索\n\n\
+             语言：{}\n段落数：{}\n\
+             不要包含格式标记、标题、序号（时间标注除外）",
             if language.is_empty() { "中文" } else { language },
             paragraph_number,
         )
@@ -73,9 +73,9 @@ pub async fn generate_script(
     };
 
     let user_msg = if prompt.is_empty() {
-        format!("请为以下主题撰写短视频脚本：{}", subject)
+        format!("创作参数：\n{}\n\n请撰写脚本并提取关键词：", intent_desc)
     } else {
-        format!("{}\n主题：{}", prompt, subject)
+        format!("{}\n\n创作参数：\n{}\n主题：{}", prompt, intent_desc, subject)
     };
 
     let body = serde_json::json!({
@@ -150,6 +150,234 @@ pub async fn generate_terms(
     let content = clean_llm_output(&content);
     let terms = parse_terms_output(&content, amount);
     Ok(terms)
+}
+
+/// 需求理解：将用户简短描述提炼为结构化的视频创作参数
+///
+/// 对应设计文档①需求理解。LLM 解析用户意图，提取结构化创作参数。
+/// 如果用户输入已经很详细（含多行或超过50字），直接构建简单结构返回。
+/// 输出格式遵循文档中的 JSON 结构：theme, style, duration, aspect_ratio, audience, mood, language, platform。
+pub async fn generate_intent(
+    provider: &str,
+    subject: &str,
+    language: &str,
+    aspect_ratio: &str,
+    conf: &Config,
+) -> Result<serde_json::Value, SomaError> {
+    if subject.lines().count() > 2 || subject.chars().count() > 50 {
+        return Ok(serde_json::json!({
+            "theme": subject,
+            "style": "",
+            "duration": "",
+            "aspect_ratio": aspect_ratio,
+            "audience": "",
+            "mood": "",
+            "language": if language.is_empty() { "中文" } else { language },
+            "platform": ""
+        }));
+    }
+
+    let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
+    let llm = LlmFactory::create(llm_provider, &api_key);
+
+    let sys_msg = "你是一个短视频创意策划专家。请根据用户的简短描述，提炼出结构化的视频创作参数。\
+                   以JSON格式输出，包含以下字段：\n\
+                   - theme: 视频主题（精炼关键词）\n\
+                   - style: 视觉风格（如：唯美治愈、科技感、纪实、幽默等）\n\
+                   - duration: 建议时长（如 30s、60s）\n\
+                   - aspect_ratio: 画幅比例（9:16竖屏 或 16:9横屏）\n\
+                   - audience: 目标受众\n\
+                   - mood: 情感基调（如：温暖、希望、紧张、欢乐等）\n\
+                   - language: 语言\n\
+                   - platform: 目标平台（抖音、视频号、YouTube等）\n\
+                   只输出JSON，不要代码围栏或解释。";
+
+    let user_msg = format!("请提炼以下视频创意：{}\n参考画幅：{}\n参考语言：{}", subject, aspect_ratio, if language.is_empty() { "中文" } else { language });
+
+    let body = serde_json::json!({
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": user_msg}
+        ],
+        "temperature": 0.5,
+        "max_tokens": 512,
+    });
+
+    let body_value = serde_json_to_tube_value(&body);
+    let result = llm.chat(&body_value).await
+        .map_err(|e| SomaError::Llm(format!("LLM intent failed: {:?}", e)))?;
+
+    let content = extract_content_from_response(&result);
+    let content = clean_llm_output(&content);
+    parse_intent_output(&content, subject, language, aspect_ratio)
+}
+
+/// 分镜脚本 + 提示词生成：将脚本文案拆分为分镜场景列表
+///
+/// 对应设计文档③分镜脚本 + ④提示词生成（合并为一次LLM调用）。
+/// 将文案拆解为场景镜头，每个镜头包含完整制作指令。
+/// 视觉提示词遵循公式：主体描述 + 环境/场景 + 光线/色彩 + 风格/质量 + 镜头参数。
+/// LLM 以 JSON 数组格式输出 StoryboardScene 列表。
+/// JSON 解析失败时回退到简单的等分拆分逻辑。
+pub async fn generate_storyboard(
+    provider: &str,
+    subject: &str,
+    script: &str,
+    clip_duration: u32,
+    intent: &serde_json::Value,
+    conf: &Config,
+) -> Result<Vec<StoryboardScene>, SomaError> {
+    let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
+    let llm = LlmFactory::create(llm_provider, &api_key);
+
+    let style = intent.get("style").and_then(|v| v.as_str()).unwrap_or("");
+    let mood = intent.get("mood").and_then(|v| v.as_str()).unwrap_or("");
+
+    let sys_msg = format!(
+        "你是一个专业的视频分镜导演。请根据给定的视频脚本文案，将其拆分为多个分镜场景，并为每个场景生成完整的制作指令和视觉提示词。\n\n\
+         输入信息：\n\
+         - 主题：{}\n\
+         - 视觉风格：{}\n\
+         - 情感基调：{}\n\n\
+         每个场景包含以下字段：\n\
+         - scene_id: 场景编号（从1开始）\n\
+         - duration: 该镜头时长（秒），每个场景约{}秒\n\
+         - narration: 该场景旁白文本，所有场景narration按顺序合并应还原原始脚本\n\
+         - visual_desc: 画面中文描述（如：近景：樱花树上花瓣随风飘落，阳光透过枝头）\n\
+         - visual_prompt: 画面英文提示词，遵循公式：主体描述 + 环境/场景 + 光线/色彩 + 风格/质量 + 镜头参数\n\
+           示例：cherry blossom petals gently falling from branches, soft golden morning light filtering through, \
+           cinematic warm pastel tones 8K, shallow depth of field bokeh\n\
+         - camera_movement: 镜头运动，从以下选择：push_in(缓慢推进), pull_out(拉远), pan_left(左摇), pan_right(右摇), \
+           tilt_up(上仰), tilt_down(下俯), static(固定), zoom(变焦), tracking(跟随), aerial(航拍), close_up(特写)\n\
+         - transition: 转场方式：cut(硬切-节奏感强), fade(淡入淡出-柔和抒情), dissolve(叠化-时间流逝), slide(滑动-空间转换), zoom(缩放-突出重点)\n\
+         - text_overlay: 字幕叠加文本（装饰性文字，如\"春 · 起始\"，若与旁白相同则留空）\n\
+         - mood: 情绪基调（如：温暖宁静、紧张悬疑、欢乐活泼等）\n\n\
+         关键要求：\n\
+         1. 场景数量根据脚本长度合理划分，每个场景应是一个完整的视觉画面\n\
+         2. visual_prompt 必须是英文，具体、有画面感，适合AI视频生成\n\
+         3. camera_movement 要与画面内容和情绪匹配\n\
+         4. 镜头运动参考：固定→展示静态场景、推进→增强沉浸感、航拍→宏大场景、跟随→增强代入感、特写→强调细节\n\n\
+         以JSON数组输出：\n\
+         [\n  {{\n    \"scene_id\": 1,\n    \"duration\": {},\n    \"narration\": \"场景旁白\",\n    \"visual_desc\": \"近景：樱花飘落...\",\n    \
+         \"visual_prompt\": \"cherry blossom petals falling, soft golden light, cinematic, 8K\",\n    \
+         \"camera_movement\": \"push_in\",\n    \"transition\": \"fade\",\n    \"text_overlay\": \"春 · 起始\",\n    \
+         \"mood\": \"温暖宁静\"\n  }}\n]\n\n\
+         只输出JSON数组，不要代码围栏或解释。", subject, style, mood, clip_duration, clip_duration);
+
+    let user_msg = format!("视频脚本：\n{}", script);
+
+    let body = serde_json::json!({
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": user_msg}
+        ],
+        "temperature": 0.4,
+        "max_tokens": 4096,
+    });
+
+    let body_value = serde_json_to_tube_value(&body);
+    let result = llm.chat(&body_value).await
+        .map_err(|e| SomaError::Llm(format!("LLM storyboard failed: {:?}", e)))?;
+
+    let content = extract_content_from_response(&result);
+    let content = clean_llm_output(&content);
+    parse_storyboard_output(&content, script, clip_duration)
+}
+
+/// 解析分镜脚本 LLM 输出，支持多种格式和容错回退
+fn parse_storyboard_output(content: &str, original_script: &str, clip_duration: u32) -> Result<Vec<StoryboardScene>, SomaError> {
+    let stripped = strip_code_fence(content);
+
+    if let Ok(scenes) = serde_json::from_str::<Vec<StoryboardScene>>(&stripped) {
+        if !scenes.is_empty() {
+            return Ok(scenes);
+        }
+    }
+
+    if let Ok(re) = regex::Regex::new(r"(?s)\[.*\]") {
+        if let Some(caps) = re.find(&stripped) {
+            if let Ok(scenes) = serde_json::from_str::<Vec<StoryboardScene>>(caps.as_str()) {
+                if !scenes.is_empty() {
+                    return Ok(scenes);
+                }
+            }
+        }
+    }
+
+    log!("分镜脚本JSON解析失败，回退到简单等分拆分");
+    Ok(fallback_storyboard(original_script, clip_duration))
+}
+
+/// 简单等分拆分回退：按标点将脚本拆分为若干场景
+fn fallback_storyboard(script: &str, clip_duration: u32) -> Vec<StoryboardScene> {
+    use soma_core::models::PUNCTUATIONS;
+
+    let sentences: Vec<&str> = script.split(|c: char| {
+        PUNCTUATIONS.contains(&c.to_string().as_str())
+    }).filter(|s| !s.trim().is_empty()).collect();
+
+    if sentences.is_empty() {
+        return vec![StoryboardScene {
+            scene_id: 1,
+            duration: Some(clip_duration),
+            narration: script.to_string(),
+            visual_desc: Some(script.to_string()),
+            visual_prompt: script.to_string(),
+            camera_movement: Some("static".to_string()),
+            transition: Some("cut".to_string()),
+            text_overlay: None,
+            mood: None,
+        }];
+    }
+
+    sentences.iter().enumerate().map(|(i, s)| {
+        StoryboardScene {
+            scene_id: (i + 1) as u32,
+            duration: Some(clip_duration),
+            narration: s.trim().to_string(),
+            visual_desc: Some(s.trim().to_string()),
+            visual_prompt: s.trim().to_string(),
+            camera_movement: Some("static".to_string()),
+            transition: if i + 1 < sentences.len() { Some("cut".to_string()) } else { None },
+            text_overlay: None,
+            mood: None,
+        }
+    }).collect()
+}
+
+/// 解析需求理解 LLM 输出，容错回退
+fn parse_intent_output(content: &str, subject: &str, language: &str, aspect_ratio: &str) -> Result<serde_json::Value, SomaError> {
+    let stripped = strip_code_fence(content);
+
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&stripped) {
+        if v.is_object() {
+            return Ok(v);
+        }
+    }
+
+    if let Ok(re) = regex::Regex::new(r"(?s)\{.*\}") {
+        if let Some(caps) = re.find(&stripped) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(caps.as_str()) {
+                if v.is_object() {
+                    return Ok(v);
+                }
+            }
+        }
+    }
+
+    log!("需求理解JSON解析失败，使用默认值");
+    Ok(serde_json::json!({
+        "theme": subject,
+        "style": "",
+        "duration": "",
+        "aspect_ratio": aspect_ratio,
+        "audience": "",
+        "mood": "",
+        "language": if language.is_empty() { "中文" } else { language },
+        "platform": ""
+    }))
 }
 
 /// 生成社交媒体发布元数据
