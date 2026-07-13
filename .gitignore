@@ -14,7 +14,10 @@ web/dist-ssr/
 /storage
 **/storage
 
-
+# ai tools
+.deveco
+.claude
+.opencode
 
 # Logs
 logs/
