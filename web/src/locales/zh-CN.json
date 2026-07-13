@@ -178,6 +178,8 @@
     "deleteConfirm": "确定要删除此任务吗？",
     "noTasks": "暂无任务",
     "continueEdit": "继续编辑",
+    "stop": "强制停止",
+    "stopConfirm": "确定要强制停止此任务吗？停止后可点击「继续编辑」重新生成。",
     "playVideo": "播放视频",
     "downloadVideo": "下载视频",
     "statusPending": "等待中",

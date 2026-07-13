@@ -11,9 +11,21 @@
 /// 支持通过 stop_at 参数在任意步骤后停止，方便调试和预览中间结果。
 
 use soma_core::error::SomaError;
-use soma_core::models::{StoryboardScene, TaskStatus, VideoParams};
+use soma_core::models::{StoryboardScene, TaskStatus, VideoParams, AiVideoSegmentLog};
 use crate::state::{self, TaskUpdateData};
 use crate::Config;
+
+fn block_on_async<F>(fut: F) -> Result<F::Output, SomaError>
+where
+    F: std::future::Future,
+{
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| SomaError::Llm(format!("tokio runtime 创建失败: {}", e)))?;
+    let local = tokio::task::LocalSet::new();
+    Ok(local.block_on(&rt, fut))
+}
 
 pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<(), SomaError> {
     let conf = Config::get();
@@ -135,6 +147,41 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         return Ok(());
     }
 
+    state::update_task(task_id, None, Some(25));
+
+    // ===== 第3.5步：旁白文案生成 =====
+    let narration_text = if let Some(ref t) = task_data {
+        if let Some(ref n) = t.narration {
+            if !n.is_empty() {
+                log::info!("task {}: 使用已有旁白文案 ({}字)", task_id, n.len());
+                n.clone()
+            } else {
+                log::info!("task {}: 开始生成旁白文案...", task_id);
+                generate_narration(task_id, params, &video_script, &storyboard, &intent, &conf)?
+            }
+        } else {
+            log::info!("task {}: 开始生成旁白文案(narration为None)...", task_id);
+            generate_narration(task_id, params, &video_script, &storyboard, &intent, &conf)?
+        }
+    } else {
+        log::info!("task {}: 开始生成旁白文案(无task_data)...", task_id);
+        generate_narration(task_id, params, &video_script, &storyboard, &intent, &conf)?
+    };
+    log::info!("task {}: 旁白文案生成完成 ({}字)", task_id, narration_text.len());
+    state::update_task_data(task_id, &TaskUpdateData {
+        narration: Some(narration_text.clone()),
+        ..Default::default()
+    });
+
+    if stop_at == "narration" {
+        state::update_task_data(task_id, &TaskUpdateData {
+            state: Some(TaskStatus::Completed.as_i32()),
+            progress: Some(100),
+            ..Default::default()
+        });
+        return Ok(());
+    }
+
     state::update_task(task_id, None, Some(30));
 
     // ===== 第4步：素材生成 =====
@@ -168,13 +215,17 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     state::update_task(task_id, None, Some(55));
 
     // ===== 第5步：音频生成 + 字幕 =====
-    let narration_text: String = if storyboard.is_empty() {
-        video_script.clone()
+    let tts_text = if narration_text.is_empty() {
+        if storyboard.is_empty() {
+            video_script.clone()
+        } else {
+            storyboard.iter()
+                .map(|s| s.narration.as_str())
+                .collect::<Vec<&str>>()
+                .join(" ")
+        }
     } else {
-        storyboard.iter()
-            .map(|s| s.narration.as_str())
-            .collect::<Vec<&str>>()
-            .join(" ")
+        narration_text.clone()
     };
 
     let (audio_file, audio_duration) = if let Some(ref t) = task_data {
@@ -183,13 +234,13 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
                 let dur = t.audio_duration.unwrap_or(0.0);
                 (af.clone(), dur)
             } else {
-                generate_audio(task_id, params, &narration_text, &conf)?
+                generate_audio(task_id, params, &tts_text, &conf)?
             }
         } else {
-            generate_audio(task_id, params, &narration_text, &conf)?
+            generate_audio(task_id, params, &tts_text, &conf)?
         }
     } else {
-        generate_audio(task_id, params, &narration_text, &conf)?
+        generate_audio(task_id, params, &tts_text, &conf)?
     };
     state::update_task_data(task_id, &TaskUpdateData {
         audio_file: Some(audio_file.clone()),
@@ -211,13 +262,13 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
             if !sp.is_empty() && std::path::Path::new(sp).exists() {
                 sp.clone()
             } else {
-                generate_subtitle(task_id, params, &narration_text, &audio_file, &conf)?
+                generate_subtitle(task_id, params, &tts_text, &audio_file, &conf)?
             }
         } else {
-            generate_subtitle(task_id, params, &narration_text, &audio_file, &conf)?
+            generate_subtitle(task_id, params, &tts_text, &audio_file, &conf)?
         }
     } else {
-        generate_subtitle(task_id, params, &narration_text, &audio_file, &conf)?
+        generate_subtitle(task_id, params, &tts_text, &audio_file, &conf)?
     };
     state::update_task_data(task_id, &TaskUpdateData {
         subtitle_path: Some(subtitle_path.clone()),
@@ -243,10 +294,9 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         if let Some(ref platforms) = ui.upload_post_platforms {
             if !platforms.is_empty() && !final_videos.is_empty() {
                 let title = video_script.chars().take(100).collect::<String>();
-                let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Upload(e.to_string()))?;
-                if let Err(e) = rt.block_on(
+                if let Err(e) = block_on_async(
                     super::upload::upload_video(&final_videos[0], &title, platforms, ui, None)
-                ) {
+                )? {
                     log::error!("自动发布失败: {:?}", e);
                 }
             }
@@ -275,10 +325,9 @@ fn generate_intent(_task_id: &str, params: &VideoParams, conf: &Config) -> Resul
     let language = params.video_language.as_deref().unwrap_or("");
     let aspect_ratio = params.video_aspect.as_deref().unwrap_or("9:16");
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Llm(e.to_string()))?;
     retry(3, || {
         let fut = super::llm::generate_intent(provider, &params.video_subject, language, aspect_ratio, conf);
-        rt.block_on(fut)
+        block_on_async(fut)?
     })
 }
 
@@ -301,18 +350,38 @@ fn generate_script(_task_id: &str, params: &VideoParams, intent: &serde_json::Va
         ""
     };
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Llm(e.to_string()))?;
     retry(5, || {
         let fut = super::llm::generate_script(provider, &params.video_subject, intent, language, paragraph_number, prompt, system_prompt, conf);
-        rt.block_on(fut)
+        block_on_async(fut)?
+    })
+}
+
+/// 第3.5步：旁白文案生成 — 将视频脚本转换为口语化旁白
+///
+/// 视频脚本包含场景描述、镜头语言等，不适合直接 TTS 朗读。
+/// 此步骤调用 LLM 将其转换为自然流畅的旁白文案。
+fn generate_narration(_task_id: &str, params: &VideoParams, script: &str, storyboard: &[StoryboardScene], _intent: &serde_json::Value, conf: &Config) -> Result<String, SomaError> {
+    let provider = conf.app.app.llm_provider.as_deref().unwrap_or("openai");
+    let style = params.intent_style.as_deref().unwrap_or("");
+    let mood = params.intent_mood.as_deref().unwrap_or("");
+    let language = params.video_language.as_deref().unwrap_or("");
+    let storyboard_json = serde_json::to_value(storyboard).unwrap_or(serde_json::Value::Null);
+
+    retry(3, || {
+        let fut = super::llm::generate_narration(provider, script, &storyboard_json, style, mood, language, conf);
+        block_on_async(fut)?
     })
 }
 
 /// 第3步：分镜脚本 + 提示词生成
 ///
-/// 若用户已提供关键词(video_terms)，转换为简单分镜；
-/// 否则调用 LLM 将脚本拆分为分镜场景，同时生成视觉提示词。
+/// 始终调用 LLM 将脚本拆分为分镜场景，生成带场景拆分的完整分镜。
+/// 若用户已提供关键词(video_terms)，作为视觉提示词的参考/约束传入 LLM。
 fn generate_storyboard_from_script(_task_id: &str, params: &VideoParams, script: &str, intent: &serde_json::Value, conf: &Config) -> Result<Vec<StoryboardScene>, SomaError> {
+    let provider = conf.app.app.llm_provider.as_deref().unwrap_or("openai");
+    let clip_duration = params.get_clip_duration();
+
+    let mut enriched_intent = intent.clone();
     if let Some(ref terms) = params.video_terms {
         let term_list = if let Some(arr) = terms.as_array() {
             arr.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<String>>()
@@ -321,33 +390,16 @@ fn generate_storyboard_from_script(_task_id: &str, params: &VideoParams, script:
         } else {
             vec![]
         };
-
         if !term_list.is_empty() {
-            let clip_dur = params.get_clip_duration();
-            let scenes: Vec<StoryboardScene> = term_list.iter().enumerate().map(|(i, term)| {
-                StoryboardScene {
-                    scene_id: (i + 1) as u32,
-                    duration: Some(clip_dur),
-                    narration: script.to_string(),
-                    visual_desc: None,
-                    visual_prompt: term.clone(),
-                    camera_movement: Some("static".to_string()),
-                    transition: if i + 1 < term_list.len() { Some("cut".to_string()) } else { None },
-                    text_overlay: None,
-                    mood: intent.get("mood").and_then(|v| v.as_str()).map(String::from),
-                }
-            }).collect();
-            return Ok(scenes);
+            enriched_intent["user_visual_keywords"] = serde_json::Value::Array(
+                term_list.iter().map(|t| serde_json::Value::String(t.clone())).collect()
+            );
         }
     }
 
-    let provider = conf.app.app.llm_provider.as_deref().unwrap_or("openai");
-    let clip_duration = params.get_clip_duration();
-
-    let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Llm(e.to_string()))?;
     retry(3, || {
-        let fut = super::llm::generate_storyboard(provider, &params.video_subject, script, clip_duration, intent, conf);
-        rt.block_on(fut)
+        let fut = super::llm::generate_storyboard(provider, &params.video_subject, script, clip_duration, &enriched_intent, conf);
+        block_on_async(fut)?
     })
 }
 
@@ -365,13 +417,12 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
         std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
     }
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Tts(e.to_string()))?;
     let result = if soma_tts::voices::is_siliconflow_voice(voice_name) {
         let sf_key = conf.app.siliconflow.api_key.as_deref().unwrap_or("");
         let tts = soma_tts::siliconflow_tts::SiliconflowTts::new(sf_key);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
-            rt.block_on(fut)
+            block_on_async(fut)?
         })
     } else if soma_tts::voices::is_elevenlabs_voice(voice_name) {
         let el_key = conf.app.elevenlabs.api_key.as_deref().unwrap_or("");
@@ -379,7 +430,7 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
         let tts = soma_tts::elevenlabs_tts::ElevenlabsTts::new(el_key, el_model);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
-            rt.block_on(fut)
+            block_on_async(fut)?
         })
     } else if soma_tts::voices::is_mimo_voice(voice_name) {
         let mimo_key = conf.app.app.mimo_api_key.as_deref().unwrap_or("");
@@ -389,7 +440,7 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
         let tts = soma_tts::mimo_tts::MimoTts::new(mimo_key, mimo_base, mimo_model, mimo_style);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
-            rt.block_on(fut)
+            block_on_async(fut)?
         })
     } else if soma_tts::voices::is_gemini_voice(voice_name) {
         let gemini_key = conf.app.app.gemini_api_key.as_deref().unwrap_or("");
@@ -397,7 +448,7 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
         let tts = soma_tts::gemini_tts::GeminiTts::new(gemini_key, "", gemini_model);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
-            rt.block_on(fut)
+            block_on_async(fut)?
         })
     } else if soma_tts::voices::is_azure_voice(voice_name) {
         let azure_key = conf.app.azure.speech_key.as_deref().unwrap_or("");
@@ -405,13 +456,13 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
         let tts = soma_tts::azure_tts::AzureTts::new(azure_key, azure_region);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
-            rt.block_on(fut)
+            block_on_async(fut)?
         })
     } else {
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
-            rt.block_on(fut)
+            block_on_async(fut)?
         })
     }.map_err(|e| {
         state::update_task(task_id, Some(TaskStatus::Failed.as_i32()), None);
@@ -471,12 +522,14 @@ pub fn get_video_materials(task_id: &str, params: &VideoParams, terms: &[String]
             resolve_portrait_ai_source(&conf.app.app)
         };
         let portrait_url = resolve_portrait_url(portrait.unwrap_or(""), &conf);
-        let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Stock(e.to_string()))?;
-        return rt.block_on(
+        let result = block_on_async(
             soma_stock::generate_ai_videos(
                 task_id, terms, &ai_source, &aspect, clip_dur, &conf.app, Some(portrait_url.as_str()),
             )
-        );
+        )??;
+        let (paths, logs) = result;
+        update_ai_video_logs(task_id, &logs);
+        return Ok(paths);
     }
 
     if source == "local" {
@@ -486,12 +539,14 @@ pub fn get_video_materials(task_id: &str, params: &VideoParams, terms: &[String]
     }
 
     if source == "cogvideox" || source == "kling" || source == "minimax" {
-        let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Stock(e.to_string()))?;
-        return rt.block_on(
+        let result = block_on_async(
             soma_stock::generate_ai_videos(
                 task_id, terms, source, &aspect, clip_dur, &conf.app, None,
             )
-        );
+        )??;
+        let (paths, logs) = result;
+        update_ai_video_logs(task_id, &logs);
+        return Ok(paths);
     }
 
     let pexels_keys = conf.app.app.pexels_api_keys.clone().unwrap_or_default();
@@ -499,14 +554,13 @@ pub fn get_video_materials(task_id: &str, params: &VideoParams, terms: &[String]
     let coverr_keys = conf.app.app.coverr_api_keys.clone().unwrap_or_default();
     let material_dir = conf.app.app.material_directory.clone().unwrap_or_default();
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| SomaError::Stock(e.to_string()))?;
-    rt.block_on(
+    block_on_async(
         soma_stock::download_videos(
             task_id, terms, source, &aspect,
             audio_duration * params.get_video_count() as f64,
             clip_dur, &pexels_keys, &pixabay_keys, &coverr_keys, &material_dir,
         )
-    )
+    )?
 }
 
 /// 第6步：合成最终视频
@@ -531,15 +585,20 @@ fn generate_final_videos(
     let mut final_videos = Vec::new();
     let mut combined_videos = Vec::new();
     let mut progress = 70u32;
+    let total_steps = video_count * 3;
+    let step_progress = if total_steps > 0 { 30 / total_steps } else { 30 };
 
     for i in 1..=video_count {
         let task_dir_path = soma_core::utils::task_dir(task_id);
         let combined_path = task_dir_path.join(format!("combined-{}.mp4", i)).to_string_lossy().to_string();
         let final_path = task_dir_path.join(format!("final-{}.mp4", i)).to_string_lossy().to_string();
 
+        progress = (progress + step_progress).min(99);
+        state::update_task(task_id, None, Some(progress));
+
         composer.combine_videos(materials, audio_file, &combined_path, &aspect, clip_dur, transition_mode)?;
 
-        progress += (30 / video_count / 2).max(1);
+        progress = (progress + step_progress).min(99);
         state::update_task(task_id, None, Some(progress));
 
         let bgm_file = composer.get_bgm_file(
@@ -586,9 +645,6 @@ fn generate_final_videos(
             current_path.clone()
         };
 
-        progress += (30 / video_count / 2).max(1);
-        state::update_task(task_id, None, Some(progress));
-
         final_videos.push(final_path_with_intro_outro);
         combined_videos.push(combined_path);
     }
@@ -605,6 +661,7 @@ where
         match f() {
             Ok(v) => return Ok(v),
             Err(e) => {
+                log::warn!("retry attempt {}/{} failed: {:?}", attempt + 1, max_retries + 1, e);
                 if attempt < max_retries {
                     let delay = std::time::Duration::from_millis(500 * (1 << attempt) as u64);
                     std::thread::sleep(delay);
@@ -614,6 +671,13 @@ where
         }
     }
     Err(last_err.unwrap_or_else(|| SomaError::Llm("重试全部失败且无错误记录".into())))
+}
+
+fn update_ai_video_logs(task_id: &str, logs: &[AiVideoSegmentLog]) {
+    state::update_task_data(task_id, &TaskUpdateData {
+        ai_video_logs: Some(logs.to_vec()),
+        ..Default::default()
+    });
 }
 
 fn resolve_portrait_ai_source(conf: &soma_core::config::AppSection) -> String {

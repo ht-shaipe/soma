@@ -12,7 +12,7 @@ extern crate tube;
 
 use async_trait::async_trait;
 use soma_core::error::SomaError;
-use soma_core::models::{MaterialInfo, VideoAspect};
+use soma_core::models::{MaterialInfo, VideoAspect, AiVideoSegmentLog};
 
 pub mod pexels;
 pub mod pixabay;
@@ -258,7 +258,7 @@ pub async fn generate_ai_videos(
     clip_duration: u32,
     conf: &soma_core::config::AppConfig,
     portrait_image: Option<&str>,
-) -> Result<Vec<String>, SomaError> {
+) -> Result<(Vec<String>, Vec<AiVideoSegmentLog>), SomaError> {
     let provider = aivideo::create_provider(source, conf)?;
     let provider = std::sync::Arc::new(provider);
 
@@ -278,6 +278,15 @@ pub async fn generate_ai_videos(
     let total = search_terms.len();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout);
     let start = std::time::Instant::now();
+
+    let mut seg_logs: Vec<AiVideoSegmentLog> = search_terms.iter().enumerate().map(|(i, term)| {
+        AiVideoSegmentLog {
+            scene_id: (i + 1) as u32,
+            prompt: term.clone(),
+            status: "pending".to_string(),
+            message: None,
+        }
+    }).collect();
 
     // 阶段1：串行提交任务（间隔2秒避免限流），带重试
     let mut pending: Vec<(usize, String)> = Vec::new(); // (idx, ai_task_id)
@@ -305,6 +314,8 @@ pub async fn generate_ai_videos(
             match provider.create_task(&params).await {
                 Ok(ai_task_id) => {
                     log!("AI视频生成 任务已提交 [{}/{}], task_id={}", idx + 1, total, ai_task_id);
+                    seg_logs[idx].status = "submitted".to_string();
+                    seg_logs[idx].message = Some(format!("task_id={}", ai_task_id));
                     pending.push((idx, ai_task_id));
                     submitted = true;
                     break;
@@ -320,6 +331,8 @@ pub async fn generate_ai_videos(
 
         if !submitted {
             log!("AI视频生成 提交彻底失败 [{}/{}]", idx + 1, total);
+            seg_logs[idx].status = "failed".to_string();
+            seg_logs[idx].message = Some("提交3次均失败".to_string());
             failed_indices.push(idx);
         }
 
@@ -363,21 +376,30 @@ pub async fn generate_ai_videos(
                 Ok(status) => match &status {
                     aivideo::VideoGenStatus::Processing => {
                         still_pending.push((idx, ai_task_id));
+                        if seg_logs[idx].status != "processing" {
+                            seg_logs[idx].status = "processing".to_string();
+                        }
                     }
                     aivideo::VideoGenStatus::Success { .. } => {
                         done_count += 1;
                         log!("AI视频生成 完成 [{}/{}]", idx + 1, total);
+                        seg_logs[idx].status = "success".to_string();
+                        seg_logs[idx].message = None;
                         completed.push((idx, status));
                     }
                     aivideo::VideoGenStatus::Failed { message } => {
                         done_count += 1;
                         log!("AI视频生成 失败 [{}/{}]: {}", idx + 1, total, message);
+                        seg_logs[idx].status = "failed".to_string();
+                        seg_logs[idx].message = Some(message.clone());
                         completed.push((idx, status));
                     }
                 },
                 Err(e) => {
                     done_count += 1;
                     log!("AI视频 轮询失败 [{}/{}]: {:?}", idx + 1, total, e);
+                    seg_logs[idx].status = "failed".to_string();
+                    seg_logs[idx].message = Some(format!("{:?}", e));
                     completed.push((idx, aivideo::VideoGenStatus::Failed { message: format!("{:?}", e) }));
                 }
             }
@@ -393,6 +415,8 @@ pub async fn generate_ai_videos(
     // 超时的任务标记
     for (idx, _) in &pending {
         log!("AI视频生成 超时 [{}/{}]", idx + 1, total);
+        seg_logs[*idx].status = "timeout".to_string();
+        seg_logs[*idx].message = Some("生成超时".to_string());
         completed.push((*idx, aivideo::VideoGenStatus::Failed { message: "生成超时".into() }));
     }
 
@@ -448,7 +472,7 @@ pub async fn generate_ai_videos(
     }
 
     indexed_paths.sort_by_key(|(idx, _)| *idx);
-    Ok(indexed_paths.into_iter().map(|(_, path)| path).collect())
+    Ok((indexed_paths.into_iter().map(|(_, path)| path).collect(), seg_logs))
 }
 
 /// 验证视频文件是否有效可播放

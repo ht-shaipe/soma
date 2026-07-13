@@ -152,6 +152,82 @@ pub async fn generate_terms(
     Ok(terms)
 }
 
+/// 根据视频脚本生成交白文案
+///
+/// 视频脚本包含场景描述、镜头语言等创作指导，不适合直接用于 TTS 朗读。
+/// 此函数将脚本转换为口语化、自然流畅的旁白文案，供 TTS 语音合成使用。
+pub async fn generate_narration(
+    provider: &str,
+    script: &str,
+    storyboard: &serde_json::Value,
+    style: &str,
+    mood: &str,
+    language: &str,
+    conf: &Config,
+) -> Result<String, SomaError> {
+    let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
+    let llm = LlmFactory::create(llm_provider, &api_key);
+
+    let storyboard_hint = if let Some(scenes) = storyboard.as_array() {
+        if !scenes.is_empty() {
+            let scene_narrations: Vec<String> = scenes.iter().filter_map(|s| {
+                s.get("narration").and_then(|n| n.as_str()).map(|n| n.to_string())
+            }).collect();
+            if !scene_narrations.is_empty() {
+                format!("\n\n参考分镜中各场景的旁白文本（请在此基础上优化为更自然流畅的口语化旁白）：\n{}", scene_narrations.join("\n"))
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let lang_instruction = if language.is_empty() || language == "zh-CN" {
+        "中文"
+    } else if language == "en-US" {
+        "English"
+    } else {
+        language
+    };
+
+    let sys_msg = format!(
+        "你是一个专业的短视频旁白撰稿人。你的任务是将视频脚本转换为适合语音朗读的旁白文案。\n\n\
+         关键要求：\n\
+         1. 旁白文案必须是口语化、自然流畅的，适合人类朗读\n\
+         2. 去掉所有场景描述、镜头指导（如'近景''航拍''推进'等）和视觉术语\n\
+         3. 去掉括号内的技术标注、情绪提示等非朗读内容\n\
+         4. 保持原文的核心信息和情感表达，但用更自然的口语方式重新表述\n\
+         5. 语句要简短清晰，适合TTS语音合成，避免过长的复杂句式\n\
+         6. 保留适当的停顿和节奏感，段落之间自然衔接\n\
+         7. 风格：{}，情感基调：{}\n\
+         8. 语言：{}\n\n\
+         直接输出旁白文案纯文本，不要加标题、标号或任何解释。", style, mood, lang_instruction
+    );
+
+    let user_msg = format!("视频脚本：\n{}{}", script, storyboard_hint);
+
+    let body = serde_json::json!({
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": user_msg}
+        ],
+        "temperature": 0.5,
+        "max_tokens": 4096,
+    });
+
+    let body_value = serde_json_to_tube_value(&body);
+    let result = llm.chat(&body_value).await
+        .map_err(|e| SomaError::Llm(format!("LLM narration failed: {:?}", e)))?;
+
+    let content = extract_content_from_response(&result);
+    let narration = clean_llm_output(&content);
+    Ok(narration.trim().to_string())
+}
+
 /// 需求理解：将用户简短描述提炼为结构化的视频创作参数
 ///
 /// 对应设计文档①需求理解。LLM 解析用户意图，提取结构化创作参数。
@@ -233,6 +309,19 @@ pub async fn generate_storyboard(
 
     let style = intent.get("style").and_then(|v| v.as_str()).unwrap_or("");
     let mood = intent.get("mood").and_then(|v| v.as_str()).unwrap_or("");
+    let user_keywords = intent.get("user_visual_keywords")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<&str>>().join(", "))
+        .unwrap_or_default();
+
+    let keyword_instruction = if user_keywords.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n5. 用户已指定以下视觉关键词，请在生成 visual_prompt 时优先参考并融入这些关键词：{}\n\
+             请确保每个场景的 visual_prompt 都能体现对应关键词的视觉元素。", user_keywords
+        )
+    };
 
     let sys_msg = format!(
         "你是一个专业的视频分镜导演。请根据给定的视频脚本文案，将其拆分为多个分镜场景，并为每个场景生成完整的制作指令和视觉提示词。\n\n\
@@ -257,13 +346,14 @@ pub async fn generate_storyboard(
          1. 场景数量根据脚本长度合理划分，每个场景应是一个完整的视觉画面\n\
          2. visual_prompt 必须是英文，具体、有画面感，适合AI视频生成\n\
          3. camera_movement 要与画面内容和情绪匹配\n\
-         4. 镜头运动参考：固定→展示静态场景、推进→增强沉浸感、航拍→宏大场景、跟随→增强代入感、特写→强调细节\n\n\
+         4. 镜头运动参考：固定→展示静态场景、推进→增强沉浸感、航拍→宏大场景、跟随→增强代入感、特写→强调细节{}\
+         \n\n\
          以JSON数组输出：\n\
          [\n  {{\n    \"scene_id\": 1,\n    \"duration\": {},\n    \"narration\": \"场景旁白\",\n    \"visual_desc\": \"近景：樱花飘落...\",\n    \
          \"visual_prompt\": \"cherry blossom petals falling, soft golden light, cinematic, 8K\",\n    \
          \"camera_movement\": \"push_in\",\n    \"transition\": \"fade\",\n    \"text_overlay\": \"春 · 起始\",\n    \
          \"mood\": \"温暖宁静\"\n  }}\n]\n\n\
-         只输出JSON数组，不要代码围栏或解释。", subject, style, mood, clip_duration, clip_duration);
+         只输出JSON数组，不要代码围栏或解释。", subject, style, mood, clip_duration, keyword_instruction, clip_duration);
 
     let user_msg = format!("视频脚本：\n{}", script);
 

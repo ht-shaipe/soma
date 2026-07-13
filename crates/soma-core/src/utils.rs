@@ -252,7 +252,7 @@ pub fn get_response(status: i32, data: Option<serde_json::Value>, message: &str)
 ///
 /// # 参数
 /// - `file`: 文件路径（本地路径或 URL）
-/// - `endpoint`: 服务外部访问端点（如 "http://localhost:8080"）
+/// - `endpoint`: 服务外部访问端点（如 "http://localhost:8090"）
 /// - `task_base`: 任务本地基础路径前缀，用于提取相对路径
 pub fn task_file_to_uri(file: &str, endpoint: &str, task_base: &str) -> String {
     // 已经是完整 URL 则直接返回

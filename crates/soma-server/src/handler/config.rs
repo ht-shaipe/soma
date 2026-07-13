@@ -25,7 +25,7 @@ async fn get_config(_param: &RequestParameter) -> Result<Value> {
             "name": app.name.as_deref().unwrap_or("Soma"),
             "version": "0.1.0",
             "host": app.host.as_deref().unwrap_or("0.0.0.0"),
-            "port": app.port.unwrap_or(8080) as u32,
+            "port": app.port.unwrap_or(8090) as u32,
             "storage_path": app.storage_path.as_deref().unwrap_or("./storage"),
             "concurrent_tasks": app.max_concurrent_tasks.unwrap_or(5),
             "max_queued_tasks": app.max_queued_tasks.unwrap_or(100),

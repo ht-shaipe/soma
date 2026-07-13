@@ -38,6 +38,9 @@ export interface VideoParams {
   video_intro?: string
   video_outro?: string
   portrait_image?: string
+  intent_style?: string
+  intent_mood?: string
+  intent_audience?: string
 }
 
 export interface MaterialInfo {
@@ -63,6 +66,13 @@ export const TaskStateCode = {
 
 export type TaskStateCode = typeof TaskStateCode[keyof typeof TaskStateCode]
 
+export interface AiVideoSegmentLog {
+  scene_id: number
+  prompt: string
+  status: 'pending' | 'submitted' | 'processing' | 'success' | 'failed' | 'timeout'
+  message?: string
+}
+
 export interface TaskInfo {
   taskId: string
   state: number
@@ -73,6 +83,7 @@ export interface TaskInfo {
   terms?: string[]
   params?: VideoParams
   storyboard?: StoryboardScene[]
+  narration?: string
   audioFile?: string
   audioDuration?: number
   subtitlePath?: string
@@ -80,6 +91,7 @@ export interface TaskInfo {
   materials?: string[]
   videos?: string[]
   combinedVideos?: string[]
+  aiVideoLogs?: AiVideoSegmentLog[]
   errorMessage?: string
   createdAt: string
   updatedAt: string

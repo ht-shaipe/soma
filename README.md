@@ -191,11 +191,11 @@ cargo run --release
 看到以下输出即表示启动成功：
 
 ```
-[INFO] Soma v0.1.0 starting on 0.0.0.0:8080
+[INFO] Soma v0.1.0 starting on 0.0.0.0:8090
 [INFO] Storage path: ./storage
 ```
 
-后端 API 运行在 `http://localhost:8080`
+后端 API 运行在 `http://localhost:8090`
 
 ### 第 6 步：启动前端
 
@@ -207,15 +207,15 @@ cd web
 # 安装依赖
 npm install
 
-# 开发模式启动（自动代理 /api 到后端 8080）
+# 开发模式启动（自动代理 /api 到后端 8090）
 npm run dev
 ```
 
-前端运行在 `http://localhost:5173`，自动代理 API 请求到后端。
+前端运行在 `http://localhost:5273`，自动代理 API 请求到后端。
 
 ### 第 7 步：开始使用
 
-1. 浏览器打开 `http://localhost:5173`
+1. 浏览器打开 `http://localhost:5273`
 2. 进入 **设置** 页面，确认 API Key 已生效（也可在此修改配置）
 3. 进入 **任务** 页面，点击 **新建任务**
 4. 填写视频主题（如："介绍人工智能的发展历程"），选择语言、段落数、画幅比例等
@@ -281,7 +281,7 @@ cd web && npm run build
 # 只需启动后端即可：
 cargo run --release
 
-# 访问 http://your-server:8080
+# 访问 http://your-server:8090
 ```
 
 ### 可选：Docker 部署
@@ -300,7 +300,7 @@ COPY --from=builder /app/conf /app/conf
 COPY --from=builder /app/resource /app/resource
 COPY --from=builder /app/web/dist /app/web/dist
 WORKDIR /app
-EXPOSE 8080
+EXPOSE 8090
 CMD ["soma-server"]
 ```
 

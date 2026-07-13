@@ -57,9 +57,13 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column :label="$t('task.actions')" width="240" fixed="right">
+      <el-table-column :label="$t('task.actions')" width="300" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="isTaskDraft(row)" type="warning" size="small" text @click="onContinueEdit(row)">
+          <el-button v-if="isTaskStuck(row)" type="danger" size="small" text @click="onStopTask(row)">
+            <el-icon><VideoPause /></el-icon>
+            {{ $t('task.stop') }}
+          </el-button>
+          <el-button v-if="isTaskEditable(row)" type="warning" size="small" text @click="onContinueEdit(row)">
             <el-icon><Edit /></el-icon>
             {{ $t('task.continueEdit') }}
           </el-button>
@@ -116,11 +120,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, VideoPlay, Delete, View, Edit } from '@element-plus/icons-vue'
+import { Refresh, VideoPlay, VideoPause, Delete, View, Edit } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
-import { TaskStateCode, isTaskDraft } from '@/types'
+import { TaskStateCode, isTaskDraft, isTaskFailed, isTaskProcessing } from '@/types'
 import type { TaskInfo } from '@/types'
 import { getStaticUrl } from '@/api/stream'
+import { stopTask } from '@/api/video'
 import TaskStatusTag from '@/components/TaskStatusTag.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -143,6 +148,15 @@ function getProgressStatus(state: number) {
   if (state === TaskStateCode.Completed) return 'success' as const
   if (state === TaskStateCode.Failed) return 'exception' as const
   return undefined
+}
+
+// Draft 和 Failed 状态都允许继续编辑/重试
+function isTaskEditable(row: TaskInfo) {
+  return isTaskDraft(row) || isTaskFailed(row)
+}
+
+function isTaskStuck(row: TaskInfo) {
+  return isTaskProcessing(row)
 }
 
 function formatDate(dateStr: string) {
@@ -173,6 +187,26 @@ function onPlayVideo(row: TaskInfo) {
 function onViewDetail(row: TaskInfo) {
   detailTask.value = row
   detailVisible.value = true
+}
+
+async function onStopTask(row: TaskInfo) {
+  try {
+    await ElMessageBox.confirm(t('task.stopConfirm'), t('common.warning'), {
+      confirmButtonText: t('common.ok'),
+      cancelButtonText: t('common.cancel'),
+      type: 'warning',
+    })
+    await stopTask(row.taskId)
+    taskStore.fetchTasks()
+    if (taskStore.currentTask?.taskId === row.taskId) {
+      taskStore.stopPolling()
+      taskStore.currentTask = null
+      taskStore.isGenerating = false
+    }
+    ElMessage.success(t('common.success'))
+  } catch {
+    // cancelled or error
+  }
 }
 
 function onContinueEdit(row: TaskInfo) {

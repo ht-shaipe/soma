@@ -148,6 +148,14 @@ export const useTaskStore = defineStore('task', () => {
     draftTaskId.value = ''
   }
 
+  function resetAll() {
+    stopPolling()
+    draftTaskId.value = ''
+    currentTask.value = null
+    isGenerating.value = false
+    logs.value = []
+  }
+
   async function fetchDraftMaterials() {
     if (!draftTaskId.value) return
     try {
@@ -181,5 +189,6 @@ export const useTaskStore = defineStore('task', () => {
     resetDraft,
     fetchDraftMaterials,
     resumeDraft,
+    resetAll,
   }
 })

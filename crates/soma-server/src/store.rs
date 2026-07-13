@@ -247,11 +247,12 @@ mod redis_store {
 
     impl TaskStore for RedisTaskStore {
         fn create(&self, task: TaskInfo) {
-            let rt = match tokio::runtime::Runtime::new() {
+            let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(r) => r,
                 Err(e) => { log::error!("Redis create runtime failed: {}", e); return; }
             };
-            let _ = rt.block_on(async {
+            let local = tokio::task::LocalSet::new();
+            let _ = local.block_on(&rt, async {
                 let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
                 let json = serde_json::to_string(&task).ok()?;
                 let key = Self::task_key(&task.task_id);
@@ -266,8 +267,9 @@ mod redis_store {
         }
 
         fn get(&self, task_id: &str) -> Option<TaskInfo> {
-            let rt = tokio::runtime::Runtime::new().ok()?;
-            rt.block_on(async {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
+            let local = tokio::task::LocalSet::new();
+            local.block_on(&rt, async {
                 let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
                 let key = Self::task_key(task_id);
                 let json: Option<String> = conn.get(&key).await.ok()?;
@@ -276,8 +278,9 @@ mod redis_store {
         }
 
         fn get_all(&self) -> Vec<TaskInfo> {
-            let rt = tokio::runtime::Runtime::new().ok()?;
-            rt.block_on(async {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
+            let local = tokio::task::LocalSet::new();
+            local.block_on(&rt, async {
                 let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
                 let idx = Self::index_key();
                 let ids: Vec<String> = conn.smembers(&idx).await.ok()?;
@@ -296,11 +299,12 @@ mod redis_store {
         }
 
         fn update(&self, task_id: &str, f: Box<dyn FnOnce(&mut TaskInfo) + Send + 'static>) {
-            let rt = match tokio::runtime::Runtime::new() {
+            let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(r) => r,
                 Err(e) => { log::error!("Redis create runtime failed: {}", e); return; }
             };
-            let _ = rt.block_on(async {
+            let local = tokio::task::LocalSet::new();
+            let _ = local.block_on(&rt, async {
                 let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
                 let key = Self::task_key(task_id);
                 let json: Option<String> = conn.get(&key).await.ok()?;
@@ -320,8 +324,9 @@ mod redis_store {
         }
 
         fn delete(&self, task_id: &str) -> bool {
-            let rt = tokio::runtime::Runtime::new().ok()?;
-            rt.block_on(async {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
+            let local = tokio::task::LocalSet::new();
+            local.block_on(&rt, async {
                 let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
                 let key = Self::task_key(task_id);
                 let idx = Self::index_key();

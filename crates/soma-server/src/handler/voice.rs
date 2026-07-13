@@ -133,36 +133,39 @@ pub async fn preview_voice(req: HttpRequest) -> HttpResponse {
     let tmp_file = tmp_dir.join(format!("preview_{}.mp3", voice_name.replace(':', "_")));
     let tmp_path = tmp_file.to_string_lossy().to_string();
 
-    let rt = match tokio::runtime::Runtime::new() {
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build() {
         Ok(r) => r,
         Err(_) => return HttpResponse::InternalServerError().body("runtime error"),
     };
+    let local = tokio::task::LocalSet::new();
 
     let result = if soma_tts::voices::is_siliconflow_voice(&voice_name) {
         let sf_key = conf.app.siliconflow.api_key.as_deref().unwrap_or("");
         let tts = soma_tts::siliconflow_tts::SiliconflowTts::new(sf_key);
-        rt.block_on(soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else if soma_tts::voices::is_elevenlabs_voice(&voice_name) {
         let el_key = conf.app.elevenlabs.api_key.as_deref().unwrap_or("");
         let el_model = conf.app.elevenlabs.model_id.as_deref().unwrap_or("eleven_multilingual_v2");
         let tts = soma_tts::elevenlabs_tts::ElevenlabsTts::new(el_key, el_model);
-        rt.block_on(soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else if soma_tts::voices::is_mimo_voice(&voice_name) {
         let mimo_key = conf.app.app.mimo_api_key.as_deref().unwrap_or("");
         let tts = soma_tts::mimo_tts::MimoTts::new(mimo_key, "", "", "");
-        rt.block_on(soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else if soma_tts::voices::is_gemini_voice(&voice_name) {
         let gemini_key = conf.app.app.gemini_api_key.as_deref().unwrap_or("");
         let tts = soma_tts::gemini_tts::GeminiTts::new(gemini_key, "", "");
-        rt.block_on(soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else if soma_tts::voices::is_azure_voice(&voice_name) {
         let azure_key = conf.app.azure.speech_key.as_deref().unwrap_or("");
         let azure_region = conf.app.azure.speech_region.as_deref().unwrap_or("eastasia");
         let tts = soma_tts::azure_tts::AzureTts::new(azure_key, azure_region);
-        rt.block_on(soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else {
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
-        rt.block_on(soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     };
 
     match result {

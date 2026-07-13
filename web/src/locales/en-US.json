@@ -178,6 +178,8 @@
     "deleteConfirm": "Are you sure you want to delete this task?",
     "noTasks": "No tasks yet",
     "continueEdit": "Continue Edit",
+    "stop": "Force Stop",
+    "stopConfirm": "Are you sure you want to force stop this task? You can click 'Continue Edit' to retry after stopping.",
     "playVideo": "Play Video",
     "downloadVideo": "Download Video",
     "statusPending": "Pending",

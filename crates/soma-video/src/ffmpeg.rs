@@ -9,6 +9,63 @@
 /// - 媒体信息查询（时长、分辨率）
 use soma_core::error::SomaError;
 use std::path::Path;
+use std::time::Duration;
+
+const FFMPEG_TIMEOUT_SECS: u64 = 600;
+
+fn run_with_timeout(cmd: &mut std::process::Command) -> Result<std::process::Output, SomaError> {
+    let mut child = cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg spawn failed: {}", e)))?;
+    let timeout = Duration::from_secs(FFMPEG_TIMEOUT_SECS);
+    match child.wait_timeout(timeout) {
+        Ok(Some(status)) => {
+            let output = child.wait_with_output()
+                .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg output read failed: {}", e)))?;
+            if !status.success() {
+                return Ok(output);
+            }
+            Ok(output)
+        }
+        Ok(None) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(SomaError::Ffmpeg(format!("ffmpeg timed out after {}s", FFMPEG_TIMEOUT_SECS)))
+        }
+        Err(e) => {
+            let _ = child.kill();
+            Err(SomaError::Ffmpeg(format!("ffmpeg wait error: {}", e)))
+        }
+    }
+}
+
+trait ChildWaitTimeout {
+    fn wait_timeout(&mut self, timeout: Duration) -> std::io::Result<Option<std::process::ExitStatus>>;
+}
+
+impl ChildWaitTimeout for std::process::Child {
+    fn wait_timeout(&mut self, timeout: Duration) -> std::io::Result<Option<std::process::ExitStatus>> {
+        match self.try_wait() {
+            Ok(Some(status)) => return Ok(Some(status)),
+            Ok(None) => {}
+            Err(e) => return Err(e),
+        }
+        let start = std::time::Instant::now();
+        loop {
+            match self.try_wait() {
+                Ok(Some(status)) => return Ok(Some(status)),
+                Ok(None) => {
+                    if start.elapsed() >= timeout {
+                        return Ok(None);
+                    }
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+}
 
 /// 将 #RRGGBB 颜色字符串转换为 ASS 字幕格式 &H00BBGGRR
 fn hex_to_ass_color(hex: &str) -> String {
@@ -144,20 +201,18 @@ impl Ffmpeg {
         }
         std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
 
-        // 调用 FFmpeg concat 分离器拼接视频
-        let result = std::process::Command::new(&self.path)
+        let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
-                "-y",                    // 覆盖已存在的输出文件
-                "-f", "concat",          // 使用 concat 分离器
-                "-safe", "0",            // 允许使用绝对路径（默认只允许相对路径）
-                "-i", concat_list.to_string_lossy().as_ref(), // 输入拼接列表文件
-                "-c:v", &self.codec,     // 指定视频编码器
-                "-threads", &self.threads.to_string(), // 编码线程数
-                "-pix_fmt", "yuv420p",   // 像素格式设为 yuv420p，确保最大兼容性
+                "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-max_delay", "500000",
+                "-i", concat_list.to_string_lossy().as_ref(),
+                "-c:v", &self.codec,
+                "-threads", &self.threads.to_string(),
+                "-pix_fmt", "yuv420p",
                 output_file,
-            ])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", e)))?;
+            ]))?;
 
         // 拼接完成后删除临时列表文件
         let _ = std::fs::remove_file(&concat_list);
@@ -176,18 +231,16 @@ impl Ffmpeg {
     /// 拼接回退方法：使用默认编码器 libx264 重新拼接
     ///
     /// 当指定编码器拼接失败时，回退到 libx264 软编码重新尝试。
-    fn concat_clips_fallback(&self, clip_files: &[String], output_file: &str, concat_list: &Path) -> Result<(), SomaError> {
-        let result = std::process::Command::new(&self.path)
+    fn concat_clips_fallback(&self, _clip_files: &[String], output_file: &str, concat_list: &Path) -> Result<(), SomaError> {
+        let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
                 "-y", "-f", "concat", "-safe", "0",
                 "-i", concat_list.to_string_lossy().as_ref(),
-                "-c:v", DEFAULT_CODEC,    // 回退为默认编码器 libx264
+                "-c:v", DEFAULT_CODEC,
                 "-threads", &self.threads.to_string(),
                 "-pix_fmt", "yuv420p",
                 output_file,
-            ])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg concat fallback failed: {}", e)))?;
+            ]))?;
         // 清理临时列表文件
         let _ = std::fs::remove_file(concat_list);
         if !result.status.success() {
@@ -221,23 +274,19 @@ impl Ffmpeg {
         start: f64,
         duration: f64,
     ) -> Result<(), SomaError> {
-        let result = std::process::Command::new(&self.path)
+        let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
                 "-y",
-                "-ss", &start.to_string(),  // 定位到起始时间（放在 -i 前以加速定位）
+                "-ss", &start.to_string(),
                 "-i", input_path,
-                "-t", &duration.to_string(), // 截取指定时长
-                // scale: 等比缩放，force_original_aspect_ratio=decrease 确保不放大
-                // pad: 用黑边填充到目标尺寸，(ow-iw)/2 和 (oh-ih)/2 使画面居中
+                "-t", &duration.to_string(),
                 "-vf", &format!("scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:(ow-iw)/2:(oh-ih)/2:black", width, height, width, height),
                 "-c:v", &self.codec,
-                "-an",                      // 移除音频（裁剪阶段只保留视频）
+                "-an",
                 "-pix_fmt", "yuv420p",
-                "-r", &FPS.to_string(),     // 设置输出帧率
+                "-r", &FPS.to_string(),
                 output_path,
-            ])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg clip+resize failed: {}", e)))?;
+            ]))?;
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
@@ -272,10 +321,8 @@ impl Ffmpeg {
             // 未识别的转场类型，跳过不做处理
             _ => return Ok(()),
         };
-        let result = std::process::Command::new(&self.path)
-            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", &self.codec, "-an", "-pix_fmt", "yuv420p", output_path])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", e)))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path)
+            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", &self.codec, "-an", "-pix_fmt", "yuv420p", output_path]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", stderr)));
@@ -332,6 +379,8 @@ impl Ffmpeg {
 
         // 如果有背景音乐，添加第三个输入流
         let bgm_index = if !bgm_file.is_empty() {
+            cmd_args.push("-stream_loop".to_string());
+            cmd_args.push("-1".to_string());
             cmd_args.push("-i".to_string());
             cmd_args.push(bgm_file.to_string());         // 输入2：背景音乐流
             Some(2u32)
@@ -414,17 +463,11 @@ impl Ffmpeg {
 
         // 音频混合处理：背景音乐与配音混音
         if let Some(bgm_i) = bgm_index {
-            // filter_complex:
-            // [1:a]volume=VOICE → 配音调整音量
-            // [2:a]volume=BGM,aloop=loop=-1:size=2e+09,atrim=1:duration=VID_DUR,afade=t=out:st=END-3:d=3 → BGM循环+淡出
-            //   aloop: 无限循环BGM
-            //   atrim: 截取到视频时长
-            //   afade: 最后3秒淡出
             let video_dur = self.get_video_duration(video_path).unwrap_or(60.0);
             let fade_start = (video_dur - 3.0).max(0.0);
             cmd_args.push("-filter_complex".to_string());
             cmd_args.push(format!(
-                "[1:a]volume={}[a1];[{}:a]volume={}[a2r];[a2r]aloop=loop=-1:size=2e+09,atrim=1:duration={:.3},afade=t=out:st={:.3}:d=3[a2];[a1][a2]amix=inputs=2:duration=longest[aout]",
+                "[1:a]volume={}[a1];[{}:a]volume={},atrim=1:duration={:.3},afade=t=out:st={:.3}:d=3[a2];[a1][a2]amix=inputs=2:duration=longest[aout]",
                 voice_volume, bgm_i, bgm_volume, video_dur, fade_start
             ));
             // 映射视频流和混合后的音频流
@@ -442,10 +485,8 @@ impl Ffmpeg {
 
         cmd_args.push(output_path.to_string());
 
-        let result = std::process::Command::new(&self.path)
-            .args(cmd_args.iter().map(|s| s.as_str()))
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg generate_video failed: {}", e)))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path)
+            .args(cmd_args.iter().map(|s| s.as_str())))?;
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
@@ -560,7 +601,7 @@ impl Ffmpeg {
         // d=帧数 指定动画总帧数，x/y 居中
         let total_frames = (duration * FPS as f64).ceil() as u32;
         let zoom_expr = format!("min(zoom+0.0005,{:.3})", 1.0 + duration * 0.03);
-        let result = std::process::Command::new(&self.path)
+        let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
                 "-y",
                 "-loop", "1",
@@ -573,9 +614,7 @@ impl Ffmpeg {
                 "-pix_fmt", "yuv420p",
                 "-t", &duration.to_string(),
                 output_path,
-            ])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg image_to_video failed: {}", e)))?;
+            ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg image_to_video failed: {}", stderr)));
@@ -589,7 +628,7 @@ impl Ffmpeg {
     /// - `watermark_path`: 水印图片路径
     /// - `output_path`: 输出视频路径
     pub fn add_watermark(&self, input_path: &str, watermark_path: &str, output_path: &str) -> Result<(), SomaError> {
-        let result = std::process::Command::new(&self.path)
+        let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
                 "-y",
                 "-i", input_path,
@@ -599,9 +638,7 @@ impl Ffmpeg {
                 "-pix_fmt", "yuv420p",
                 "-c:a", "copy",
                 output_path,
-            ])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg add_watermark failed: {}", e)))?;
+            ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg add_watermark failed: {}", stderr)));
@@ -633,16 +670,14 @@ impl Ffmpeg {
         std::fs::write(&list_path, &list_content)
             .map_err(|e| SomaError::Ffmpeg(format!("写入 concat 列表失败: {}", e)))?;
 
-        let result = std::process::Command::new(&self.path)
+        let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
                 "-y",
                 "-f", "concat", "-safe", "0",
                 "-i", list_path.to_str().unwrap_or(""),
                 "-c", "copy",
                 output_path,
-            ])
-            .output()
-            .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", e)))?;
+            ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", stderr)));

@@ -53,8 +53,12 @@ async fn upload(param: &RequestParameter) -> Result<Value> {
 
     let title = task_info.script.as_deref().unwrap_or(&task_id).chars().take(100).collect::<String>();
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| tube::error!("runtime error: {}", e))?;
-    let result = rt.block_on(
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| tube::error!("runtime error: {}", e))?;
+    let local = tokio::task::LocalSet::new();
+    let result = local.block_on(&rt,
         crate::service::upload::upload_video(&video_path, &title, &platforms, ui, None)
     ).map_err(|e| tube::error!("发布失败: {:?}", e))?;
 
@@ -74,8 +78,12 @@ async fn status(param: &RequestParameter) -> Result<Value> {
     let conf = Config::get();
     let api_key = conf.app.ui.upload_post_api_key.as_deref().unwrap_or("");
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| tube::error!("runtime error: {}", e))?;
-    let result = rt.block_on(
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| tube::error!("runtime error: {}", e))?;
+    let local = tokio::task::LocalSet::new();
+    let result = local.block_on(&rt,
         crate::service::upload::check_status(&request_id, api_key)
     ).map_err(|e| tube::error!("查询失败: {:?}", e))?;
 

@@ -370,6 +370,8 @@ pub struct TaskInfo {
     pub terms: Option<Vec<String>>,
     /// 分镜脚本场景列表
     pub storyboard: Option<Vec<StoryboardScene>>,
+    /// 旁白文案（口语化的朗读文本，由脚本转换而来，用于 TTS 语音生成）
+    pub narration: Option<String>,
     /// 生成的语音文件路径
     pub audio_file: Option<String>,
     /// 语音时长（秒）
@@ -382,6 +384,8 @@ pub struct TaskInfo {
     pub videos: Option<Vec<String>>,
     /// 最终合并后的视频文件路径列表
     pub combined_videos: Option<Vec<String>>,
+    /// AI 视频生成逐段日志（每段脚本/分镜的提示词和生成状态）
+    pub ai_video_logs: Option<Vec<AiVideoSegmentLog>>,
     /// 错误信息（任务失败时填充）
     pub error_message: Option<String>,
     /// 任务创建时间（UTC）
@@ -407,12 +411,14 @@ impl TaskInfo {
             script: None,
             terms: None,
             storyboard: None,
+            narration: None,
             audio_file: None,
             audio_duration: None,
             subtitle_path: None,
             materials: None,
             videos: None,
             combined_videos: None,
+            ai_video_logs: None,
             error_message: None,
             created_at: now,
             updated_at: now,
@@ -439,6 +445,20 @@ impl TaskInfo {
     pub fn is_completed(&self) -> bool {
         self.state == TaskStatus::Completed.as_i32()
     }
+}
+
+/// AI 视频生成单段日志，记录每个分镜场景的提示词和生成状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiVideoSegmentLog {
+    /// 场景编号（对应 StoryboardScene.scene_id）
+    pub scene_id: u32,
+    /// 提交给 AI 视频生成 API 的英文提示词（即 visual_prompt）
+    pub prompt: String,
+    /// 生成状态："pending" / "submitted" / "processing" / "success" / "failed" / "timeout"
+    pub status: String,
+    /// 状态补充信息（如失败原因、AI 任务 ID 等）
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 /// 字幕时间轴条目，对应 SRT 格式的一条字幕

@@ -35,6 +35,12 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
   const videoEncoder = ref('libx264')
   const localVideoMaterials = ref<File[]>([])
 
+  // 切换素材源时清除已缓存的素材，强制重新获取
+  watch(videoSource, () => {
+    materialsFetched.value = false
+    materialsList.value = []
+  })
+
   const ttsServer = ref('edge-tts')
   const voiceName = ref('zh-CN-XiaoxiaoNeural-Female')
 
@@ -72,6 +78,7 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
   const materialsFetched = ref(false)
   const materialsList = ref<string[]>([])
   const fetchingMaterials = ref(false)
+  const narration = ref('')
   const audioFile = ref('')
   const audioDuration = ref(0)
 
@@ -190,6 +197,9 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
         materialsList.value = task.materials
         materialsFetched.value = true
       }
+      if (task.narration) {
+        narration.value = task.narration
+      }
       if (task.audioFile) {
         audioFile.value = task.audioFile
       }
@@ -253,6 +263,7 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
     storyboardParsed.value = false
     materialsFetched.value = false
     materialsList.value = []
+    narration.value = ''
   }
 
   function collectStepParams(step: number): Partial<VideoParams> {
@@ -281,12 +292,11 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
           video_count: videoCount.value,
           video_concat_mode: videoConcatMode.value,
           video_transition_mode: videoTransitionMode.value,
-        }
-      case 3:
-        return {
           video_terms: videoTerms.value || undefined,
           match_materials_to_script: matchMaterialsToScript.value,
         }
+      case 3:
+        return {}
       case 4:
         return {
           video_source: videoSource.value,
@@ -344,7 +354,7 @@ export const useVideoParamsStore = defineStore('videoParams', () => {
     videoWatermark, videoIntro, videoOutro, portraitImage,
     storyboard, storyboardParsed,
     materialsFetched, materialsList, fetchingMaterials,
-    audioFile, audioDuration,
+    narration, audioFile, audioDuration,
     toVideoParams, loadFromTask, resetAll, resetScript, collectStepParams,
   }
 })

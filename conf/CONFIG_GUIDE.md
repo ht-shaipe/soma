@@ -265,7 +265,7 @@ minimax_video_model = "MiniMax-Hailuo-2.3"   # 可选 video-01 / T2V-01 / I2V-01
 | `app.name` | `soma` | 应用名称 |
 | `app.version` | `0.1.0` | 版本号 |
 | `app.host` | `0.0.0.0` | 监听地址 |
-| `app.port` | `8080` | 监听端口 |
+| `app.port` | `8090` | 监听端口 |
 | `app.storage_path` | `./storage` | 存储/输出目录 |
 | `app.concurrent_tasks` | `2` | 最大并发视频生成任务数 |
 | `ffmpeg.path` | `ffmpeg` | FFmpeg 路径（需系统安装） |

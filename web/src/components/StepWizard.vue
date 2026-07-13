@@ -4,9 +4,9 @@
       <el-step :title="$t('wizard.step1.short')" :icon="Aim" />
       <el-step :title="$t('wizard.step2.short')" :icon="Edit" />
       <el-step :title="$t('wizard.step3.short')" :icon="Grid" />
-      <el-step :title="$t('wizard.step4.short')" :icon="MagicStick" />
+      <el-step title="旁白" :icon="Microphone" />
       <el-step :title="$t('wizard.step5.short')" :icon="Picture" />
-      <el-step :title="$t('wizard.step6.short')" :icon="Microphone" />
+      <el-step :title="$t('wizard.step6.short')" :icon="ChatLineSquare" />
       <el-step :title="$t('wizard.step7.short')" :icon="ChatLineSquare" />
       <el-step :title="$t('wizard.step8.short')" :icon="Film" />
       <el-step :title="$t('wizard.step9.short')" :icon="Upload" />
@@ -174,14 +174,7 @@
                 </div>
               </div>
             </el-card>
-          </div>
-
-          <div v-if="currentStep === 3" class="step-panel">
-            <div class="step-header">
-              <h3>{{ $t('wizard.step4.title') }}</h3>
-              <p class="step-desc">{{ $t('wizard.step4.desc') }}</p>
-            </div>
-            <el-card class="panel-card" shadow="hover">
+            <el-card class="panel-card" shadow="hover" style="margin-top: 12px">
               <div class="form-row">
                 <el-checkbox v-model="videoParamsStore.matchMaterialsToScript">
                   {{ $t('video.matchMaterialsToScript') }}
@@ -207,6 +200,34 @@
                 </el-button>
               </div>
               <ApiKeyManager />
+            </el-card>
+          </div>
+
+          <div v-if="currentStep === 3" class="step-panel">
+            <div class="step-header">
+              <h3>旁白文案</h3>
+              <p class="step-desc">将视频脚本转换为适合语音朗读的口语化旁白文案，用于 TTS 语音合成</p>
+            </div>
+            <el-card class="panel-card" shadow="hover">
+              <div style="margin-bottom: 8px">
+                <el-button
+                  type="primary"
+                  :loading="generatingNarration"
+                  @click="onGenerateNarration"
+                  style="width: 100%"
+                >
+                  {{ generatingNarration ? '正在生成旁白...' : 'AI 生成旁白文案' }}
+                </el-button>
+              </div>
+              <div class="form-row">
+                <div class="form-label">旁白文案 <span style="color:#909399;font-size:12px;font-weight:normal">（可直接编辑，生成语音时使用此文本）</span></div>
+                <el-input
+                  v-model="videoParamsStore.narration"
+                  type="textarea"
+                  :rows="10"
+                  placeholder="点击上方按钮 AI 自动生成，或手动输入旁白文案..."
+                />
+              </div>
             </el-card>
           </div>
 
@@ -311,6 +332,7 @@
               </el-button>
             </div>
             <TaskProgress v-if="taskStore.currentTask" />
+            <AiVideoLogs />
             <LogOutput />
             <VideoPreview />
           </div>
@@ -392,13 +414,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { VideoCamera, Aim, Edit, Grid, MagicStick, Picture, Microphone, ChatLineSquare, Film, Upload, ArrowLeft, ArrowRight, Loading, CircleCheck } from '@element-plus/icons-vue'
+import { VideoCamera, Aim, Edit, Grid, Picture, Microphone, ChatLineSquare, Film, Upload, ArrowLeft, ArrowRight, Loading, CircleCheck } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useVideoParamsStore } from '@/stores/videoParams'
 import { useTaskStore } from '@/stores/task'
 import { useI18n } from 'vue-i18n'
 import { generateSocialMetadata, generateIntent, generateStoryboard, generateTerms, generateScript } from '@/api/llm'
-import { getTask, generateAudio } from '@/api/video'
+import { getTask, generateAudio, generateNarration } from '@/api/video'
 import type { VideoParams, StoryboardScene } from '@/types'
 import ScriptPanel from '@/components/ScriptPanel.vue'
 import ScriptAdvancedSettings from '@/components/ScriptAdvancedSettings.vue'
@@ -409,6 +431,7 @@ import ApiKeyManager from '@/components/ApiKeyManager.vue'
 import PortraitUploader from '@/components/PortraitUploader.vue'
 import LocalFileUploader from '@/components/LocalFileUploader.vue'
 import TaskProgress from '@/components/TaskProgress.vue'
+import AiVideoLogs from '@/components/AiVideoLogs.vue'
 import LogOutput from '@/components/LogOutput.vue'
 import VideoPreview from '@/components/VideoPreview.vue'
 
@@ -421,7 +444,11 @@ const currentStep = ref(0)
 
 onMounted(async () => {
   const resumeId = route.query.resume as string
-  if (!resumeId) return
+  if (!resumeId) {
+    videoParamsStore.resetAll()
+    taskStore.resetAll()
+    return
+  }
   videoParamsStore.resetAll()
   try {
     const task = await getTask(resumeId)
@@ -430,8 +457,10 @@ onMounted(async () => {
     }
     taskStore.resumeDraft(resumeId)
     intentParsed.value = true
-    if (videoParamsStore.videoScript) {
-      currentStep.value = videoParamsStore.storyboard.length > 0 ? 3 : 2
+    if (videoParamsStore.narration) {
+      currentStep.value = 4
+    } else if (videoParamsStore.videoScript) {
+      currentStep.value = videoParamsStore.storyboard.length > 0 ? 3 : 3
     } else if (videoParamsStore.videoSubject) {
       currentStep.value = 1
     }
@@ -445,6 +474,7 @@ const intentParsed = ref(false)
 const generatingScript = ref(false)
 const generatingStoryboard = ref(false)
 const generatingTerms = ref(false)
+const generatingNarration = ref(false)
 const generatingAudio = ref(false)
 
 const selectedPlatforms = ref<string[]>([])
@@ -513,12 +543,6 @@ function validateStep(step: number): boolean {
     case 1:
       if (!videoParamsStore.videoScript.trim()) {
         ElMessage.warning(t('wizard.validate.scriptRequired'))
-        return false
-      }
-      break
-    case 3:
-      if (!videoParamsStore.videoTerms.trim()) {
-        ElMessage.warning(t('wizard.validate.termsRequired'))
         return false
       }
       break
@@ -672,12 +696,6 @@ async function generateStoryboardAuto() {
   }
 }
 
-async function generateTermsAuto() {
-  if (videoParamsStore.videoTerms.trim()) return
-  if (!videoParamsStore.videoScript.trim()) return
-  await onGenerateTerms()
-}
-
 async function onGenerateTerms() {
   if (!videoParamsStore.videoScript.trim()) {
     ElMessage.warning(t('wizard.validate.scriptRequired'))
@@ -708,11 +726,34 @@ async function onGenerateTerms() {
   }
 }
 
+async function onGenerateNarration() {
+  if (!taskStore.draftTaskId) {
+    ElMessage.warning('请先完成前序步骤')
+    return
+  }
+  if (!videoParamsStore.videoScript.trim()) {
+    ElMessage.warning(t('wizard.validate.scriptRequired'))
+    return
+  }
+  generatingNarration.value = true
+  try {
+    const result = await generateNarration(taskStore.draftTaskId)
+    if (result.narration) {
+      videoParamsStore.narration = result.narration
+      ElMessage.success('旁白文案生成成功')
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    ElMessage.error(msg)
+  } finally {
+    generatingNarration.value = false
+  }
+}
+
 async function fetchMaterialsAuto() {
   if (videoParamsStore.materialsFetched || videoParamsStore.videoSource === 'local') return
   if (!taskStore.draftTaskId) return
   if (!videoParamsStore.videoTerms.trim()) {
-    ElMessage.warning(t('wizard.validate.termsRequired'))
     return
   }
   videoParamsStore.fetchingMaterials = true
@@ -757,21 +798,39 @@ async function onNext() {
         await taskStore.initDraftTask(params)
       }
       await parseIntent()
+      if (taskStore.draftTaskId) {
+        const stepParams = videoParamsStore.collectStepParams(0) as Partial<VideoParams>
+        await taskStore.saveStepConfig(stepParams)
+      }
       await generateScriptAuto()
     }
     if (currentStep.value === 1) {
       await generateStoryboardAuto()
     }
+    if (currentStep.value === 2) {
+      if (!videoParamsStore.videoTerms.trim()) {
+        await onGenerateTerms()
+      }
+    }
     if (currentStep.value === 3) {
-      await generateTermsAuto()
+      if (!videoParamsStore.narration.trim()) {
+        await onGenerateNarration()
+      }
+      if (taskStore.draftTaskId && videoParamsStore.narration.trim()) {
+        await taskStore.saveStepConfig({ narration: videoParamsStore.narration } as any)
+      }
     }
     if (currentStep.value === 4) {
+      if (taskStore.draftTaskId) {
+        const stepParams = videoParamsStore.collectStepParams(4) as Partial<VideoParams>
+        await taskStore.saveStepConfig(stepParams)
+      }
       await fetchMaterialsAuto()
     }
     if (currentStep.value === 5) {
       await generateAudioAuto()
     }
-    if (taskStore.draftTaskId) {
+    if (taskStore.draftTaskId && currentStep.value !== 3 && currentStep.value !== 4) {
       const stepParams = videoParamsStore.collectStepParams(currentStep.value) as Partial<VideoParams> & {
         script?: string
         terms?: string[]
@@ -785,7 +844,7 @@ async function onNext() {
         const prompts = videoParamsStore.storyboard.map(s => s.visual_prompt).filter(Boolean)
         if (prompts.length > 0) stepParams.terms = prompts
       }
-      if (currentStep.value === 3 && videoParamsStore.videoTerms) {
+      if (currentStep.value === 2 && videoParamsStore.videoTerms) {
         const termsList = videoParamsStore.videoTerms.split(/[,，]/).map(t => t.trim()).filter(Boolean)
         if (termsList.length > 0) {
           stepParams.terms = termsList
@@ -854,10 +913,7 @@ async function onPublish() {
   }
   publishing.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    ElMessage.success(t('wizard.step9.publishSuccess'))
-  } catch {
-    ElMessage.error(t('wizard.step9.publishFailed'))
+    ElMessage.info(t('wizard.step9.publishing'))
   } finally {
     publishing.value = false
   }

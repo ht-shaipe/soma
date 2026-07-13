@@ -60,14 +60,34 @@ impl TaskQueue {
             let p = params.clone();
             let sa = stop_at.clone();
             std::thread::spawn(move || {
-                let result = service::pipeline::run_task(&tid, &p, &sa);
-                if let Err(e) = result {
-                    log::error!("task {} failed: {:?}", tid, e);
-                    state::update_task_data(&tid, &state::TaskUpdateData {
-                        state: Some(TaskStatus::Failed.as_i32()),
-                        error_message: Some(format!("{:?}", e)),
-                        ..Default::default()
-                    });
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    service::pipeline::run_task(&tid, &p, &sa)
+                }));
+                match result {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        log::error!("task {} failed: {:?}", tid, e);
+                        state::update_task_data(&tid, &state::TaskUpdateData {
+                            state: Some(TaskStatus::Failed.as_i32()),
+                            error_message: Some(format!("{:?}", e)),
+                            ..Default::default()
+                        });
+                    }
+                    Err(panic_val) => {
+                        let msg = if let Some(s) = panic_val.downcast_ref::<&str>() {
+                            s.to_string()
+                        } else if let Some(s) = panic_val.downcast_ref::<String>() {
+                            s.clone()
+                        } else {
+                            "unknown panic".to_string()
+                        };
+                        log::error!("task {} panicked: {}", tid, msg);
+                        state::update_task_data(&tid, &state::TaskUpdateData {
+                            state: Some(TaskStatus::Failed.as_i32()),
+                            error_message: Some(format!("pipeline panicked: {}", msg)),
+                            ..Default::default()
+                        });
+                    }
                 }
                 lock_queue().task_done();
             });
@@ -97,14 +117,34 @@ impl TaskQueue {
                 let p = task.params.clone();
                 let sa = task.stop_at.clone();
                 std::thread::spawn(move || {
-                    let result = service::pipeline::run_task(&tid, &p, &sa);
-                    if let Err(e) = result {
-                        log::error!("task {} failed: {:?}", tid, e);
-                        state::update_task_data(&tid, &state::TaskUpdateData {
-                            state: Some(TaskStatus::Failed.as_i32()),
-                            error_message: Some(format!("{:?}", e)),
-                            ..Default::default()
-                        });
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        service::pipeline::run_task(&tid, &p, &sa)
+                    }));
+                    match result {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => {
+                            log::error!("task {} failed: {:?}", tid, e);
+                            state::update_task_data(&tid, &state::TaskUpdateData {
+                                state: Some(TaskStatus::Failed.as_i32()),
+                                error_message: Some(format!("{:?}", e)),
+                                ..Default::default()
+                            });
+                        }
+                        Err(panic_val) => {
+                            let msg = if let Some(s) = panic_val.downcast_ref::<&str>() {
+                                s.to_string()
+                            } else if let Some(s) = panic_val.downcast_ref::<String>() {
+                                s.clone()
+                            } else {
+                                "unknown panic".to_string()
+                            };
+                            log::error!("task {} panicked: {}", tid, msg);
+                            state::update_task_data(&tid, &state::TaskUpdateData {
+                                state: Some(TaskStatus::Failed.as_i32()),
+                                error_message: Some(format!("pipeline panicked: {}", msg)),
+                                ..Default::default()
+                            });
+                        }
                     }
                     lock_queue().task_done();
                 });

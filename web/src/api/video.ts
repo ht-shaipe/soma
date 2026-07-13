@@ -33,10 +33,18 @@ export function deleteTask(taskId: string) {
   return api.post('/tasks/delete', { taskId }).then(extractData<{ deleted: boolean }>)
 }
 
+export function stopTask(taskId: string) {
+  return api.post('/tasks/stop', { taskId }).then(extractData<{ stopped: boolean; taskId: string }>)
+}
+
 export function fetchMaterials(taskId: string) {
   return api.post('/videos/fetchMaterials', { taskId }).then(extractData<{ taskId: string; materials: string[]; total: number }>)
 }
 
 export function generateAudio(taskId: string) {
   return api.post('/videos/generateAudio', { taskId }).then(extractData<{ taskId: string; audioFile: string; audioDuration: number }>)
+}
+
+export function generateNarration(taskId: string) {
+  return api.post('/videos/generateNarration', { taskId }).then(extractData<{ taskId: string; narration: string }>)
 }

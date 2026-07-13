@@ -387,9 +387,9 @@ impl AppConfig {
         self.app.host.as_deref().unwrap_or("0.0.0.0")
     }
 
-    /// 获取服务监听端口号，默认 8080
+    /// 获取服务监听端口号，默认 8090
     pub fn get_listen_port(&self) -> u16 {
-        self.app.port.unwrap_or(8080)
+        self.app.port.unwrap_or(8090)
     }
 
     /// 获取存储目录路径，默认 "./storage"

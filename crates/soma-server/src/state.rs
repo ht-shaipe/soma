@@ -3,7 +3,7 @@
 /// 通过 TaskStore trait 抽象任务存储，支持内存和 Redis 后端。
 /// 提供任务的创建、查询、更新、删除等 CRUD 操作。
 
-use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams};
+use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams, AiVideoSegmentLog};
 use crate::store::{TaskStore, InMemoryTaskStore, SqliteTaskStore};
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -52,14 +52,16 @@ pub fn update_task_data(task_id: &str, data: &TaskUpdateData) {
         if let Some(p) = d.progress { task.progress = p; }
         if let Some(ref s) = d.script { task.script = Some(s.clone()); }
         if let Some(ref t) = d.terms { task.terms = Some(t.clone()); }
-        if let Some(ref sb) = d.storyboard { task.storyboard = Some(sb.clone()); }
-        if let Some(ref a) = d.audio_file { task.audio_file = Some(a.clone()); }
+    if let Some(ref sb) = d.storyboard { task.storyboard = Some(sb.clone()); }
+    if let Some(ref n) = d.narration { task.narration = Some(n.clone()); }
+    if let Some(ref a) = d.audio_file { task.audio_file = Some(a.clone()); }
         if let Some(dur) = d.audio_duration { task.audio_duration = Some(dur); }
         if let Some(ref s) = d.subtitle_path { task.subtitle_path = Some(s.clone()); }
         if let Some(ref m) = d.materials { task.materials = Some(m.clone()); }
         if let Some(ref v) = d.videos { task.videos = Some(v.clone()); }
-        if let Some(ref v) = d.combined_videos { task.combined_videos = Some(v.clone()); }
-        if let Some(ref e) = d.error_message { task.error_message = Some(e.clone()); }
+    if let Some(ref v) = d.combined_videos { task.combined_videos = Some(v.clone()); }
+    if let Some(ref v) = d.ai_video_logs { task.ai_video_logs = Some(v.clone()); }
+    if let Some(ref e) = d.error_message { task.error_message = Some(e.clone()); }
         task.updated_at = chrono::Utc::now();
     }));
 }
@@ -98,7 +100,10 @@ pub fn create_draft_task_entry(task_id: &str, params: VideoParams) {
 pub fn update_task_params(task_id: &str, params: &VideoParams) {
     let p = params.clone();
     lock_store().update(task_id, Box::new(move |task| {
-        if task.state != TaskStatus::Draft.as_i32() {
+        // 允许 Draft 和 Failed 状态更新配置
+        let allow_edit = task.state == TaskStatus::Draft.as_i32()
+            || task.state == TaskStatus::Failed.as_i32();
+        if !allow_edit {
             return;
         }
         if !p.video_subject.is_empty() { task.params.video_subject = p.video_subject.clone(); }
@@ -150,7 +155,10 @@ pub fn update_task_params(task_id: &str, params: &VideoParams) {
 pub fn update_task_params_from_json(task_id: &str, json: &serde_json::Value) {
     let j = json.clone();
     lock_store().update(task_id, Box::new(move |task| {
-        if task.state != TaskStatus::Draft.as_i32() {
+        // 允许 Draft 和 Failed 状态更新配置
+        let allow_edit = task.state == TaskStatus::Draft.as_i32()
+            || task.state == TaskStatus::Failed.as_i32();
+        if !allow_edit {
             return;
         }
         if let Some(v) = j.get("video_subject").and_then(|v| v.as_str()) {
@@ -300,11 +308,13 @@ pub struct TaskUpdateData {
     pub script: Option<String>,
     pub terms: Option<Vec<String>>,
     pub storyboard: Option<Vec<StoryboardScene>>,
+    pub narration: Option<String>,
     pub audio_file: Option<String>,
     pub audio_duration: Option<f64>,
     pub subtitle_path: Option<String>,
     pub materials: Option<Vec<String>>,
     pub videos: Option<Vec<String>>,
     pub combined_videos: Option<Vec<String>>,
+    pub ai_video_logs: Option<Vec<AiVideoSegmentLog>>,
     pub error_message: Option<String>,
 }

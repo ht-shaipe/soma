@@ -9,7 +9,7 @@ export const useConfigStore = defineStore('config', () => {
       name: 'Soma',
       version: '0.1.0',
       host: '0.0.0.0',
-      port: 8080,
+      port: 8090,
       storage_path: './storage',
       concurrent_tasks: 1,
     },
