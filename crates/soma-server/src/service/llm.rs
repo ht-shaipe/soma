@@ -58,14 +58,27 @@ pub async fn generate_script(
     );
 
     let sys_msg = if system_prompt.is_empty() {
+        let lang_label = if language.is_empty() { "中文" } else { language };
         format!(
-            "你是短视频脚本撰写专家。根据创作参数撰写短视频脚本，并提取素材搜索关键词。\n\
-             输出两部分，用 ===KEYWORDS=== 分隔：\n\
-             第一部分：脚本，按时间线标注 [开始s-结束s] 旁白文本\n\
-             第二部分：5个英文搜索关键词，逗号分隔，适合Pexels/Pixabay搜索\n\n\
+            "你是一位顶尖短视频脚本作家，擅长创作引人入胜、信息丰富且情感饱满的短视频旁白脚本。\n\n\
+             任务：根据创作参数撰写短视频旁白脚本，并为每个段落提取素材搜索关键词。\n\n\
+             输出格式（两部分用 ===KEYWORDS=== 分隔）：\n\n\
+             第一部分：旁白脚本\n\
+             - 按时间线标注 [开始s-结束s] 旁白文本\n\
+             - 每段旁白要言之有物，避免空话套话和重复\n\
+             - 用生动的语言描述，有画面感和情感共鸣\n\
+             - 语句长短交替，有节奏感，适合语音朗读\n\
+             - 段落之间自然衔接，逻辑递进\n\
+             - 总时长内的内容密度要足够，不要留大段空白\n\n\
+             第二部分：搜索关键词\n\
+             - 每个段落对应1-2个英文搜索关键词，用于在Pexels/Pixabay搜索视频素材\n\
+             - 关键词要简短精准（1-3个英文单词），如：ocean waves、city night、coffee pouring\n\
+             - 不要用长句或描述性短语作为关键词\n\
+             - 关键词要能搜索到高质量、有视觉冲击力的视频画面\n\
+             - 格式：段落1关键词1,段落1关键词2;段落2关键词1,段落2关键词2;...\n\n\
              语言：{}\n段落数：{}\n\
              不要包含格式标记、标题、序号（时间标注除外）",
-            if language.is_empty() { "中文" } else { language },
+            lang_label,
             paragraph_number,
         )
     } else {
@@ -123,10 +136,13 @@ pub async fn generate_terms(
     let sys_msg = format!(
         "你是一个视频素材搜索关键词提取专家。请从给定的视频脚本中提取{}个最适合搜索视频素材的关键词。\
          要求：\n\
-         1. 每个关键词应该是英文的，适合在Pexels、Pixabay等素材网站搜索\n\
-         2. 关键词要具体、有视觉画面感\n\
-         3. 只输出关键词，用逗号分隔\n\
-         4. 不要包含任何解释或编号",
+         1. 每个关键词必须是简短的英文词组（1-3个单词），适合在Pexels、Pixabay等素材网站搜索\n\
+         2. 关键词要精准、有视觉画面感，能搜到高质量视频素材\n\
+         3. 好的关键词示例：ocean waves、sunrise mountain、coffee pouring、city lights night、rain window\n\
+         4. 不好的关键词示例：a beautiful ocean scene with waves crashing（太长）、emotion（太抽象）、video（太泛）\n\
+         5. 按脚本段落顺序排列，每个段落至少1个关键词\n\
+         6. 只输出关键词，用逗号分隔\n\
+         7. 不要包含任何解释或编号",
         amount,
     );
 
@@ -196,14 +212,16 @@ pub async fn generate_narration(
     let sys_msg = format!(
         "你是一个专业的短视频旁白撰稿人。你的任务是将视频脚本转换为适合语音朗读的旁白文案。\n\n\
          关键要求：\n\
-         1. 旁白文案必须是口语化、自然流畅的，适合人类朗读\n\
+         1. 旁白文案必须是口语化、自然流畅的，像一位专业播音员在娓娓道来\n\
          2. 去掉所有场景描述、镜头指导（如'近景''航拍''推进'等）和视觉术语\n\
          3. 去掉括号内的技术标注、情绪提示等非朗读内容\n\
-         4. 保持原文的核心信息和情感表达，但用更自然的口语方式重新表述\n\
-         5. 语句要简短清晰，适合TTS语音合成，避免过长的复杂句式\n\
-         6. 保留适当的停顿和节奏感，段落之间自然衔接\n\
-         7. 风格：{}，情感基调：{}\n\
-         8. 语言：{}\n\n\
+         4. 保持原文的核心信息和情感表达，用更自然生动的口语方式重新表述\n\
+         5. 语句要简短有力，适合TTS语音合成，避免过长复杂句式和书面化表达\n\
+         6. 善用短句和停顿制造节奏感，段落之间自然衔接不突兀\n\
+         7. 添加适当的语气词和连接词（'然而''不仅如此''想象一下'等），让旁白更有感染力\n\
+         8. 每段旁白要有信息增量，避免空洞重复\n\
+         9. 风格：{}，情感基调：{}\n\
+         10. 语言：{}\n\n\
          直接输出旁白文案纯文本，不要加标题、标号或任何解释。", style, mood, lang_instruction
     );
 
@@ -337,6 +355,9 @@ pub async fn generate_storyboard(
          - visual_prompt: 画面英文提示词，遵循公式：主体描述 + 环境/场景 + 光线/色彩 + 风格/质量 + 镜头参数\n\
            示例：cherry blossom petals gently falling from branches, soft golden morning light filtering through, \
            cinematic warm pastel tones 8K, shallow depth of field bokeh\n\
+         - search_keyword: 素材搜索英文关键词（1-3个单词，简短精准，适合Pexels/Pixabay搜索）\n\
+           示例：cherry blossom、ocean waves、city lights、coffee pouring、golden sunset\n\
+           要求：必须是简短词组，不能是长句描述；要能搜到高质量有视觉冲击力的素材\n\
          - camera_movement: 镜头运动，从以下选择：push_in(缓慢推进), pull_out(拉远), pan_left(左摇), pan_right(右摇), \
            tilt_up(上仰), tilt_down(下俯), static(固定), zoom(变焦), tracking(跟随), aerial(航拍), close_up(特写)\n\
          - transition: 转场方式：cut(硬切-节奏感强), fade(淡入淡出-柔和抒情), dissolve(叠化-时间流逝), slide(滑动-空间转换), zoom(缩放-突出重点)\n\
@@ -345,12 +366,15 @@ pub async fn generate_storyboard(
          关键要求：\n\
          1. 场景数量根据脚本长度合理划分，每个场景应是一个完整的视觉画面\n\
          2. visual_prompt 必须是英文，具体、有画面感，适合AI视频生成\n\
-         3. camera_movement 要与画面内容和情绪匹配\n\
-         4. 镜头运动参考：固定→展示静态场景、推进→增强沉浸感、航拍→宏大场景、跟随→增强代入感、特写→强调细节{}\
+         3. search_keyword 必须是简短英文词组（1-3个单词），精准可搜索\n\
+         4. camera_movement 要与画面内容和情绪匹配\n\
+         5. transition 优先使用 fade 和 dissolve（更柔和专业），避免过多 cut 导致画面跳跃\n\
+         6. 镜头运动参考：固定→展示静态场景、推进→增强沉浸感、航拍→宏大场景、跟随→增强代入感、特写→强调细节{}\
          \n\n\
          以JSON数组输出：\n\
          [\n  {{\n    \"scene_id\": 1,\n    \"duration\": {},\n    \"narration\": \"场景旁白\",\n    \"visual_desc\": \"近景：樱花飘落...\",\n    \
          \"visual_prompt\": \"cherry blossom petals falling, soft golden light, cinematic, 8K\",\n    \
+         \"search_keyword\": \"cherry blossom\",\n    \
          \"camera_movement\": \"push_in\",\n    \"transition\": \"fade\",\n    \"text_overlay\": \"春 · 起始\",\n    \
          \"mood\": \"温暖宁静\"\n  }}\n]\n\n\
          只输出JSON数组，不要代码围栏或解释。", subject, style, mood, clip_duration, keyword_instruction, clip_duration);
@@ -415,6 +439,7 @@ fn fallback_storyboard(script: &str, clip_duration: u32) -> Vec<StoryboardScene>
             narration: script.to_string(),
             visual_desc: Some(script.to_string()),
             visual_prompt: script.to_string(),
+            search_keyword: None,
             camera_movement: Some("static".to_string()),
             transition: Some("cut".to_string()),
             text_overlay: None,
@@ -429,6 +454,7 @@ fn fallback_storyboard(script: &str, clip_duration: u32) -> Vec<StoryboardScene>
             narration: s.trim().to_string(),
             visual_desc: Some(s.trim().to_string()),
             visual_prompt: s.trim().to_string(),
+            search_keyword: None,
             camera_movement: Some("static".to_string()),
             transition: if i + 1 < sentences.len() { Some("cut".to_string()) } else { None },
             text_overlay: None,

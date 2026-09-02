@@ -107,11 +107,29 @@ impl VideoComposer {
             let mut transitioned = Vec::new();
             for (seg_i, (ref seg_path, seg_dur)) in segments.iter().enumerate() {
                 let trans_output = output_dir.join(format!("temp-trans-{}.mp4", seg_i)).to_string_lossy().to_string();
-                if transition_mode == "Shuffle" {
-                    crate::effects::apply_shuffle_transition(seg_path, &trans_output, transition_duration, ffmpeg_path, codec)?;
+                let effective_transition = if transition_mode == "Shuffle" {
+                    if seg_i == 0 {
+                        "FadeIn".to_string()
+                    } else if seg_i == segments.len() - 1 {
+                        "FadeOut".to_string()
+                    } else {
+                        let trans = ["FadeIn", "FadeOut", "Dissolve", "SlideIn", "SlideOut"];
+                        use rand::Rng;
+                        let idx = rand::rng().random_range(0..trans.len());
+                        trans[idx].to_string()
+                    }
+                } else if transition_mode == "FadeIn" || transition_mode == "FadeOut" || transition_mode == "Dissolve" {
+                    if seg_i == 0 {
+                        "FadeIn".to_string()
+                    } else if seg_i == segments.len() - 1 {
+                        "FadeOut".to_string()
+                    } else {
+                        transition_mode.to_string()
+                    }
                 } else {
-                    crate::effects::apply_transition(seg_path, &trans_output, transition_mode, transition_duration, ffmpeg_path, "left", codec)?;
-                }
+                    transition_mode.to_string()
+                };
+                crate::effects::apply_transition(seg_path, &trans_output, &effective_transition, transition_duration, ffmpeg_path, "left", codec)?;
                 transitioned.push((trans_output, *seg_dur));
             }
             // 清理原始片段

@@ -274,13 +274,19 @@ impl Ffmpeg {
         start: f64,
         duration: f64,
     ) -> Result<(), SomaError> {
+        let vf = format!(
+            "split[original][bg];[bg]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},gblur=sigma=20[blurred];\
+             [original]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];\
+             [blurred][fg]overlay=(W-w)/2:(H-h)/2",
+            w = width, h = height
+        );
         let result = run_with_timeout(std::process::Command::new(&self.path)
             .args(&[
                 "-y",
                 "-ss", &start.to_string(),
                 "-i", input_path,
                 "-t", &duration.to_string(),
-                "-vf", &format!("scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:(ow-iw)/2:(oh-ih)/2:black", width, height, width, height),
+                "-vf", &vf,
                 "-c:v", &self.codec,
                 "-an",
                 "-pix_fmt", "yuv420p",
@@ -308,17 +314,16 @@ impl Ffmpeg {
     /// # 返回
     /// 成功返回 Ok(())，无法识别的转场类型也返回 Ok(())（跳过），失败返回 SomaError
     pub fn add_transition(&self, input_path: &str, output_path: &str, transition: &str, duration: f64) -> Result<(), SomaError> {
-        // 根据转场类型构建不同的 fade 滤镜参数
         let vf = match transition {
-            // fade=t=in:st=0:d=N → 从第0秒开始淡入，持续N秒
             "FadeIn" => format!("fade=t=in:st=0:d={}", duration),
             "FadeOut" => {
-                // 淡出需要计算起始时间 = 视频总时长 - 淡出持续时间
                 let dur = self.get_video_duration(input_path)?;
-                // fade=t=out:st=START:d=N → 从START秒开始淡出，持续N秒
                 format!("fade=t=out:st={}:d={}", dur - duration, duration)
             }
-            // 未识别的转场类型，跳过不做处理
+            "Dissolve" => {
+                let dur = self.get_video_duration(input_path)?;
+                format!("fade=t=in:st=0:d={},fade=t=out:st={}:d={}", duration.min(dur * 0.3), dur - duration, duration)
+            }
             _ => return Ok(()),
         };
         let result = run_with_timeout(std::process::Command::new(&self.path)
@@ -358,10 +363,10 @@ impl Ffmpeg {
         // 字幕参数，带默认值
         let subtitle_enabled = params.get_subtitle_enabled();
         let font_name = params.font_name.as_deref().unwrap_or("STHeitiMedium.ttc");
-        let font_size = params.font_size.unwrap_or(16);
+        let font_size = params.font_size.unwrap_or(26);
         let text_color = params.text_fore_color.as_deref().unwrap_or("#FFFFFF");
         let stroke_color = params.stroke_color.as_deref().unwrap_or("#000000");
-        let stroke_width = params.stroke_width.unwrap_or(1.5);
+        let stroke_width = params.stroke_width.unwrap_or(3.0);
 
         let subtitle_position = params.subtitle_position.as_deref().unwrap_or("bottom");
 

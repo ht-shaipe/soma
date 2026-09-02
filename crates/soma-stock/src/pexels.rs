@@ -76,26 +76,35 @@ impl SomaStockProvider for Pexels {
 
         for v in videos {
             let duration = v.get("duration").and_then(|d| d.as_f64()).unwrap_or(0.0);
-            // 过滤掉时长不足的视频
             if (duration as u32) < min_duration {
                 continue;
             }
-            // 遍历视频的所有可用文件格式/分辨率
             if let Some(files) = v.get("video_files").and_then(|f| f.as_array()) {
+                let mut best_match: Option<(u32, &serde_json::Value)> = None;
                 for vf in files {
                     let w = vf.get("width").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
                     let h = vf.get("height").and_then(|h| h.as_u64()).unwrap_or(0) as u32;
-                    // 精确匹配目标分辨率
-                    if w == target_w && h == target_h {
-                        if let Some(link) = vf.get("link").and_then(|l| l.as_str()) {
-                            items.push(MaterialInfo {
-                                provider: "pexels".into(),
-                                url: link.to_string(),
-                                duration,
-                            });
-                            // 找到匹配的分辨率后跳出，避免添加同一视频的多个格式
-                            break;
+                    if w == 0 || h == 0 {
+                        continue;
+                    }
+                    let exact = w == target_w && h == target_h;
+                    let wide_enough = w >= target_w && h >= target_h;
+                    let near_match = w >= (target_w as f64 * 0.8) as u32;
+                    let quality = if exact { 3 } else if wide_enough { 2 } else if near_match { 1 } else { 0 };
+                    let current_best = best_match.as_ref().map(|(q, _)| *q).unwrap_or(0);
+                    if quality > current_best || (quality == current_best && quality > 0) {
+                        if quality > 0 {
+                            best_match = Some((quality, vf));
                         }
+                    }
+                }
+                if let Some((_, vf)) = best_match {
+                    if let Some(link) = vf.get("link").and_then(|l| l.as_str()) {
+                        items.push(MaterialInfo {
+                            provider: "pexels".into(),
+                            url: link.to_string(),
+                            duration,
+                        });
                     }
                 }
             }

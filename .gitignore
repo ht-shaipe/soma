@@ -18,6 +18,7 @@ web/dist-ssr/
 .deveco
 .claude
 .opencode
+.codeartsdoer
 
 # Logs
 logs/

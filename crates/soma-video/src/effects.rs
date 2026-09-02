@@ -14,6 +14,11 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
             let dur = get_video_duration(input_path, ffmpeg_path)?;
             format!("fade=t=out:st={}:d={}", (dur - duration).max(0.0), duration)
         }
+        "Dissolve" => {
+            let dur = get_video_duration(input_path, ffmpeg_path)?;
+            let in_dur = duration.min(dur * 0.3);
+            format!("fade=t=in:st=0:d={},fade=t=out:st={}:d={}", in_dur, dur - duration, duration)
+        }
         "SlideIn" => build_slide_in_filter(duration, side)?,
         "SlideOut" => build_slide_out_filter(input_path, duration, side, ffmpeg_path)?,
         _ => {
@@ -56,7 +61,7 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
 pub fn apply_shuffle_transition(input_path: &str, output_path: &str, duration: f64, ffmpeg_path: &str, codec: &str) -> Result<(), SomaError> {
     use rand::Rng;
     let mut rng = rand::rng();
-    let transitions = ["FadeIn", "FadeOut", "SlideIn", "SlideOut"];
+    let transitions = ["FadeIn", "FadeOut", "Dissolve", "SlideIn", "SlideOut"];
     let sides = ["left", "right", "top", "bottom"];
     let t_idx = rng.random_range(0..transitions.len());
     let s_idx = rng.random_range(0..sides.len());

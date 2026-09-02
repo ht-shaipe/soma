@@ -123,13 +123,28 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
             if !terms.is_empty() {
                 terms.clone()
             } else {
-                storyboard.iter().map(|s| s.visual_prompt.clone()).collect()
+                storyboard.iter().map(|s| {
+                    s.search_keyword.as_deref()
+                        .filter(|k| !k.is_empty())
+                        .unwrap_or(&s.visual_prompt)
+                        .to_string()
+                }).collect()
             }
         } else {
-            storyboard.iter().map(|s| s.visual_prompt.clone()).collect()
+            storyboard.iter().map(|s| {
+                s.search_keyword.as_deref()
+                    .filter(|k| !k.is_empty())
+                    .unwrap_or(&s.visual_prompt)
+                    .to_string()
+            }).collect()
         }
     } else {
-        storyboard.iter().map(|s| s.visual_prompt.clone()).collect()
+        storyboard.iter().map(|s| {
+            s.search_keyword.as_deref()
+                .filter(|k| !k.is_empty())
+                .unwrap_or(&s.visual_prompt)
+                .to_string()
+        }).collect()
     };
 
     state::update_task_data(task_id, &TaskUpdateData {
@@ -580,7 +595,7 @@ fn generate_final_videos(
         let aspect = params.get_video_aspect();
         let clip_dur = params.get_clip_duration();
         let video_count = params.get_video_count();
-        let transition_mode = params.video_transition_mode.as_deref().unwrap_or("none");
+        let transition_mode = params.video_transition_mode.as_deref().unwrap_or("FadeIn");
 
     let mut final_videos = Vec::new();
     let mut combined_videos = Vec::new();

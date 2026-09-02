@@ -151,6 +151,9 @@ pub struct StoryboardScene {
     /// 画面英文提示词（用于 AI 视频生成或素材搜索）
     /// 结构公式：主体描述 + 环境/场景 + 光线/色彩 + 风格/质量 + 镜头参数
     pub visual_prompt: String,
+    /// 素材搜索英文关键词（1-3个单词，简短精准，适合Pexels/Pixabay搜索）
+    #[serde(default)]
+    pub search_keyword: Option<String>,
     /// 镜头运动方式：push_in / pull_out / pan_left / pan_right / tilt_up / tilt_down / static / zoom / tracking / aerial / close_up
     #[serde(default)]
     pub camera_movement: Option<String>,
@@ -291,9 +294,9 @@ impl VideoParams {
         }
     }
 
-    /// 获取单个素材片段时长（秒），默认 5 秒
+    /// 获取单个素材片段时长（秒），默认 4 秒
     pub fn get_clip_duration(&self) -> u32 {
-        self.video_clip_duration.unwrap_or(5)
+        self.video_clip_duration.unwrap_or(4)
     }
 
     /// 获取生成视频数量，默认 1
