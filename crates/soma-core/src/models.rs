@@ -275,6 +275,21 @@ pub struct VideoParams {
     pub intent_mood: Option<String>,
     /// 意图解析 - 目标受众
     pub intent_audience: Option<String>,
+    /// TTS 提供者名称（透传自 DigitalHumanParams.tts_provider）
+    #[serde(default)]
+    pub tts_provider: Option<String>,
+    /// 参考音频路径（透传自 DigitalHumanParams.clone_reference_audio）
+    #[serde(default)]
+    pub clone_reference_audio: Option<String>,
+    /// 参考文本（透传自 DigitalHumanParams.clone_reference_text）
+    #[serde(default)]
+    pub clone_reference_text: Option<String>,
+    /// 克隆模型选择（透传自 DigitalHumanParams.clone_model）
+    #[serde(default)]
+    pub clone_model: Option<String>,
+    /// 商户标识（透传自 DigitalHumanParams.merchant_id，HeyGem 多商户模式）
+    #[serde(default)]
+    pub merchant_id: Option<String>,
 }
 
 impl VideoParams {
@@ -284,6 +299,16 @@ impl VideoParams {
             .as_deref()
             .and_then(VideoAspect::from_str)
             .unwrap_or(VideoAspect::Portrait)
+    }
+
+    /// 获取 TTS 提供者名称，默认 "edge"
+    pub fn get_tts_provider(&self) -> &str {
+        self.tts_provider.as_deref().unwrap_or("edge")
+    }
+
+    /// 获取商户标识，未提供返回 None
+    pub fn get_merchant_id(&self) -> Option<&str> {
+        self.merchant_id.as_deref()
     }
 
     /// 获取素材拼接模式，默认随机
@@ -489,3 +514,266 @@ pub const PUNCTUATIONS: &[&str] = &[
 pub const FILE_TYPE_VIDEOS: &[&str] = &["mp4", "mov", "mkv", "webm"];
 /// 支持的图片文件扩展名
 pub const FILE_TYPE_IMAGES: &[&str] = &["jpg", "jpeg", "png", "bmp"];
+
+/// 数字人口播视频生成任务参数，由用户提交时传入
+///
+/// 与 `VideoParams` 区别：输入为单张人像照片 + 一段文案，
+/// 输出为口播视频（人物开口说话，口型与配音同步），
+/// 不经过 LLM 文案改写，文案原样朗读。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigitalHumanParams {
+    /// 人像照片文件名（位于 `storage/portraits/` 目录下），必填
+    pub portrait_image: String,
+    /// 口播文案文本，必填，原样朗读不经过 LLM 改写，长度 ≤ 1000 字
+    pub narration_text: String,
+    /// TTS 语音名称，如 "zh-CN-XiaoxiaoNeural"
+    #[serde(default)]
+    pub voice_name: Option<String>,
+    /// 语音语速倍率
+    #[serde(default)]
+    pub voice_rate: Option<f32>,
+    /// 语音音量（0.0~2.0）
+    #[serde(default)]
+    pub voice_volume: Option<f32>,
+    /// 文案语言代码，如 "zh-CN"、"en-US"
+    #[serde(default)]
+    pub video_language: Option<String>,
+    /// 画面宽高比，如 "16:9"、"9:16"、"1:1"
+    #[serde(default)]
+    pub video_aspect: Option<String>,
+    /// 是否启用字幕叠加
+    #[serde(default)]
+    pub subtitle_enabled: Option<bool>,
+    /// 字幕位置，"top"/"bottom"/"custom"
+    #[serde(default)]
+    pub subtitle_position: Option<String>,
+    /// 自定义字幕垂直位置比例（0.0~1.0）
+    #[serde(default)]
+    pub custom_position: Option<f64>,
+    /// 背景音乐类型，如 "random"、"none"
+    #[serde(default)]
+    pub bgm_type: Option<String>,
+    /// 自定义背景音乐文件路径
+    #[serde(default)]
+    pub bgm_file: Option<String>,
+    /// 背景音乐音量（0.0~1.0）
+    #[serde(default)]
+    pub bgm_volume: Option<f32>,
+    /// 字幕字体名称
+    #[serde(default)]
+    pub font_name: Option<String>,
+    /// 字幕字号（像素）
+    #[serde(default)]
+    pub font_size: Option<u32>,
+    /// 字幕文字前景色
+    #[serde(default)]
+    pub text_fore_color: Option<String>,
+    /// 字幕描边颜色
+    #[serde(default)]
+    pub stroke_color: Option<String>,
+    /// 字幕描边宽度
+    #[serde(default)]
+    pub stroke_width: Option<f32>,
+    /// TTS 提供者名称，如 "edge"、"siliconflow"、"elevenlabs"、"mimo"、"azure"、"gemini"
+    #[serde(default)]
+    pub tts_provider: Option<String>,
+    /// 视频编码器名称（如 libx264, h264_videotoolbox, h264_nvenc）
+    #[serde(default)]
+    pub video_encoder: Option<String>,
+    /// FFmpeg 合成线程数
+    #[serde(default)]
+    pub n_threads: Option<u32>,
+    /// 参考音频文件路径（tts_provider = "voice_clone" 时必填，指向 storage/voice_clone_refs/ 目录下文件）
+    #[serde(default)]
+    pub clone_reference_audio: Option<String>,
+    /// 参考音频对应文本（可选，长度 ≤ 100 字）
+    #[serde(default)]
+    pub clone_reference_text: Option<String>,
+    /// 克隆模型选择（可选，取值 gpt_sovits/cosyvoice/fish_speech，未指定时使用配置默认）
+    #[serde(default)]
+    pub clone_model: Option<String>,
+    /// 商户标识（HeyGem 多商户模式，用于隔离数字人模型资产）
+    #[serde(default)]
+    pub merchant_id: Option<String>,
+}
+
+impl DigitalHumanParams {
+    /// 获取视频宽高比，无法识别时默认竖屏 9:16
+    pub fn get_video_aspect(&self) -> VideoAspect {
+        self.video_aspect
+            .as_deref()
+            .and_then(VideoAspect::from_str)
+            .unwrap_or(VideoAspect::Portrait)
+    }
+
+    /// 获取 TTS 提供者名称，默认 "edge"
+    pub fn get_tts_provider(&self) -> &str {
+        self.tts_provider.as_deref().unwrap_or("edge")
+    }
+
+    /// 获取参考音频文件路径，未提供返回空串
+    pub fn get_clone_reference_audio(&self) -> &str {
+        self.clone_reference_audio.as_deref().unwrap_or("")
+    }
+
+    /// 获取参考音频对应文本，未提供返回空串
+    pub fn get_clone_reference_text(&self) -> &str {
+        self.clone_reference_text.as_deref().unwrap_or("")
+    }
+
+    /// 获取克隆模型选择，未提供返回空串（使用配置默认值）
+    pub fn get_clone_model(&self) -> &str {
+        self.clone_model.as_deref().unwrap_or("")
+    }
+
+    /// 获取商户标识，未提供返回 None
+    pub fn get_merchant_id(&self) -> Option<&str> {
+        self.merchant_id.as_deref()
+    }
+}
+
+/// 数字人口播视频任务信息，记录单个口播任务的完整生命周期数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigitalHumanTaskInfo {
+    /// 任务唯一 ID
+    pub task_id: String,
+    /// 任务生成参数
+    pub params: DigitalHumanParams,
+    /// 当前任务状态码（对应 TaskStatus 的 i32 值）
+    pub state: i32,
+    /// 任务进度百分比（0~100），按阶段上报：0→30（音频）→90（口播视频）→100（合成）
+    pub progress: u32,
+    /// 生成的语音文件路径
+    pub audio_file: Option<String>,
+    /// 语音时长（秒）
+    pub audio_duration: Option<f64>,
+    /// 字幕文件路径
+    pub subtitle_path: Option<String>,
+    /// 口播视频文件路径（第三方数字人服务生成）
+    pub portrait_video_path: Option<String>,
+    /// 最终合成视频文件路径
+    pub final_video_path: Option<String>,
+    /// 错误信息（任务失败时填充）
+    pub error_message: Option<String>,
+    /// 分段总数
+    #[serde(default)]
+    pub segment_count: Option<u32>,
+    /// 当前分段序号
+    #[serde(default)]
+    pub current_segment: Option<u32>,
+    /// 各分段音频文件路径
+    #[serde(default)]
+    pub segment_audio_files: Option<Vec<String>>,
+    /// 各分段口播视频文件路径
+    #[serde(default)]
+    pub segment_video_files: Option<Vec<String>>,
+    /// 商户标识（HeyGem 多商户模式）
+    #[serde(default)]
+    pub merchant_id: Option<String>,
+    /// HeyGem 视频合成任务编码
+    #[serde(default)]
+    pub heygem_task_code: Option<String>,
+    /// 任务创建时间（UTC）
+    pub created_at: DateTime<Utc>,
+    /// 任务最后更新时间（UTC）
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 商户数字人模型资产状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AssetStatus {
+    Untrained,
+    Ready,
+    Training,
+}
+
+/// 商户数字人模型资产
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MerchantAsset {
+    pub merchant_id: String,
+    pub silent_video_path: String,
+    pub reference_audio: String,
+    pub reference_text: String,
+    pub trained_at: DateTime<Utc>,
+    pub asset_status: AssetStatus,
+}
+
+impl DigitalHumanTaskInfo {
+    /// 创建新数字人任务，初始状态为 Processing、进度 0
+    pub fn new(task_id: String, params: DigitalHumanParams) -> Self {
+        Self::with_status(task_id, params, TaskStatus::Processing)
+    }
+
+    /// 创建新数字人任务，指定初始状态
+    pub fn with_status(
+        task_id: String,
+        params: DigitalHumanParams,
+        status: TaskStatus,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            task_id,
+            params,
+            state: status.as_i32(),
+            progress: 0,
+            audio_file: None,
+            audio_duration: None,
+            subtitle_path: None,
+            portrait_video_path: None,
+            final_video_path: None,
+            error_message: None,
+            segment_count: None,
+            current_segment: None,
+            segment_audio_files: None,
+            segment_video_files: None,
+            merchant_id: None,
+            heygem_task_code: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// 更新任务状态和/或进度，同时刷新 updated_at 时间戳
+    pub fn update(&mut self, state: Option<i32>, progress: Option<u32>) {
+        if let Some(s) = state {
+            self.state = s;
+        }
+        if let Some(p) = progress {
+            self.progress = p;
+        }
+        self.updated_at = Utc::now();
+    }
+
+    /// 判断任务是否已失败
+    pub fn is_failed(&self) -> bool {
+        self.state == TaskStatus::Failed.as_i32()
+    }
+
+    /// 判断任务是否已完成
+    pub fn is_completed(&self) -> bool {
+        self.state == TaskStatus::Completed.as_i32()
+    }
+}
+
+/// 人像照片信息，对应 `storage/portraits/` 目录下的一个照片文件
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortraitInfo {
+    /// 照片文件名（UUID 命名，含扩展名）
+    pub name: String,
+    /// 照片相对路径（相对于存储根目录，如 `portraits/xxx.jpg`）
+    pub path: String,
+    /// 照片文件大小（字节）
+    pub size: u64,
+    /// 照片文件类型（扩展名，如 "jpg"、"png"）
+    pub file_type: String,
+    /// 上传时间（UTC）
+    pub uploaded_at: DateTime<Utc>,
+}
+
+/// 数字人口播文案最大长度（字）
+pub const DH_NARRATION_TEXT_MAX_LEN: usize = 1000;
+/// 人像照片最大文件大小（10MB）
+pub const DH_PORTRAIT_MAX_SIZE: u64 = 10 * 1024 * 1024;
+/// 支持的人像照片扩展名
+pub const DH_PORTRAIT_FILE_TYPES: &[&str] = &["jpg", "jpeg", "png"];

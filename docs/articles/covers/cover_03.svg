@@ -1,0 +1,95 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#101C33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#F74C00" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#F74C00" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FF7A45"/>
+      <stop offset="1" stop-color="#FF9E3C"/>
+    </linearGradient>
+    <pattern id="dots" width="42" height="42" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#FFFFFF" opacity="0.05"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#dots)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <rect x="0" y="0" width="10" height="900" fill="url(#accent)"/>
+
+  <text x="1528" y="262" text-anchor="end" font-family="'PingFang SC',sans-serif" font-size="250" font-weight="800" fill="#FFFFFF" opacity="0.05">03</text>
+  <circle cx="1290" cy="430" r="300" fill="none" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="2"/>
+  <circle cx="1290" cy="430" r="382" fill="none" stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="2"/>
+
+  <rect x="80" y="72" width="470" height="52" rx="26" fill="#F74C00" fill-opacity="0.08" stroke="#FF7A45" stroke-opacity="0.5" stroke-width="2"/>
+  <circle cx="114" cy="98" r="7" fill="#FF7A45"/>
+  <text x="140" y="107" font-family="'PingFang SC','Hiragino Sans GB',sans-serif" font-size="24" fill="#C9A58A" letter-spacing="2">SOMA · 数字人实战系列 03 / 05</text>
+
+  <text x="80" y="238" font-family="'PingFang SC',sans-serif" font-size="30" font-weight="600" fill="#FF8A50" letter-spacing="6">tokio · block_on_async 模式详解</text>
+
+  <text x="78" y="334" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">Rust 异步调用</text>
+  <text x="78" y="436" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">Python GPU 推理</text>
+
+  <rect x="80" y="478" width="120" height="6" rx="3" fill="url(#accent)"/>
+
+  <text x="80" y="540" font-family="'PingFang SC',sans-serif" font-size="30" fill="#B9C9E2">tokio::spawn panic 的根源与正确封装姿势</text>
+
+  <g font-family="'PingFang SC',sans-serif" font-size="22" fill="#EAD9C8">
+    <rect x="80" y="586" width="100" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FF7A45" stroke-opacity="0.35"/>
+    <text x="130" y="617" text-anchor="middle">tokio</text>
+    <rect x="200" y="586" width="140" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FF7A45" stroke-opacity="0.35"/>
+    <text x="270" y="617" text-anchor="middle">LocalSet</text>
+    <rect x="360" y="586" width="110" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FF7A45" stroke-opacity="0.35"/>
+    <text x="415" y="617" text-anchor="middle">?Send</text>
+    <rect x="490" y="586" width="190" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FF7A45" stroke-opacity="0.35"/>
+    <text x="585" y="617" text-anchor="middle">SSH 子进程</text>
+  </g>
+
+  <text x="80" y="812" font-family="'PingFang SC',sans-serif" font-size="22" fill="#64789B" letter-spacing="1">Rust AI 短视频自动生成 · 开发实践笔记</text>
+
+  <!-- illustration: async gear -->
+  <g transform="translate(1060,110)">
+    <!-- dashed loop ring -->
+    <circle cx="230" cy="250" r="170" fill="none" stroke="#FF8A50" stroke-opacity="0.4" stroke-width="2.5" stroke-dasharray="6 10"/>
+    <polygon points="0,0 -16,-9 -16,9" transform="translate(352,128) rotate(122)" fill="#FF8A50" opacity="0.7"/>
+    <polygon points="0,0 -16,-9 -16,9" transform="translate(108,372) rotate(-58)" fill="#FF8A50" opacity="0.7"/>
+
+    <!-- gear teeth -->
+    <g fill="#FF7A45">
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(0 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(30 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(60 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(90 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(120 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(150 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(180 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(210 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(240 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(270 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(300 230 250)"/>
+      <rect x="221" y="88" width="18" height="42" rx="5" transform="rotate(330 230 250)"/>
+    </g>
+    <circle cx="230" cy="250" r="118" fill="none" stroke="#FF7A45" stroke-width="30"/>
+    <circle cx="230" cy="250" r="52" fill="#0F1D36" stroke="#FF8A50" stroke-width="3"/>
+    <text x="230" y="260" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="26" font-weight="700" fill="#FFC9A8">async</text>
+
+    <!-- Rust -> Python pills -->
+    <rect x="20" y="480" width="150" height="48" rx="24" fill="#FF7A45" fill-opacity="0.08" stroke="#FF8A50" stroke-opacity="0.6" stroke-width="2"/>
+    <text x="95" y="511" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="22" font-weight="700" fill="#FFB08A">Rust</text>
+    <rect x="290" y="480" width="150" height="48" rx="24" fill="#FF7A45" fill-opacity="0.08" stroke="#FF8A50" stroke-opacity="0.6" stroke-width="2"/>
+    <text x="365" y="511" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="22" font-weight="700" fill="#FFC9A8">Python</text>
+
+    <line x1="186" y1="504" x2="274" y2="504" stroke="#FF8A50" stroke-width="4"/>
+    <polygon points="0,0 -14,-8 -14,8" transform="translate(278,504)" fill="#FF8A50"/>
+    <polygon points="0,0 14,-8 14,8" transform="translate(182,504)" fill="#FF8A50"/>
+    <text x="230" y="562" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="18" fill="#9FB3CE">block_on_async 调用</text>
+
+    <rect x="95" y="596" width="270" height="40" rx="20" fill="#FF7A45" fill-opacity="0.08" stroke="#FF8A50" stroke-opacity="0.5" stroke-width="1.5"/>
+    <text x="230" y="622" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="19" fill="#FFD1B8">SSH 远程调用 · GPU 推理</text>
+  </g>
+</svg>

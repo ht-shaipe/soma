@@ -1,0 +1,108 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#101C33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#4DA3FF" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#4DA3FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4DA3FF"/>
+      <stop offset="1" stop-color="#7C6BFF"/>
+    </linearGradient>
+    <pattern id="dots" width="42" height="42" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#FFFFFF" opacity="0.05"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#dots)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <rect x="0" y="0" width="10" height="900" fill="url(#accent)"/>
+
+  <!-- ghost chapter number -->
+  <text x="1528" y="262" text-anchor="end" font-family="'PingFang SC',sans-serif" font-size="250" font-weight="800" fill="#FFFFFF" opacity="0.05">01</text>
+
+  <!-- faint circles behind illustration -->
+  <circle cx="1290" cy="430" r="300" fill="none" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="2"/>
+  <circle cx="1290" cy="430" r="382" fill="none" stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="2"/>
+
+  <!-- series badge -->
+  <rect x="80" y="72" width="470" height="52" rx="26" fill="#4DA3FF" fill-opacity="0.08" stroke="#4DA3FF" stroke-opacity="0.5" stroke-width="2"/>
+  <circle cx="114" cy="98" r="7" fill="#4DA3FF"/>
+  <text x="140" y="107" font-family="'PingFang SC','Hiragino Sans GB',sans-serif" font-size="24" fill="#9DB8DA" letter-spacing="2">SOMA · 数字人实战系列 01 / 05</text>
+
+  <!-- kicker -->
+  <text x="80" y="238" font-family="'PingFang SC',sans-serif" font-size="30" font-weight="600" fill="#4DA3FF" letter-spacing="6">数字人口播视频生成 · 选型之路</text>
+
+  <!-- title -->
+  <text x="78" y="334" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">从云端 API</text>
+  <text x="78" y="436" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">到开源自部署</text>
+
+  <rect x="80" y="478" width="120" height="6" rx="3" fill="url(#accent)"/>
+
+  <!-- subtitle -->
+  <text x="80" y="540" font-family="'PingFang SC',sans-serif" font-size="30" fill="#B9C9E2">照片 + 文案 → 口播视频：方案横评、成本对比与最终架构</text>
+
+  <!-- chips -->
+  <g font-family="'PingFang SC',sans-serif" font-size="22" fill="#CFE0F5">
+    <rect x="80" y="586" width="252" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#4DA3FF" stroke-opacity="0.35"/>
+    <text x="206" y="617" text-anchor="middle">EchoMimicV3-Flash</text>
+    <rect x="352" y="586" width="136" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#4DA3FF" stroke-opacity="0.35"/>
+    <text x="420" y="617" text-anchor="middle">HeyGem</text>
+    <rect x="508" y="586" width="142" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#4DA3FF" stroke-opacity="0.35"/>
+    <text x="579" y="617" text-anchor="middle">HeyGen</text>
+    <rect x="670" y="586" width="242" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#4DA3FF" stroke-opacity="0.35"/>
+    <text x="791" y="617" text-anchor="middle">RTX 4090 按需租用</text>
+  </g>
+
+  <!-- footer -->
+  <text x="80" y="812" font-family="'PingFang SC',sans-serif" font-size="22" fill="#64789B" letter-spacing="1">Rust AI 短视频自动生成 · 开发实践笔记</text>
+
+  <!-- illustration: decision fork -->
+  <g transform="translate(1060,110)">
+    <!-- start node -->
+    <circle cx="66" cy="320" r="16" fill="none" stroke="#4DA3FF" stroke-opacity="0.5" stroke-width="2"/>
+    <circle cx="66" cy="320" r="8" fill="#E9F2FF"/>
+    <text x="66" y="278" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="20" fill="#8FA6C6">需求</text>
+
+    <!-- dashed path to cloud -->
+    <path d="M 84 312 C 150 240, 210 200, 266 160" fill="none" stroke="#8FA6C6" stroke-width="3" stroke-dasharray="8 8" opacity="0.7"/>
+    <polygon points="0,0 -18,7 -13,-11" transform="translate(272,154) rotate(-33)" fill="#8FA6C6"/>
+
+    <!-- solid path to server -->
+    <path d="M 84 330 C 160 358, 214 400, 258 442" fill="none" stroke="#4DA3FF" stroke-width="5"/>
+    <polygon points="0,0 -20,8 -14,-12" transform="translate(264,447) rotate(40)" fill="#4DA3FF"/>
+
+    <!-- cloud -->
+    <g fill="#E9F2FF" opacity="0.95">
+      <circle cx="322" cy="112" r="44"/>
+      <circle cx="276" cy="130" r="30"/>
+      <circle cx="372" cy="126" r="32"/>
+      <rect x="276" y="98" width="132" height="46" rx="23"/>
+    </g>
+    <text x="322" y="124" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="26" font-weight="700" fill="#12203A">API</text>
+    <rect x="236" y="184" width="172" height="38" rx="19" fill="#FFB020" fill-opacity="0.12" stroke="#FFB020" stroke-opacity="0.55" stroke-width="1.5"/>
+    <text x="322" y="210" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="20" fill="#FFC964">$$$ 按条计费</text>
+
+    <!-- server rack -->
+    <rect x="250" y="450" width="160" height="170" rx="14" fill="#0F1D36" stroke="#4DA3FF" stroke-width="3"/>
+    <rect x="268" y="478" width="124" height="34" rx="6" fill="#14264A" stroke="#27436E" stroke-width="1.5"/>
+    <rect x="268" y="528" width="124" height="34" rx="6" fill="#14264A" stroke="#27436E" stroke-width="1.5"/>
+    <rect x="268" y="578" width="124" height="34" rx="6" fill="#14264A" stroke="#27436E" stroke-width="1.5"/>
+    <circle cx="378" cy="495" r="5" fill="#35D0A5"/>
+    <circle cx="378" cy="545" r="5" fill="#35D0A5"/>
+    <circle cx="378" cy="595" r="5" fill="#35D0A5"/>
+    <text x="330" y="551" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="17" fill="#7E9CC9">GPU × 1</text>
+
+    <!-- check badge -->
+    <circle cx="250" cy="450" r="24" fill="#35D0A5" stroke="#0B1220" stroke-width="4"/>
+    <polyline points="238,451 247,460 264,441" fill="none" stroke="#06251C" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- server pill -->
+    <rect x="228" y="648" width="204" height="40" rx="20" fill="#35D0A5" fill-opacity="0.12" stroke="#35D0A5" stroke-opacity="0.5" stroke-width="1.5"/>
+    <text x="330" y="674" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="20" fill="#7BE3C6">开源自部署 · ≈ ¥0.2/条</text>
+  </g>
+</svg>

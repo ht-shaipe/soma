@@ -117,6 +117,29 @@ pub fn resolve_path_within_directory(base_dir: &str, unsafe_path: &str) -> Resul
     Ok(resolved.to_string_lossy().to_string())
 }
 
+/// 校验本地文件路径安全性
+///
+/// 拒绝空路径和包含 `..` 的路径遍历攻击，规范化为绝对路径。
+/// 当 `require_exists=true` 时校验文件存在性。
+pub fn validate_local_path(path: &str, require_exists: bool) -> Result<PathBuf, SomaError> {
+    if path.is_empty() {
+        return Err(SomaError::UnsafePath("路径不能为空".into()));
+    }
+    let p = std::path::Path::new(path);
+    if p.components().any(|c| c == std::path::Component::ParentDir) {
+        return Err(SomaError::UnsafePath(format!("路径包含非法字符: {}", path)));
+    }
+    let canonical = if p.is_absolute() {
+        PathBuf::from(path)
+    } else {
+        std::env::current_dir().unwrap_or_default().join(path)
+    };
+    if require_exists && !canonical.exists() {
+        return Err(SomaError::UnsafePath(format!("文件不存在: {}", path)));
+    }
+    Ok(canonical)
+}
+
 /// 按标点符号拆分字符串
 ///
 /// 遇到标点符号时断开，生成多个片段。换行符也会触发断开。
@@ -226,6 +249,30 @@ pub fn sanitize_upload_filename(filename: &str) -> Result<String, SomaError> {
         return Err(SomaError::Config("invalid filename".into()));
     }
     Ok(normalized)
+}
+
+/// 校验商户标识合法性
+///
+/// 规则：非空、长度 ≤ 64、仅含字母/数字/下划线，
+/// 拒绝 `..`、`/`、`\` 等路径穿越字符。
+pub fn validate_merchant_id(merchant_id: &str) -> Result<(), SomaError> {
+    if merchant_id.is_empty() {
+        return Err(SomaError::Config("商户标识不能为空".into()));
+    }
+    if merchant_id.chars().count() > 64 {
+        return Err(SomaError::Config("商户标识长度不能超过 64".into()));
+    }
+    if merchant_id.contains("..") || merchant_id.contains('/') || merchant_id.contains('\\') {
+        return Err(SomaError::Config(
+            "商户标识格式非法，仅允许字母、数字、下划线，长度 ≤ 64".into(),
+        ));
+    }
+    if !merchant_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(SomaError::Config(
+            "商户标识格式非法，仅允许字母、数字、下划线，长度 ≤ 64".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// 构建标准 API 响应 JSON

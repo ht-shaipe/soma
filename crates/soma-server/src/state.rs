@@ -3,7 +3,7 @@
 /// 通过 TaskStore trait 抽象任务存储，支持内存和 Redis 后端。
 /// 提供任务的创建、查询、更新、删除等 CRUD 操作。
 
-use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams, AiVideoSegmentLog};
+use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams, AiVideoSegmentLog, DigitalHumanTaskInfo, DigitalHumanParams};
 use crate::store::{TaskStore, InMemoryTaskStore, SqliteTaskStore};
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -317,4 +317,99 @@ pub struct TaskUpdateData {
     pub combined_videos: Option<Vec<String>>,
     pub ai_video_logs: Option<Vec<AiVideoSegmentLog>>,
     pub error_message: Option<String>,
+}
+
+/// 数字人任务更新数据
+#[derive(Debug, Default, Clone)]
+pub struct DhTaskUpdateData {
+    pub state: Option<i32>,
+    pub progress: Option<u32>,
+    pub audio_file: Option<String>,
+    pub audio_duration: Option<f64>,
+    pub subtitle_path: Option<String>,
+    pub portrait_video_path: Option<String>,
+    pub final_video_path: Option<String>,
+    pub error_message: Option<String>,
+    pub segment_count: Option<u32>,
+    pub current_segment: Option<u32>,
+    pub segment_audio_files: Option<Vec<String>>,
+    pub segment_video_files: Option<Vec<String>>,
+    pub merchant_id: Option<String>,
+    pub heygem_task_code: Option<String>,
+}
+
+/// 创建数字人任务条目（状态 Processing）
+pub fn create_dh_task_entry(task_id: &str, params: DigitalHumanParams) {
+    let task = DigitalHumanTaskInfo::new(task_id.to_string(), params);
+    lock_store().create_dh(task);
+}
+
+/// 创建数字人草稿任务条目（状态 Draft）
+pub fn create_dh_draft_task_entry(task_id: &str, params: DigitalHumanParams) {
+    let task = DigitalHumanTaskInfo::with_status(task_id.to_string(), params, TaskStatus::Draft);
+    lock_store().create_dh(task);
+}
+
+/// 获取数字人任务
+pub fn get_dh_task(task_id: &str) -> Option<DigitalHumanTaskInfo> {
+    lock_store().get_dh(task_id)
+}
+
+/// 获取全部数字人任务（分页）
+pub fn get_all_dh_tasks(page: usize, page_size: usize) -> (Vec<DigitalHumanTaskInfo>, usize) {
+    let mut tasks = lock_store().get_all_dh();
+    tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    let total = tasks.len();
+    let start = (page.saturating_sub(1)) * page_size;
+    let end = (start + page_size).min(total);
+    if start < total {
+        (tasks[start..end].to_vec(), total)
+    } else {
+        (vec![], total)
+    }
+}
+
+/// 删除数字人任务
+pub fn delete_dh_task(task_id: &str) -> bool {
+    lock_store().delete_dh(task_id)
+}
+
+/// 设置数字人任务状态
+pub fn set_dh_task_state(task_id: &str, state: TaskStatus) {
+    let state_val = state.as_i32();
+    lock_store().update_dh(task_id, Box::new(move |task| {
+        task.state = state_val;
+        task.updated_at = chrono::Utc::now();
+    }));
+}
+
+/// 更新数字人任务数据
+pub fn update_dh_task_data(task_id: &str, data: &DhTaskUpdateData) {
+    let d = data.clone();
+    lock_store().update_dh(task_id, Box::new(move |task| {
+        if let Some(ref s) = d.state { task.state = *s; }
+        if let Some(p) = d.progress { task.progress = p; }
+        if let Some(ref a) = d.audio_file { task.audio_file = Some(a.clone()); }
+        if let Some(dur) = d.audio_duration { task.audio_duration = Some(dur); }
+        if let Some(ref s) = d.subtitle_path { task.subtitle_path = Some(s.clone()); }
+        if let Some(ref p) = d.portrait_video_path { task.portrait_video_path = Some(p.clone()); }
+        if let Some(ref f) = d.final_video_path { task.final_video_path = Some(f.clone()); }
+        if let Some(ref e) = d.error_message { task.error_message = Some(e.clone()); }
+        if let Some(sc) = d.segment_count { task.segment_count = Some(sc); }
+        if let Some(cs) = d.current_segment { task.current_segment = Some(cs); }
+        if let Some(ref sa) = d.segment_audio_files { task.segment_audio_files = Some(sa.clone()); }
+        if let Some(ref sv) = d.segment_video_files { task.segment_video_files = Some(sv.clone()); }
+        if let Some(ref mid) = d.merchant_id { task.merchant_id = Some(mid.clone()); }
+        if let Some(ref tc) = d.heygem_task_code { task.heygem_task_code = Some(tc.clone()); }
+        task.updated_at = chrono::Utc::now();
+    }));
+}
+
+/// 更新数字人任务进度
+pub fn update_dh_task(task_id: &str, state: Option<i32>, progress: Option<u32>) {
+    let state_val = state;
+    let progress_val = progress;
+    lock_store().update_dh(task_id, Box::new(move |task| {
+        task.update(state_val, progress_val);
+    }));
 }

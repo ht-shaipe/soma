@@ -9,3 +9,11 @@ pub mod pipeline;
 pub mod llm;
 /// 跨平台发布服务 - Upload-Post API
 pub mod upload;
+/// 数字人口播视频生成流水线 - 三阶段（音频→口播视频→合成）
+pub mod digital_human;
+/// 数字人分段口播视频生成 - 长文案分段生成流程
+pub mod segment_dh_video;
+/// HeyGem 商户模型资产管理
+pub mod heygem_merchant;
+/// HeyGem 商户模型训练编排
+pub mod heygem_trainer;

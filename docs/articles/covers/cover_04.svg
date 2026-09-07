@@ -1,0 +1,112 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#101C33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#B76EF2" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#B76EF2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#B98CFF"/>
+      <stop offset="1" stop-color="#7C6BFF"/>
+    </linearGradient>
+    <pattern id="dots" width="42" height="42" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#FFFFFF" opacity="0.05"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#dots)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <rect x="0" y="0" width="10" height="900" fill="url(#accent)"/>
+
+  <text x="1528" y="262" text-anchor="end" font-family="'PingFang SC',sans-serif" font-size="250" font-weight="800" fill="#FFFFFF" opacity="0.05">04</text>
+  <circle cx="1290" cy="430" r="300" fill="none" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="2"/>
+  <circle cx="1290" cy="430" r="382" fill="none" stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="2"/>
+
+  <rect x="80" y="72" width="470" height="52" rx="26" fill="#B76EF2" fill-opacity="0.08" stroke="#B98CFF" stroke-opacity="0.5" stroke-width="2"/>
+  <circle cx="114" cy="98" r="7" fill="#B98CFF"/>
+  <text x="140" y="107" font-family="'PingFang SC','Hiragino Sans GB',sans-serif" font-size="24" fill="#B7A8D8" letter-spacing="2">SOMA · 数字人实战系列 04 / 05</text>
+
+  <text x="80" y="238" font-family="'PingFang SC',sans-serif" font-size="30" font-weight="600" fill="#B98CFF" letter-spacing="6">CosyVoice · 声音克隆引擎</text>
+
+  <text x="78" y="334" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">声音克隆 TTS</text>
+  <text x="78" y="436" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">集成踩坑记</text>
+
+  <rect x="80" y="478" width="120" height="6" rx="3" fill="url(#accent)"/>
+
+  <text x="80" y="540" font-family="'PingFang SC',sans-serif" font-size="30" fill="#B9C9E2">多格式统一 24kHz；参考音频路径三种情况解析</text>
+
+  <g font-family="'PingFang SC',sans-serif" font-size="22" fill="#E3D8F5">
+    <rect x="80" y="586" width="175" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.35"/>
+    <text x="167" y="617" text-anchor="middle">CosyVoice2</text>
+    <rect x="275" y="586" width="125" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.35"/>
+    <text x="337" y="617" text-anchor="middle">FFmpeg</text>
+    <rect x="420" y="586" width="175" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.35"/>
+    <text x="507" y="617" text-anchor="middle">24kHz mono</text>
+    <rect x="615" y="586" width="130" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.35"/>
+    <text x="680" y="617" text-anchor="middle">路径解析</text>
+  </g>
+
+  <text x="80" y="812" font-family="'PingFang SC',sans-serif" font-size="22" fill="#64789B" letter-spacing="1">Rust AI 短视频自动生成 · 开发实践笔记</text>
+
+  <!-- illustration: microphone + waveform -->
+  <g transform="translate(1060,110)">
+    <!-- sound waves -->
+    <path d="M 140 105 Q 108 150 140 195" fill="none" stroke="#B98CFF" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+    <path d="M 320 105 Q 352 150 320 195" fill="none" stroke="#B98CFF" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+    <path d="M 348 82 Q 398 150 348 218" fill="none" stroke="#B98CFF" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- mic -->
+    <rect x="185" y="60" width="90" height="180" rx="45" fill="#0F1D36" stroke="#B98CFF" stroke-width="4"/>
+    <g stroke="#7C6BFF" stroke-width="3" opacity="0.7">
+      <line x1="197" y1="105" x2="263" y2="105"/>
+      <line x1="197" y1="135" x2="263" y2="135"/>
+      <line x1="197" y1="165" x2="263" y2="165"/>
+    </g>
+    <path d="M 150 140 Q 150 232 230 232 Q 310 232 310 140" fill="none" stroke="#B98CFF" stroke-width="6" stroke-linecap="round"/>
+    <line x1="230" y1="232" x2="230" y2="270" stroke="#B98CFF" stroke-width="6" stroke-linecap="round"/>
+    <line x1="168" y1="274" x2="292" y2="274" stroke="#B98CFF" stroke-width="6" stroke-linecap="round"/>
+
+    <!-- waveform -->
+    <rect x="50" y="399" width="360" height="2" fill="#7C6BFF" opacity="0.4"/>
+    <g fill="#B98CFF">
+      <rect x="58"  y="392" width="12" height="16" rx="6" opacity="0.9"/>
+      <rect x="86"  y="384" width="12" height="32" rx="6" opacity="0.55"/>
+      <rect x="114" y="375" width="12" height="50" rx="6" opacity="0.9"/>
+      <rect x="142" y="366" width="12" height="68" rx="6" opacity="0.55"/>
+      <rect x="170" y="378" width="12" height="44" rx="6" opacity="0.9"/>
+      <rect x="198" y="358" width="12" height="84" rx="6" opacity="0.55"/>
+      <rect x="226" y="371" width="12" height="58" rx="6" opacity="0.9"/>
+      <rect x="254" y="386" width="12" height="28" rx="6" opacity="0.55"/>
+      <rect x="282" y="364" width="12" height="72" rx="6" opacity="0.9"/>
+      <rect x="310" y="352" width="12" height="96" rx="6" opacity="0.55"/>
+      <rect x="338" y="374" width="12" height="52" rx="6" opacity="0.9"/>
+      <rect x="366" y="382" width="12" height="36" rx="6" opacity="0.55"/>
+      <rect x="394" y="390" width="12" height="20" rx="6" opacity="0.9"/>
+      <rect x="422" y="380" width="12" height="40" rx="6" opacity="0.55"/>
+    </g>
+
+    <!-- format chips -->
+    <g font-family="'PingFang SC',sans-serif" font-size="19" fill="#D9C8FF">
+      <rect x="6"   y="470" width="80" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.5" stroke-width="1.5"/>
+      <text x="46"  y="496" text-anchor="middle">WAV</text>
+      <rect x="98"  y="470" width="80" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.5" stroke-width="1.5"/>
+      <text x="138" y="496" text-anchor="middle">MP3</text>
+      <rect x="190" y="470" width="80" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.5" stroke-width="1.5"/>
+      <text x="230" y="496" text-anchor="middle">M4A</text>
+      <rect x="282" y="470" width="80" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.5" stroke-width="1.5"/>
+      <text x="322" y="496" text-anchor="middle">AAC</text>
+      <rect x="374" y="470" width="80" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.06" stroke="#B98CFF" stroke-opacity="0.5" stroke-width="1.5"/>
+      <text x="414" y="496" text-anchor="middle">FLAC</text>
+    </g>
+
+    <line x1="230" y1="518" x2="230" y2="548" stroke="#B98CFF" stroke-width="3"/>
+    <polygon points="0,0 -9,-14 9,-14" transform="translate(230,558)" fill="#B98CFF"/>
+
+    <rect x="80" y="566" width="300" height="44" rx="22" fill="#35D0A5" fill-opacity="0.1" stroke="#35D0A5" stroke-opacity="0.6" stroke-width="2"/>
+    <text x="230" y="595" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="20" fill="#7BE3C6">统一 24kHz · mono · WAV</text>
+  </g>
+</svg>
