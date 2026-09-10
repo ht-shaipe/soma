@@ -17,3 +17,5 @@ pub mod segment_dh_video;
 pub mod heygem_merchant;
 /// HeyGem 商户模型训练编排
 pub mod heygem_trainer;
+/// Live2D 模型管理
+pub mod live2d_model;

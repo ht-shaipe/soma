@@ -373,6 +373,77 @@ pub struct DigitalHumanSection {
     /// HeyGem/Duix.Avatar 数字人配置
     #[serde(default)]
     pub heygem: HeyGemConfig,
+    /// Live2D 卡通数字人配置
+    #[serde(default)]
+    pub live2d: Live2DConfig,
+}
+
+/// Live2D 卡通数字人提供商配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.live2d]` 子段。
+/// 纯 CPU 渲染，零 GPU 成本，通过 Python 子进程调用 live2d-py。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Live2DConfig {
+    /// Live2D 模型存储目录，默认 "./storage/live2d_models"
+    pub models_dir: Option<String>,
+    /// Python 解释器路径，默认 "python3"
+    pub python_path: Option<String>,
+    /// 渲染脚本路径，默认 "resource/live2d_runner.py"
+    pub script_path: Option<String>,
+    /// 渲染帧率，默认 30，clamp [24, 60]
+    pub fps: Option<u32>,
+    /// 输出视频宽度，默认 1080，clamp [256, 3840]
+    pub width: Option<u32>,
+    /// 输出视频高度，默认 1920，clamp [256, 3840]
+    pub height: Option<u32>,
+    /// 默认模型 ID，留空时需在任务参数中指定
+    pub default_model: Option<String>,
+    /// 单次渲染超时时间（秒），默认 600
+    pub timeout: Option<u64>,
+    /// 最大重试次数，默认 3
+    pub max_retries: Option<u32>,
+    /// 渲染线程数，默认 1，clamp 到 CPU 核数
+    pub render_threads: Option<u32>,
+    /// 是否执行环境预检，默认 true
+    pub preflight_check: Option<bool>,
+}
+
+impl Live2DConfig {
+    pub fn get_models_dir(&self) -> &str {
+        self.models_dir.as_deref().unwrap_or("./storage/live2d_models")
+    }
+    pub fn get_python_path(&self) -> &str {
+        self.python_path.as_deref().unwrap_or("python3")
+    }
+    pub fn get_script_path(&self) -> &str {
+        self.script_path.as_deref().unwrap_or("resource/live2d_runner.py")
+    }
+    pub fn get_fps(&self) -> u32 {
+        self.fps.unwrap_or(30).clamp(24, 60)
+    }
+    pub fn get_width(&self) -> u32 {
+        self.width.unwrap_or(1080).clamp(256, 3840)
+    }
+    pub fn get_height(&self) -> u32 {
+        self.height.unwrap_or(1920).clamp(256, 3840)
+    }
+    pub fn get_default_model(&self) -> &str {
+        self.default_model.as_deref().unwrap_or("")
+    }
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(600)
+    }
+    pub fn get_max_retries(&self) -> u32 {
+        self.max_retries.unwrap_or(3)
+    }
+    pub fn get_render_threads(&self) -> u32 {
+        let requested = self.render_threads.unwrap_or(1);
+        let max = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
+        requested.clamp(1, max)
+    }
+    pub fn get_preflight_check(&self) -> bool {
+        self.preflight_check.unwrap_or(true)
+    }
 }
 
 /// HeyGem/Duix.Avatar HTTP 数字人提供商配置

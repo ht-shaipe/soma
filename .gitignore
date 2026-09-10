@@ -53,5 +53,6 @@ conf/config.local.toml
 *.tmp
 *.temp
 .cache/
+.venv-live2d
 
 *.lock

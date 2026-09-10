@@ -275,6 +275,15 @@ pub fn validate_merchant_id(merchant_id: &str) -> Result<(), SomaError> {
     Ok(())
 }
 
+/// 校验 Live2D 模型标识合法性
+///
+/// 直接委托 `validate_merchant_id`（语义一致：非空、长度 ≤ 64、仅含字母/数字/下划线）。
+pub fn validate_live2d_model_id(model_id: &str) -> Result<(), SomaError> {
+    validate_merchant_id(model_id).map_err(|_| {
+        SomaError::Config("模型标识格式非法，仅允许字母、数字、下划线，长度 ≤ 64".into())
+    })
+}
+
 /// 构建标准 API 响应 JSON
 ///
 /// # 参数

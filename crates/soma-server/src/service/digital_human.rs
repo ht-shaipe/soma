@@ -61,6 +61,7 @@ pub fn dh_params_to_video_params(params: &DigitalHumanParams) -> VideoParams {
         clone_reference_text: params.clone_reference_text.clone(),
         clone_model: params.clone_model.clone(),
         merchant_id: params.merchant_id.clone(),
+        live2d_model_id: params.live2d_model_id.clone(),
     }
 }
 
@@ -113,6 +114,43 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
             ..Default::default()
         });
         std::path::PathBuf::from(asset.silent_video_path)
+    } else if provider == "live2d" {
+        let l2d_conf = &conf.app.digital_human.live2d;
+        let model_id = params
+            .get_live2d_model_id()
+            .map(|s| s.to_string())
+            .or_else(|| {
+                let dm = l2d_conf.get_default_model();
+                if dm.is_empty() { None } else { Some(dm.to_string()) }
+            })
+            .ok_or_else(|| {
+                let msg = "未指定 Live2D 模型，请配置 default_model 或在任务参数中指定 live2d_model_id".to_string();
+                state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(msg.clone()),
+                    ..Default::default()
+                });
+                SomaError::Config(msg)
+            })?;
+        let model_store = crate::service::live2d_model::Live2DModelStore::new(
+            l2d_conf.get_models_dir(),
+        );
+        if !model_store.check_model_ready(&model_id)? {
+            let msg = format!("Live2D 模型 {} 不存在或未就绪", model_id);
+            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
+                state: Some(TaskStatus::Failed.as_i32()),
+                error_message: Some(msg.clone()),
+                ..Default::default()
+            });
+            return Err(SomaError::VideoGen(msg));
+        }
+        let model_path = model_store.get_model_path(&model_id)?;
+        state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
+            live2d_model_id: Some(model_id.clone()),
+            ..Default::default()
+        });
+        log::info!("Live2D 模型就绪: task_id={}, model_id={}", task_id, model_id);
+        model_path
     } else {
         let p = soma_core::utils::storage_dir("portraits", false)
             .join(&params.portrait_image);
@@ -129,7 +167,7 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
         p
     };
 
-    if provider == "echomimic_v3" || provider == "heygem" {
+    if provider == "echomimic_v3" || provider == "heygem" || provider == "live2d" {
         match crate::service::segment_dh_video::run_segment_flow(
             task_id, params, &portrait_path, &params.narration_text, &conf,
         ) {

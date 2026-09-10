@@ -179,3 +179,30 @@ assets_dir = "./storage/heygem_assets"
 auto_overwrite = false
 # 是否执行环境预检
 preflight_check = true
+
+# Live2D 卡通口播配置（provider = "live2d" 时生效）
+# 纯 CPU 渲染，零 GPU 成本，TTS 默认 Edge TTS 免费额度
+# 部署要求：Python 3.8+、pip install live2d-py phonemizer（或 aeneas）、FFmpeg 已安装
+[digital_human.live2d]
+# 模型存储根目录（每个模型隔离在 {models_dir}/{model_id}/ 子目录）
+models_dir = "./storage/live2d_models"
+# Python 解释器路径
+python_path = "python3"
+# 渲染脚本路径
+script_path = "resource/live2d_runner.py"
+# 渲染帧率 [24, 60]
+fps = 30
+# 输出视频宽度 [256, 3840]
+width = 1080
+# 输出视频高度 [256, 3840]
+height = 1920
+# 默认模型标识（任务未指定 live2d_model_id 时使用）
+default_model = ""
+# 渲染超时（秒）
+timeout = 600
+# 最大重试次数
+max_retries = 3
+# 渲染线程数（受 CPU 核数约束）
+render_threads = 1
+# 是否执行环境预检
+preflight_check = true

@@ -313,7 +313,8 @@ fn generate_segment_video(
     }
 
     let video_dur = ffmpeg.get_video_duration(seg_mp4).unwrap_or(0.0);
-    if video_dur < dur {
+    let provider = conf.app.digital_human.get_provider();
+    if provider != "live2d" && video_dur < dur {
         let pad = dur - video_dur;
         log::info!("分段 {} 补冻结帧: video={:.2}s audio={:.2}s pad={:.2}s", index, video_dur, dur, pad);
         let padded_mp4 = task_dir.join(format!("portrait_{}_padded.mp4", index)).to_string_lossy().to_string();

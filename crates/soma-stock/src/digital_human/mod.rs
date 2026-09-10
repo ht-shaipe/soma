@@ -15,6 +15,7 @@ pub mod heygen;
 pub mod sadtalker;
 pub mod echomimic_v3;
 pub mod heygem;
+pub mod live2d;
 
 /// 数字人口播视频生成请求参数
 #[derive(Debug, Clone)]
@@ -103,7 +104,8 @@ pub async fn poll_until_done(
 
 /// 根据配置创建对应的数字人口播视频生成提供商实例
 ///
-/// 支持 "heygen"（云端 API）、"sadtalker"（本地 CPU/GPU 推理）和 "echomimic_v3"（本地 GPU 推理），
+/// 支持 "heygen"（云端 API）、"sadtalker"（本地 CPU/GPU 推理）、"echomimic_v3"（本地 GPU 推理）、
+/// "heygem"（HeyGem/Duix.Avatar HTTP API）和 "live2d"（Live2D 卡通口播，纯 CPU 渲染），
 /// 其他返回 `SomaError::Config`。
 pub fn create_provider(conf: &DigitalHumanSection) -> Result<Box<dyn DigitalHumanProvider>, SomaError> {
     let provider = conf.get_provider();
@@ -163,6 +165,20 @@ pub fn create_provider(conf: &DigitalHumanSection) -> Result<Box<dyn DigitalHuma
                 ));
             }
             Ok(Box::new(heygem::HeyGemProvider::new(hg_conf.clone())))
+        }
+        "live2d" => {
+            let l2d_conf = &conf.live2d;
+            if l2d_conf.get_script_path().is_empty() {
+                return Err(SomaError::Config(
+                    "Live2D 配置不完整，请在 [digital_human.live2d] 段设置 script_path".into(),
+                ));
+            }
+            if l2d_conf.get_models_dir().is_empty() {
+                return Err(SomaError::Config(
+                    "Live2D 配置不完整，请在 [digital_human.live2d] 段设置 models_dir".into(),
+                ));
+            }
+            Ok(Box::new(live2d::Live2DProvider::new(l2d_conf.clone())))
         }
         _ => Err(SomaError::Config(format!(
             "不支持的数字人提供商: {}",

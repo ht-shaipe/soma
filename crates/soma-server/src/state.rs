@@ -336,6 +336,8 @@ pub struct DhTaskUpdateData {
     pub segment_video_files: Option<Vec<String>>,
     pub merchant_id: Option<String>,
     pub heygem_task_code: Option<String>,
+    pub live2d_model_id: Option<String>,
+    pub frames_dir: Option<String>,
 }
 
 /// 创建数字人任务条目（状态 Processing）
@@ -401,6 +403,8 @@ pub fn update_dh_task_data(task_id: &str, data: &DhTaskUpdateData) {
         if let Some(ref sv) = d.segment_video_files { task.segment_video_files = Some(sv.clone()); }
         if let Some(ref mid) = d.merchant_id { task.merchant_id = Some(mid.clone()); }
         if let Some(ref tc) = d.heygem_task_code { task.heygem_task_code = Some(tc.clone()); }
+        if let Some(ref lid) = d.live2d_model_id { task.live2d_model_id = Some(lid.clone()); }
+        if let Some(ref fd) = d.frames_dir { task.frames_dir = Some(fd.clone()); }
         task.updated_at = chrono::Utc::now();
     }));
 }

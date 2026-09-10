@@ -290,6 +290,9 @@ pub struct VideoParams {
     /// 商户标识（透传自 DigitalHumanParams.merchant_id，HeyGem 多商户模式）
     #[serde(default)]
     pub merchant_id: Option<String>,
+    /// Live2D 模型标识（透传自 DigitalHumanParams.live2d_model_id）
+    #[serde(default)]
+    pub live2d_model_id: Option<String>,
 }
 
 impl VideoParams {
@@ -595,6 +598,9 @@ pub struct DigitalHumanParams {
     /// 商户标识（HeyGem 多商户模式，用于隔离数字人模型资产）
     #[serde(default)]
     pub merchant_id: Option<String>,
+    /// Live2D 模型标识（指定使用哪个 Live2D 卡通模型）
+    #[serde(default)]
+    pub live2d_model_id: Option<String>,
 }
 
 impl DigitalHumanParams {
@@ -629,6 +635,11 @@ impl DigitalHumanParams {
     /// 获取商户标识，未提供返回 None
     pub fn get_merchant_id(&self) -> Option<&str> {
         self.merchant_id.as_deref()
+    }
+
+    /// 获取 Live2D 模型标识，未提供返回 None
+    pub fn get_live2d_model_id(&self) -> Option<&str> {
+        self.live2d_model_id.as_deref()
     }
 }
 
@@ -673,6 +684,12 @@ pub struct DigitalHumanTaskInfo {
     /// HeyGem 视频合成任务编码
     #[serde(default)]
     pub heygem_task_code: Option<String>,
+    /// Live2D 模型标识
+    #[serde(default)]
+    pub live2d_model_id: Option<String>,
+    /// Live2D 渲染临时帧目录
+    #[serde(default)]
+    pub frames_dir: Option<String>,
     /// 任务创建时间（UTC）
     pub created_at: DateTime<Utc>,
     /// 任务最后更新时间（UTC）
@@ -697,6 +714,89 @@ pub struct MerchantAsset {
     pub reference_text: String,
     pub trained_at: DateTime<Utc>,
     pub asset_status: AssetStatus,
+}
+
+/// Live2D 模型状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Live2DModelStatus {
+    Available,
+    Deleting,
+}
+
+/// Live2D 模型元数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Live2DModel {
+    pub model_id: String,
+    pub model3_json: String,
+    pub textures: Vec<String>,
+    pub motions: Vec<String>,
+    pub expressions: Vec<String>,
+    pub package_size_mb: f64,
+    pub uploaded_at: DateTime<Utc>,
+    pub model_status: Live2DModelStatus,
+}
+
+/// Live2D 口型参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Live2DMouthParams {
+    pub mouth_open_y: f32,
+    pub mouth_form: f32,
+    pub mouth_open_x: f32,
+}
+
+/// viseme（音素）到 Live2D 口型参数的映射表
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisemeMapping {
+    pub mappings: std::collections::HashMap<String, Live2DMouthParams>,
+}
+
+impl Default for VisemeMapping {
+    fn default() -> Self {
+        let mut m = std::collections::HashMap::new();
+        // 中文拼音音素 → Live2D 口型参数
+        m.insert("a".into(), Live2DMouthParams { mouth_open_y: 1.0, mouth_form: 0.0, mouth_open_x: 0.5 });
+        m.insert("o".into(), Live2DMouthParams { mouth_open_y: 0.8, mouth_form: -0.8, mouth_open_x: 0.3 });
+        m.insert("e".into(), Live2DMouthParams { mouth_open_y: 0.6, mouth_form: -0.3, mouth_open_x: 0.4 });
+        m.insert("i".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.8, mouth_open_x: 0.2 });
+        m.insert("u".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.9, mouth_open_x: 0.1 });
+        m.insert("v".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.8, mouth_open_x: 0.1 });
+        m.insert("b".into(), Live2DMouthParams { mouth_open_y: 0.1, mouth_form: 0.0, mouth_open_x: 0.3 });
+        m.insert("p".into(), Live2DMouthParams { mouth_open_y: 0.1, mouth_form: 0.0, mouth_open_x: 0.3 });
+        m.insert("m".into(), Live2DMouthParams { mouth_open_y: 0.1, mouth_form: 0.0, mouth_open_x: 0.3 });
+        m.insert("f".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: -0.5, mouth_open_x: 0.2 });
+        m.insert("d".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.3, mouth_open_x: 0.3 });
+        m.insert("t".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.3, mouth_open_x: 0.3 });
+        m.insert("n".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: 0.2, mouth_open_x: 0.3 });
+        m.insert("l".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.5, mouth_open_x: 0.3 });
+        m.insert("g".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: -0.2, mouth_open_x: 0.3 });
+        m.insert("k".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: -0.2, mouth_open_x: 0.3 });
+        m.insert("h".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.4 });
+        m.insert("j".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.6, mouth_open_x: 0.2 });
+        m.insert("q".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.6, mouth_open_x: 0.2 });
+        m.insert("x".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.5, mouth_open_x: 0.2 });
+        m.insert("zh".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.4, mouth_open_x: 0.3 });
+        m.insert("ch".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.4, mouth_open_x: 0.3 });
+        m.insert("sh".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.4, mouth_open_x: 0.3 });
+        m.insert("r".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.5, mouth_open_x: 0.3 });
+        m.insert("z".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.3 });
+        m.insert("c".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.3 });
+        m.insert("s".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.4 });
+        m.insert("w".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.7, mouth_open_x: 0.1 });
+        m.insert("y".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.7, mouth_open_x: 0.2 });
+        Self { mappings: m }
+    }
+}
+
+impl VisemeMapping {
+    /// 获取音素对应的口型参数，未知音素回退到中性口型
+    pub fn get_params(&self, phoneme: &str) -> Live2DMouthParams {
+        self.mappings.get(phoneme).cloned().unwrap_or(Live2DMouthParams {
+            mouth_open_y: 0.0,
+            mouth_form: 0.0,
+            mouth_open_x: 0.0,
+        })
+    }
 }
 
 impl DigitalHumanTaskInfo {
@@ -729,6 +829,8 @@ impl DigitalHumanTaskInfo {
             segment_video_files: None,
             merchant_id: None,
             heygem_task_code: None,
+            live2d_model_id: None,
+            frames_dir: None,
             created_at: now,
             updated_at: now,
         }
