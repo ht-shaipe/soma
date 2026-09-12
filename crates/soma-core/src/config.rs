@@ -30,6 +30,9 @@ pub struct AppConfig {
     pub xfyun: XfyunSection,
     /// UI 界面与发布相关配置
     pub ui: UiSection,
+    /// 数字人口播视频生成配置
+    #[serde(default)]
+    pub digital_human: DigitalHumanSection,
 }
 
 /// 应用基本配置段，涵盖视频源、LLM 提供者、字幕、存储等核心参数
@@ -337,6 +340,612 @@ pub struct ElevenlabsSection {
     pub model_id: Option<String>,
 }
 
+/// 数字人口播视频生成配置段
+///
+/// 配置第三方数字人服务（首期 HeyGen）的 API 密钥、超时、轮询等参数，
+/// 以及敏感词库路径。对应 TOML 配置文件的 `[digital_human]` 段。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DigitalHumanSection {
+    /// 数字人服务提供者名称，默认 "heygen"
+    pub provider: Option<String>,
+    /// 数字人服务 API 密钥
+    pub api_key: Option<String>,
+    /// 数字人服务基础 URL
+    pub base_url: Option<String>,
+    /// 数字人模型名称
+    pub model: Option<String>,
+    /// 单次任务超时时间（秒），默认 300
+    pub timeout: Option<u64>,
+    /// 轮询间隔（秒），默认 5
+    pub poll_interval: Option<u64>,
+    /// 最大重试次数，默认 3
+    pub max_retries: Option<u32>,
+    /// 敏感词库文件路径，默认 "resource/sensitive_words.txt"
+    pub sensitive_words_path: Option<String>,
+    /// SadTalker 本地数字人专属配置
+    #[serde(default)]
+    pub sadtalker: SadTalkerConfig,
+    /// EchoMimicV3-Flash 本地数字人专属配置
+    #[serde(default)]
+    pub echomimic_v3: EchoMimicV3Config,
+    /// 声音克隆 TTS 专属配置
+    #[serde(default)]
+    pub voice_clone: VoiceCloneConfig,
+    /// 分段生成策略配置
+    #[serde(default)]
+    pub segment: SegmentConfig,
+    /// HeyGem/Duix.Avatar 数字人配置
+    #[serde(default)]
+    pub heygem: HeyGemConfig,
+    /// Live2D 卡通数字人配置
+    #[serde(default)]
+    pub live2d: Live2DConfig,
+}
+
+/// Live2D 卡通数字人提供商配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.live2d]` 子段。
+/// 纯 CPU 渲染，零 GPU 成本，通过 Python 子进程调用 live2d-py。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Live2DConfig {
+    /// Live2D 模型存储目录，默认 "./storage/live2d_models"
+    pub models_dir: Option<String>,
+    /// Python 解释器路径，默认 "python3"
+    pub python_path: Option<String>,
+    /// 渲染脚本路径，默认 "resource/live2d_runner.py"
+    pub script_path: Option<String>,
+    /// 渲染帧率，默认 30，clamp [24, 60]
+    pub fps: Option<u32>,
+    /// 输出视频宽度，默认 1080，clamp [256, 3840]
+    pub width: Option<u32>,
+    /// 输出视频高度，默认 1920，clamp [256, 3840]
+    pub height: Option<u32>,
+    /// 默认模型 ID，留空时需在任务参数中指定
+    pub default_model: Option<String>,
+    /// 单次渲染超时时间（秒），默认 600
+    pub timeout: Option<u64>,
+    /// 最大重试次数，默认 3
+    pub max_retries: Option<u32>,
+    /// 渲染线程数，默认 1，clamp 到 CPU 核数
+    pub render_threads: Option<u32>,
+    /// 是否执行环境预检，默认 true
+    pub preflight_check: Option<bool>,
+}
+
+impl Live2DConfig {
+    pub fn get_models_dir(&self) -> &str {
+        self.models_dir.as_deref().unwrap_or("./storage/live2d_models")
+    }
+    pub fn get_python_path(&self) -> &str {
+        self.python_path.as_deref().unwrap_or("python3")
+    }
+    pub fn get_script_path(&self) -> &str {
+        self.script_path.as_deref().unwrap_or("resource/live2d_runner.py")
+    }
+    pub fn get_fps(&self) -> u32 {
+        self.fps.unwrap_or(30).clamp(24, 60)
+    }
+    pub fn get_width(&self) -> u32 {
+        self.width.unwrap_or(1080).clamp(256, 3840)
+    }
+    pub fn get_height(&self) -> u32 {
+        self.height.unwrap_or(1920).clamp(256, 3840)
+    }
+    pub fn get_default_model(&self) -> &str {
+        self.default_model.as_deref().unwrap_or("")
+    }
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(600)
+    }
+    pub fn get_max_retries(&self) -> u32 {
+        self.max_retries.unwrap_or(3)
+    }
+    pub fn get_render_threads(&self) -> u32 {
+        let requested = self.render_threads.unwrap_or(1);
+        let max = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
+        requested.clamp(1, max)
+    }
+    pub fn get_preflight_check(&self) -> bool {
+        self.preflight_check.unwrap_or(true)
+    }
+}
+
+/// HeyGem/Duix.Avatar HTTP 数字人提供商配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.heygem]` 子段。
+/// 通过 HTTP API 调用 Docker 部署的 HeyGem 服务。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HeyGemConfig {
+    /// TTS 服务基础 URL，默认 "http://127.0.0.1:18180"
+    pub tts_base_url: Option<String>,
+    /// 视频合成服务基础 URL，默认 "http://127.0.0.1:8383"
+    pub video_base_url: Option<String>,
+    /// 单次任务超时时间（秒），默认 600
+    pub timeout: Option<u64>,
+    /// 轮询间隔（秒），默认 5
+    pub poll_interval: Option<u64>,
+    /// 最大重试次数，默认 3
+    pub max_retries: Option<u32>,
+    /// 最大并发数，默认 2
+    pub max_concurrent: Option<u32>,
+    /// TTS top_p 参数，默认 0.7
+    pub top_p: Option<f64>,
+    /// TTS temperature 参数，默认 0.7
+    pub temperature: Option<f64>,
+    /// TTS repetition_penalty 参数，默认 1.5
+    pub repetition_penalty: Option<f64>,
+    /// 商户资产存储目录，默认 "./storage/heygem_assets"
+    pub assets_dir: Option<String>,
+    /// 是否自动覆盖已有资产，默认 false
+    pub auto_overwrite: Option<bool>,
+    /// 是否执行环境预检，默认 true
+    pub preflight_check: Option<bool>,
+}
+
+impl HeyGemConfig {
+    pub fn get_tts_base_url(&self) -> &str {
+        self.tts_base_url.as_deref().unwrap_or("http://127.0.0.1:18180")
+    }
+    pub fn get_video_base_url(&self) -> &str {
+        self.video_base_url.as_deref().unwrap_or("http://127.0.0.1:8383")
+    }
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(600)
+    }
+    pub fn get_poll_interval(&self) -> u64 {
+        self.poll_interval.unwrap_or(5)
+    }
+    pub fn get_max_retries(&self) -> u32 {
+        self.max_retries.unwrap_or(3)
+    }
+    pub fn get_max_concurrent(&self) -> u32 {
+        self.max_concurrent.unwrap_or(2)
+    }
+    pub fn get_top_p(&self) -> f64 {
+        self.top_p.unwrap_or(0.7)
+    }
+    pub fn get_temperature(&self) -> f64 {
+        self.temperature.unwrap_or(0.7)
+    }
+    pub fn get_repetition_penalty(&self) -> f64 {
+        self.repetition_penalty.unwrap_or(1.5)
+    }
+    pub fn get_assets_dir(&self) -> &str {
+        self.assets_dir.as_deref().unwrap_or("./storage/heygem_assets")
+    }
+    pub fn get_auto_overwrite(&self) -> bool {
+        self.auto_overwrite.unwrap_or(false)
+    }
+    pub fn get_preflight_check(&self) -> bool {
+        self.preflight_check.unwrap_or(true)
+    }
+}
+
+/// SadTalker 本地数字人提供商配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.sadtalker]` 子段。
+/// 所有字段为 `Option<T>`，缺失时使用 getter 默认值。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SadTalkerConfig {
+    /// Python 虚拟环境目录路径
+    pub env_path: Option<String>,
+    /// Python 解释器路径，默认 "python3"
+    pub python_path: Option<String>,
+    /// 封装脚本路径，默认 "{env_path}/sadtalker_runner.py"
+    pub script_path: Option<String>,
+    /// 模型权重目录路径
+    pub model_path: Option<String>,
+    /// 推理设备，默认 "cpu"，可选 "cuda"
+    pub device: Option<String>,
+    /// 是否使用 still 模式（仅生成上半身）
+    pub still_mode: Option<bool>,
+    /// 是否使用全图增强
+    pub full_enhancer: Option<bool>,
+    /// 生成视频尺寸，默认 256
+    pub batch_size: Option<u32>,
+    /// 输出分辨率，默认 256
+    pub size: Option<u32>,
+    /// 头部姿态风格，默认 0
+    pub pose_style: Option<u32>,
+    /// 表情缩放系数，默认 1.0
+    pub exp_scale: Option<f64>,
+    /// 单次推理超时时间（秒），默认 900
+    pub timeout: Option<u64>,
+    /// 最大并发数，默认 1（串行）
+    pub max_concurrent: Option<u32>,
+    /// 是否在提交任务前执行环境预检，默认 true
+    pub preflight_check: Option<bool>,
+}
+
+impl SadTalkerConfig {
+    /// 获取环境目录路径，未配置返回空串
+    pub fn get_env_path(&self) -> &str {
+        self.env_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取 Python 解释器路径，默认 "python3"
+    pub fn get_python_path(&self) -> String {
+        self.python_path.clone().unwrap_or_else(|| "python3".to_string())
+    }
+
+    /// 获取封装脚本路径，默认 "{env_path}/sadtalker_runner.py"
+    pub fn get_script_path(&self) -> String {
+        if let Some(ref s) = self.script_path {
+            return s.clone();
+        }
+        let env = self.get_env_path();
+        if env.is_empty() {
+            "sadtalker_runner.py".to_string()
+        } else {
+            format!("{}/sadtalker_runner.py", env)
+        }
+    }
+
+    /// 获取模型权重目录路径，未配置返回空串
+    pub fn get_model_path(&self) -> &str {
+        self.model_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取推理设备，默认 "cpu"
+    pub fn get_device(&self) -> &str {
+        self.device.as_deref().unwrap_or("cpu")
+    }
+
+    /// 获取单次推理超时时间（秒），默认 900
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(900)
+    }
+
+    /// 获取最大并发数，默认 1
+    pub fn get_max_concurrent(&self) -> u32 {
+        self.max_concurrent.unwrap_or(1)
+    }
+
+    /// 是否执行环境预检，默认 true
+    pub fn get_preflight_check(&self) -> bool {
+        self.preflight_check.unwrap_or(true)
+    }
+
+    /// 获取 still 模式，默认 false
+    pub fn get_still_mode(&self) -> bool {
+        self.still_mode.unwrap_or(false)
+    }
+
+    /// 获取全图增强，默认 false
+    pub fn get_full_enhancer(&self) -> bool {
+        self.full_enhancer.unwrap_or(false)
+    }
+
+    /// 获取 batch size，默认 2
+    pub fn get_batch_size(&self) -> u32 {
+        self.batch_size.unwrap_or(2)
+    }
+
+    /// 获取输出尺寸，默认 256
+    pub fn get_size(&self) -> u32 {
+        self.size.unwrap_or(256)
+    }
+
+    /// 获取姿态风格，默认 0
+    pub fn get_pose_style(&self) -> u32 {
+        self.pose_style.unwrap_or(0)
+    }
+
+    /// 获取表情缩放，默认 1.0
+    pub fn get_exp_scale(&self) -> f64 {
+        self.exp_scale.unwrap_or(1.0)
+    }
+}
+
+/// EchoMimicV3-Flash 本地数字人提供商配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.echomimic_v3]` 子段。
+/// 所有字段为 `Option<T>`，缺失时使用 getter 默认值。
+/// 基于 Wan2.1-Fun-V1.1-1.3B 视频扩散模型，GPU 推理，8 步 Flash 快速生成。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EchoMimicV3Config {
+    /// EchoMimicV3 运行环境目录路径
+    pub env_path: Option<String>,
+    /// Python 解释器路径，默认 "python3"
+    pub python_path: Option<String>,
+    /// 推理封装脚本路径，默认 "{env_path}/echomimic_v3_runner.py"
+    pub script_path: Option<String>,
+    /// 模型权重目录路径
+    pub model_path: Option<String>,
+    /// 推理设备，默认 "cuda"（强制 GPU）
+    pub device: Option<String>,
+    /// 输出分辨率，默认 768（可选 512）
+    pub resolution: Option<u32>,
+    /// Flash 推理步数，默认 8
+    pub infer_steps: Option<u32>,
+    /// 推理配置文件路径，默认 "{env_path}/config/prompts/flash.yaml"
+    pub config_path: Option<String>,
+    /// GPU 显存限制（GB），默认 24
+    pub gpu_memory_limit: Option<u32>,
+    /// 单次推理超时时间（秒），默认 600
+    pub timeout: Option<u64>,
+    /// 最大并发数，默认 1（串行）
+    pub max_concurrent: Option<u32>,
+    /// 最大重试次数，默认 3
+    pub max_retries: Option<u32>,
+    /// 是否在提交任务前执行环境预检，默认 true
+    pub preflight_check: Option<bool>,
+    /// 模型下载源，默认 "modelscope"（可选 "huggingface"）
+    pub model_source: Option<String>,
+}
+
+impl EchoMimicV3Config {
+    /// 获取环境目录路径，未配置返回空串
+    pub fn get_env_path(&self) -> &str {
+        self.env_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取 Python 解释器路径，默认 "python3"
+    pub fn get_python_path(&self) -> String {
+        self.python_path.clone().unwrap_or_else(|| "python3".to_string())
+    }
+
+    /// 获取推理封装脚本路径，默认 "{env_path}/echomimic_v3_runner.py"
+    pub fn get_script_path(&self) -> String {
+        if let Some(ref s) = self.script_path {
+            return s.clone();
+        }
+        let env = self.get_env_path();
+        if env.is_empty() {
+            "echomimic_v3_runner.py".to_string()
+        } else {
+            format!("{}/echomimic_v3_runner.py", env)
+        }
+    }
+
+    /// 获取模型权重目录路径，未配置返回空串
+    pub fn get_model_path(&self) -> &str {
+        self.model_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取推理设备，默认 "cuda"（强制 GPU）
+    pub fn get_device(&self) -> &str {
+        self.device.as_deref().unwrap_or("cuda")
+    }
+
+    /// 获取输出分辨率，默认 768
+    pub fn get_resolution(&self) -> u32 {
+        self.resolution.unwrap_or(768)
+    }
+
+    /// 获取 Flash 推理步数，默认 8
+    pub fn get_infer_steps(&self) -> u32 {
+        self.infer_steps.unwrap_or(8)
+    }
+
+    /// 获取推理配置文件路径，默认 "{env_path}/config/prompts/flash.yaml"
+    pub fn get_config_path(&self) -> String {
+        if let Some(ref s) = self.config_path {
+            return s.clone();
+        }
+        let env = self.get_env_path();
+        if env.is_empty() {
+            "config/prompts/flash.yaml".to_string()
+        } else {
+            format!("{}/config/prompts/flash.yaml", env)
+        }
+    }
+
+    /// 获取 GPU 显存限制（GB），默认 24
+    pub fn get_gpu_memory_limit(&self) -> u32 {
+        self.gpu_memory_limit.unwrap_or(24)
+    }
+
+    /// 获取单次推理超时时间（秒），默认 600
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(600)
+    }
+
+    /// 获取最大并发数，默认 1
+    pub fn get_max_concurrent(&self) -> u32 {
+        self.max_concurrent.unwrap_or(1)
+    }
+
+    /// 获取最大重试次数，默认 3
+    pub fn get_max_retries(&self) -> u32 {
+        self.max_retries.unwrap_or(3)
+    }
+
+    /// 是否执行环境预检，默认 true
+    pub fn get_preflight_check(&self) -> bool {
+        self.preflight_check.unwrap_or(true)
+    }
+
+    /// 获取模型下载源，默认 "modelscope"
+    pub fn get_model_source(&self) -> &str {
+        self.model_source.as_deref().unwrap_or("modelscope")
+    }
+}
+
+/// 声音克隆 TTS 提供商配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.voice_clone]` 子段。
+/// 所有字段为 `Option<T>`，缺失时使用 getter 默认值。
+/// 通过 SSH 远程调用 GPU 服务器上的声音克隆模型（GPT-SoVITS/CosyVoice/Fish-Speech）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VoiceCloneConfig {
+    /// SSH 主机地址，必填
+    pub ssh_host: Option<String>,
+    /// SSH 端口，默认 22
+    pub ssh_port: Option<u16>,
+    /// SSH 用户名，默认 "root"
+    pub ssh_user: Option<String>,
+    /// SSH 私钥本地路径，必填
+    pub ssh_key_path: Option<String>,
+    /// GPU 服务器上运行环境根目录，必填
+    pub remote_env_path: Option<String>,
+    /// 远程 Python 解释器路径，默认 "python3"
+    pub remote_python_path: Option<String>,
+    /// 远程推理封装脚本路径，默认 "{remote_env_path}/voice_clone_runner.py"
+    pub remote_script_path: Option<String>,
+    /// 远程模型权重目录，必填
+    pub remote_model_path: Option<String>,
+    /// 推理设备，默认 "cuda"（强制 GPU）
+    pub device: Option<String>,
+    /// 默认克隆模型，默认 "gpt_sovits"（可选 "cosyvoice"/"fish_speech"）
+    pub default_clone_model: Option<String>,
+    /// GPU 显存上限（GB），默认 24
+    pub gpu_memory_limit: Option<u32>,
+    /// 单次合成超时时间（秒），默认 300
+    pub timeout: Option<u64>,
+    /// 最大并发数，默认 1（串行）
+    pub max_concurrent: Option<u32>,
+    /// 最大重试次数，默认 3
+    pub max_retries: Option<u32>,
+    /// 是否在合成前执行环境预检，默认 true
+    pub preflight_check: Option<bool>,
+}
+
+impl VoiceCloneConfig {
+    /// 获取 SSH 主机地址，未配置返回空串
+    pub fn get_ssh_host(&self) -> &str {
+        self.ssh_host.as_deref().unwrap_or("")
+    }
+
+    /// 获取 SSH 端口，默认 22
+    pub fn get_ssh_port(&self) -> u16 {
+        self.ssh_port.unwrap_or(22)
+    }
+
+    /// 获取 SSH 用户名，默认 "root"
+    pub fn get_ssh_user(&self) -> &str {
+        self.ssh_user.as_deref().unwrap_or("root")
+    }
+
+    /// 获取 SSH 私钥路径，未配置返回空串
+    pub fn get_ssh_key_path(&self) -> &str {
+        self.ssh_key_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取远程环境目录路径，未配置返回空串
+    pub fn get_remote_env_path(&self) -> &str {
+        self.remote_env_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取远程 Python 解释器路径，默认 "python3"
+    pub fn get_remote_python_path(&self) -> String {
+        self.remote_python_path.clone().unwrap_or_else(|| "python3".to_string())
+    }
+
+    /// 获取远程推理封装脚本路径，默认 "{remote_env_path}/voice_clone_runner.py"
+    pub fn get_remote_script_path(&self) -> String {
+        if let Some(ref s) = self.remote_script_path {
+            return s.clone();
+        }
+        let env = self.get_remote_env_path();
+        if env.is_empty() {
+            "voice_clone_runner.py".to_string()
+        } else {
+            format!("{}/voice_clone_runner.py", env)
+        }
+    }
+
+    /// 获取远程模型权重目录路径，未配置返回空串
+    pub fn get_remote_model_path(&self) -> &str {
+        self.remote_model_path.as_deref().unwrap_or("")
+    }
+
+    /// 获取推理设备，默认 "cuda"（强制 GPU）
+    pub fn get_device(&self) -> &str {
+        self.device.as_deref().unwrap_or("cuda")
+    }
+
+    /// 获取默认克隆模型，默认 "gpt_sovits"
+    pub fn get_default_clone_model(&self) -> &str {
+        self.default_clone_model.as_deref().unwrap_or("gpt_sovits")
+    }
+
+    /// 获取 GPU 显存限制（GB），默认 24
+    pub fn get_gpu_memory_limit(&self) -> u32 {
+        self.gpu_memory_limit.unwrap_or(24)
+    }
+
+    /// 获取单次合成超时时间（秒），默认 300
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(300)
+    }
+
+    /// 获取最大并发数，默认 1
+    pub fn get_max_concurrent(&self) -> u32 {
+        self.max_concurrent.unwrap_or(1)
+    }
+
+    /// 获取最大重试次数，默认 3
+    pub fn get_max_retries(&self) -> u32 {
+        self.max_retries.unwrap_or(3)
+    }
+
+    /// 是否执行环境预检，默认 true
+    pub fn get_preflight_check(&self) -> bool {
+        self.preflight_check.unwrap_or(true)
+    }
+}
+
+/// 分段生成策略配置
+///
+/// 对应 TOML 配置文件的 `[digital_human.segment]` 子段。
+/// 控制 EchoMimicV3 长文案分段生成的参数。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SegmentConfig {
+    /// 单段最大时长（秒），默认 5.0
+    pub segment_max_duration: Option<f64>,
+    /// 单段最大字符数，默认 25
+    pub segment_max_chars: Option<usize>,
+    /// 分段失败重试次数，默认 3
+    pub segment_retry_count: Option<u32>,
+}
+
+impl SegmentConfig {
+    /// 获取单段最大时长（秒），默认 5.0
+    pub fn get_segment_max_duration(&self) -> f64 {
+        self.segment_max_duration.unwrap_or(5.0)
+    }
+
+    /// 获取单段最大字符数，默认 25
+    pub fn get_segment_max_chars(&self) -> usize {
+        self.segment_max_chars.unwrap_or(25)
+    }
+
+    /// 获取分段失败重试次数，默认 3
+    pub fn get_segment_retry_count(&self) -> u32 {
+        self.segment_retry_count.unwrap_or(3)
+    }
+}
+
+impl DigitalHumanSection {
+    /// 获取提供者名称，默认 "heygen"
+    pub fn get_provider(&self) -> &str {
+        self.provider.as_deref().unwrap_or("heygen")
+    }
+
+    /// 获取单次任务超时时间（秒），默认 300
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(300)
+    }
+
+    /// 获取轮询间隔（秒），默认 5
+    pub fn get_poll_interval(&self) -> u64 {
+        self.poll_interval.unwrap_or(5)
+    }
+
+    /// 获取最大重试次数，默认 3
+    pub fn get_max_retries(&self) -> u32 {
+        self.max_retries.unwrap_or(3)
+    }
+
+    /// 获取敏感词库文件路径，默认 "resource/sensitive_words.txt"
+    pub fn get_sensitive_words_path(&self) -> &str {
+        self.sensitive_words_path
+            .as_deref()
+            .unwrap_or("resource/sensitive_words.txt")
+    }
+}
+
 /// 火山引擎（字节豆包）TTS 语音合成配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VolcengineSection {
@@ -473,5 +1082,249 @@ impl AppConfig {
             return which.to_string_lossy().to_string();
         }
         "ffmpeg".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_echomimic_v3_config_default() {
+        let config = EchoMimicV3Config::default();
+        assert_eq!(config.get_env_path(), "");
+        assert_eq!(config.get_python_path(), "python3");
+        assert_eq!(config.get_model_path(), "");
+        assert_eq!(config.get_device(), "cuda");
+        assert_eq!(config.get_resolution(), 768);
+        assert_eq!(config.get_infer_steps(), 8);
+        assert_eq!(config.get_gpu_memory_limit(), 24);
+        assert_eq!(config.get_timeout(), 600);
+        assert_eq!(config.get_max_concurrent(), 1);
+        assert_eq!(config.get_max_retries(), 3);
+        assert!(config.get_preflight_check());
+        assert_eq!(config.get_model_source(), "modelscope");
+    }
+
+    #[test]
+    fn test_echomimic_v3_config_script_path_default() {
+        let config = EchoMimicV3Config {
+            env_path: Some("/opt/EchoMimicV3".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(config.get_script_path(), "/opt/EchoMimicV3/echomimic_v3_runner.py");
+        assert_eq!(config.get_config_path(), "/opt/EchoMimicV3/config/prompts/flash.yaml");
+    }
+
+    #[test]
+    fn test_echomimic_v3_config_script_path_no_env() {
+        let config = EchoMimicV3Config::default();
+        assert_eq!(config.get_script_path(), "echomimic_v3_runner.py");
+        assert_eq!(config.get_config_path(), "config/prompts/flash.yaml");
+    }
+
+    #[test]
+    fn test_echomimic_v3_config_custom_values() {
+        let config = EchoMimicV3Config {
+            env_path: Some("/env".to_string()),
+            python_path: Some("/env/bin/python".to_string()),
+            script_path: Some("/custom/runner.py".to_string()),
+            model_path: Some("/models".to_string()),
+            device: Some("cuda:1".to_string()),
+            resolution: Some(512),
+            infer_steps: Some(4),
+            config_path: Some("/custom/flash.yaml".to_string()),
+            gpu_memory_limit: Some(16),
+            timeout: Some(1200),
+            max_concurrent: Some(2),
+            max_retries: Some(5),
+            preflight_check: Some(false),
+            model_source: Some("huggingface".to_string()),
+        };
+        assert_eq!(config.get_python_path(), "/env/bin/python");
+        assert_eq!(config.get_script_path(), "/custom/runner.py");
+        assert_eq!(config.get_model_path(), "/models");
+        assert_eq!(config.get_device(), "cuda:1");
+        assert_eq!(config.get_resolution(), 512);
+        assert_eq!(config.get_infer_steps(), 4);
+        assert_eq!(config.get_config_path(), "/custom/flash.yaml");
+        assert_eq!(config.get_gpu_memory_limit(), 16);
+        assert_eq!(config.get_timeout(), 1200);
+        assert_eq!(config.get_max_concurrent(), 2);
+        assert_eq!(config.get_max_retries(), 5);
+        assert!(!config.get_preflight_check());
+        assert_eq!(config.get_model_source(), "huggingface");
+    }
+
+    #[test]
+    fn test_digital_human_section_echomimic_v3_default() {
+        let section = DigitalHumanSection::default();
+        assert_eq!(section.echomimic_v3.get_device(), "cuda");
+        assert_eq!(section.echomimic_v3.get_resolution(), 768);
+    }
+
+    #[test]
+    fn test_digital_human_section_with_echomimic_v3_toml() {
+        let toml_str = r#"
+provider = "echomimic_v3"
+
+[echomimic_v3]
+env_path = "/opt/EchoMimicV3"
+model_path = "/models/echomimic"
+device = "cuda:0"
+resolution = 512
+infer_steps = 4
+timeout = 900
+"#;
+        let config: DigitalHumanSection = toml::from_str(toml_str).unwrap();
+        let emv3 = &config.echomimic_v3;
+        assert_eq!(config.get_provider(), "echomimic_v3");
+        assert_eq!(emv3.get_env_path(), "/opt/EchoMimicV3");
+        assert_eq!(emv3.get_model_path(), "/models/echomimic");
+        assert_eq!(emv3.get_device(), "cuda:0");
+        assert_eq!(emv3.get_resolution(), 512);
+        assert_eq!(emv3.get_infer_steps(), 4);
+        assert_eq!(emv3.get_timeout(), 900);
+    }
+
+    #[test]
+    fn test_digital_human_section_without_echomimic_v3_toml() {
+        let toml_str = r#"
+provider = "heygen"
+api_key = "test-key"
+"#;
+        let config: DigitalHumanSection = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.get_provider(), "heygen");
+        assert_eq!(config.echomimic_v3.get_device(), "cuda");
+        assert_eq!(config.echomimic_v3.get_resolution(), 768);
+    }
+
+    #[test]
+    fn test_digital_human_sadtalker_and_echomimic_v3_independent() {
+        let toml_str = r#"
+provider = "echomimic_v3"
+
+[sadtalker]
+env_path = "/sadtalker/env"
+model_path = "/sadtalker/models"
+device = "cpu"
+size = 256
+
+[echomimic_v3]
+env_path = "/echomimic/env"
+model_path = "/echomimic/models"
+device = "cuda:0"
+resolution = 768
+"#;
+        let config: DigitalHumanSection = toml::from_str(toml_str).unwrap();
+        let sadtalker = &config.sadtalker;
+        let emv3 = &config.echomimic_v3;
+        assert_eq!(sadtalker.get_env_path(), "/sadtalker/env");
+        assert_eq!(sadtalker.get_model_path(), "/sadtalker/models");
+        assert_eq!(sadtalker.get_device(), "cpu");
+        assert_eq!(sadtalker.get_size(), 256);
+        assert_eq!(emv3.get_env_path(), "/echomimic/env");
+        assert_eq!(emv3.get_model_path(), "/echomimic/models");
+        assert_eq!(emv3.get_device(), "cuda:0");
+        assert_eq!(emv3.get_resolution(), 768);
+    }
+
+    #[test]
+    fn test_voice_clone_config_default() {
+        let config = VoiceCloneConfig::default();
+        assert_eq!(config.get_ssh_host(), "");
+        assert_eq!(config.get_ssh_port(), 22);
+        assert_eq!(config.get_ssh_user(), "root");
+        assert_eq!(config.get_ssh_key_path(), "");
+        assert_eq!(config.get_remote_env_path(), "");
+        assert_eq!(config.get_remote_python_path(), "python3");
+        assert_eq!(config.get_remote_model_path(), "");
+        assert_eq!(config.get_device(), "cuda");
+        assert_eq!(config.get_default_clone_model(), "gpt_sovits");
+        assert_eq!(config.get_gpu_memory_limit(), 24);
+        assert_eq!(config.get_timeout(), 300);
+        assert_eq!(config.get_max_concurrent(), 1);
+        assert_eq!(config.get_max_retries(), 3);
+        assert!(config.get_preflight_check());
+    }
+
+    #[test]
+    fn test_voice_clone_config_custom_values() {
+        let toml_str = r#"
+ssh_host = "connect.example.com"
+ssh_port = 26322
+ssh_user = "root"
+ssh_key_path = "~/.ssh/id_rsa"
+remote_env_path = "/root/voice_clone"
+remote_python_path = "/root/venv/bin/python"
+remote_model_path = "/root/models"
+device = "cuda:0"
+default_clone_model = "cosyvoice"
+gpu_memory_limit = 16
+timeout = 120
+max_concurrent = 2
+max_retries = 5
+preflight_check = false
+"#;
+        let config: VoiceCloneConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.get_ssh_host(), "connect.example.com");
+        assert_eq!(config.get_ssh_port(), 26322);
+        assert_eq!(config.get_ssh_key_path(), "~/.ssh/id_rsa");
+        assert_eq!(config.get_remote_env_path(), "/root/voice_clone");
+        assert_eq!(config.get_remote_python_path(), "/root/venv/bin/python");
+        assert_eq!(config.get_remote_model_path(), "/root/models");
+        assert_eq!(config.get_device(), "cuda:0");
+        assert_eq!(config.get_default_clone_model(), "cosyvoice");
+        assert_eq!(config.get_gpu_memory_limit(), 16);
+        assert_eq!(config.get_timeout(), 120);
+        assert_eq!(config.get_max_concurrent(), 2);
+        assert_eq!(config.get_max_retries(), 5);
+        assert!(!config.get_preflight_check());
+    }
+
+    #[test]
+    fn test_voice_clone_config_remote_script_path_default() {
+        let mut config = VoiceCloneConfig::default();
+        config.remote_env_path = Some("/root/voice_clone".into());
+        assert_eq!(
+            config.get_remote_script_path(),
+            "/root/voice_clone/voice_clone_runner.py"
+        );
+    }
+
+    #[test]
+    fn test_voice_clone_config_remote_script_path_explicit() {
+        let mut config = VoiceCloneConfig::default();
+        config.remote_script_path = Some("/custom/runner.py".into());
+        assert_eq!(config.get_remote_script_path(), "/custom/runner.py");
+    }
+
+    #[test]
+    fn test_digital_human_section_with_voice_clone_toml() {
+        let toml_str = r#"
+provider = "echomimic_v3"
+
+[voice_clone]
+ssh_host = "connect.example.com"
+ssh_port = 26322
+remote_env_path = "/root/voice_clone"
+remote_model_path = "/root/models"
+"#;
+        let config: DigitalHumanSection = toml::from_str(toml_str).unwrap();
+        let vc = &config.voice_clone;
+        assert_eq!(vc.get_ssh_host(), "connect.example.com");
+        assert_eq!(vc.get_ssh_port(), 26322);
+        assert_eq!(vc.get_remote_env_path(), "/root/voice_clone");
+        assert_eq!(vc.get_remote_model_path(), "/root/models");
+        assert_eq!(vc.get_device(), "cuda");
+        assert_eq!(vc.get_default_clone_model(), "gpt_sovits");
+    }
+
+    #[test]
+    fn test_digital_human_section_without_voice_clone_toml() {
+        let toml_str = r#"provider = "heygen""#;
+        let config: DigitalHumanSection = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.voice_clone.get_ssh_host(), "");
+        assert_eq!(config.voice_clone.get_device(), "cuda");
     }
 }

@@ -34,7 +34,7 @@ rand = "0.9"
 base64 = "0.22"
 lazy_static = "1.5"
 
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "multipart"] }
 actix-web = "4.13"
 actix-cors = "0.7"
 actix-rt = "2.11"
@@ -42,8 +42,8 @@ actix-files = "0.6"
 actix-multipart = "0.7"
 clap = { version = "4", features = ["derive"] }
 
-tube = { path = "/Users/shaipe/workspace/rust/kit/tube", features = ["derive", "utils", "fs", "cmd"] }
-tube_web = { path = "/Users/shaipe/workspace/rust/kit/tube/web" }
-tube_net = { path = "/Users/shaipe/workspace/rust/kit/tube/net" }
-tube_value = { path = "/Users/shaipe/workspace/rust/kit/tube/value" }
-ai-llm-kit = { path = "/Users/shaipe/workspace/rust/kit/ai/llm" }
+tube = { path = "../../kit/tube", features = ["derive", "utils", "fs", "cmd"] }
+tube_web = { path = "../../kit/tube/web" }
+tube_net = { path = "../../kit/tube/net" }
+tube_value = { path = "../../kit/tube/value" }
+ai-llm-kit = { path = "../../kit/ai/llm" }

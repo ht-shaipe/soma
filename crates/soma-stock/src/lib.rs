@@ -18,6 +18,7 @@ pub mod pexels;
 pub mod pixabay;
 pub mod coverr;
 pub mod aivideo;
+pub mod digital_human;
 
 /// 素材供应商特征（Trait）
 ///

@@ -1,0 +1,100 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#101C33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#FFB020" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFB020" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFC53D"/>
+      <stop offset="1" stop-color="#FF8A3C"/>
+    </linearGradient>
+    <pattern id="dots" width="42" height="42" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#FFFFFF" opacity="0.05"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#dots)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <rect x="0" y="0" width="10" height="900" fill="url(#accent)"/>
+
+  <text x="1528" y="262" text-anchor="end" font-family="'PingFang SC',sans-serif" font-size="250" font-weight="800" fill="#FFFFFF" opacity="0.05">02</text>
+  <circle cx="1290" cy="430" r="300" fill="none" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="2"/>
+  <circle cx="1290" cy="430" r="382" fill="none" stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="2"/>
+
+  <rect x="80" y="72" width="470" height="52" rx="26" fill="#FFB020" fill-opacity="0.08" stroke="#FFB020" stroke-opacity="0.5" stroke-width="2"/>
+  <circle cx="114" cy="98" r="7" fill="#FFB020"/>
+  <text x="140" y="107" font-family="'PingFang SC','Hiragino Sans GB',sans-serif" font-size="24" fill="#C9B48A" letter-spacing="2">SOMA · 数字人实战系列 02 / 05</text>
+
+  <text x="80" y="238" font-family="'PingFang SC',sans-serif" font-size="30" font-weight="600" fill="#FFC53D" letter-spacing="6">EchoMimicV3-Flash · AutoDL 实战</text>
+
+  <text x="78" y="334" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">GPU 服务器部署</text>
+  <text x="78" y="436" font-family="'PingFang SC',sans-serif" font-size="84" font-weight="700" fill="#F4F8FF">环境搭建的 6 个坑</text>
+
+  <rect x="80" y="478" width="120" height="6" rx="3" fill="url(#accent)"/>
+
+  <text x="80" y="540" font-family="'PingFang SC',sans-serif" font-size="30" fill="#B9C9E2">从 CUDA 到冷启动：6 个坑逐个拆解与解决方案</text>
+
+  <g font-family="'PingFang SC',sans-serif" font-size="22" fill="#E8DFC8">
+    <rect x="80" y="586" width="120" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFB020" stroke-opacity="0.35"/>
+    <text x="140" y="617" text-anchor="middle">AutoDL</text>
+    <rect x="220" y="586" width="150" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFB020" stroke-opacity="0.35"/>
+    <text x="295" y="617" text-anchor="middle">RTX 4090</text>
+    <rect x="390" y="586" width="160" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFB020" stroke-opacity="0.35"/>
+    <text x="470" y="617" text-anchor="middle">CUDA 12.1</text>
+    <rect x="570" y="586" width="175" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFB020" stroke-opacity="0.35"/>
+    <text x="657" y="617" text-anchor="middle">ModelScope</text>
+  </g>
+
+  <text x="80" y="812" font-family="'PingFang SC',sans-serif" font-size="22" fill="#64789B" letter-spacing="1">Rust AI 短视频自动生成 · 开发实践笔记</text>
+
+  <!-- illustration: GPU card + 6 pits -->
+  <g transform="translate(1060,110)">
+    <!-- GPU card -->
+    <rect x="80" y="90" width="300" height="160" rx="16" fill="#14264A" stroke="#FFB020" stroke-width="3"/>
+    <rect x="215" y="80" width="30" height="12" rx="3" fill="#FFC53D" opacity="0.8"/>
+    <circle cx="165" cy="170" r="52" fill="#0F1D36" stroke="#FF8A3C" stroke-width="4"/>
+    <circle cx="165" cy="170" r="14" fill="#FF8A3C"/>
+    <g stroke="#FF8A3C" stroke-width="4" opacity="0.75">
+      <line x1="165" y1="126" x2="165" y2="214"/>
+      <line x1="121" y1="170" x2="209" y2="170"/>
+    </g>
+    <circle cx="295" cy="170" r="52" fill="#0F1D36" stroke="#FF8A3C" stroke-width="4"/>
+    <circle cx="295" cy="170" r="14" fill="#FF8A3C"/>
+    <g stroke="#FF8A3C" stroke-width="4" opacity="0.75">
+      <line x1="295" y1="126" x2="295" y2="214"/>
+      <line x1="251" y1="170" x2="339" y2="170"/>
+    </g>
+    <rect x="115" y="270" width="230" height="38" rx="19" fill="#FFB020" fill-opacity="0.1" stroke="#FFB020" stroke-opacity="0.5" stroke-width="1.5"/>
+    <text x="230" y="296" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="20" fill="#FFC964">RTX 4090 · 24GB</text>
+
+    <!-- 6 pit tiles -->
+    <g font-family="'PingFang SC',sans-serif">
+      <rect x="4" y="350" width="140" height="100" rx="12" fill="#0F1D36" stroke="#FFB020" stroke-opacity="0.55" stroke-width="2"/>
+      <text x="74" y="404" text-anchor="middle" font-size="34" font-weight="700" fill="#FFC53D">1</text>
+      <text x="74" y="432" text-anchor="middle" font-size="18" fill="#C9D6EA">模型下载</text>
+      <rect x="160" y="350" width="140" height="100" rx="12" fill="#0F1D36" stroke="#FFB020" stroke-opacity="0.55" stroke-width="2"/>
+      <text x="230" y="404" text-anchor="middle" font-size="34" font-weight="700" fill="#FFC53D">2</text>
+      <text x="230" y="432" text-anchor="middle" font-size="18" fill="#C9D6EA">CUDA</text>
+      <rect x="316" y="350" width="140" height="100" rx="12" fill="#0F1D36" stroke="#FFB020" stroke-opacity="0.55" stroke-width="2"/>
+      <text x="386" y="404" text-anchor="middle" font-size="34" font-weight="700" fill="#FFC53D">3</text>
+      <text x="386" y="432" text-anchor="middle" font-size="18" fill="#C9D6EA">显存</text>
+      <rect x="4" y="468" width="140" height="100" rx="12" fill="#0F1D36" stroke="#FFB020" stroke-opacity="0.55" stroke-width="2"/>
+      <text x="74" y="522" text-anchor="middle" font-size="34" font-weight="700" fill="#FFC53D">4</text>
+      <text x="74" y="550" text-anchor="middle" font-size="18" fill="#C9D6EA">FFmpeg</text>
+      <rect x="160" y="468" width="140" height="100" rx="12" fill="#0F1D36" stroke="#FFB020" stroke-opacity="0.55" stroke-width="2"/>
+      <text x="230" y="522" text-anchor="middle" font-size="34" font-weight="700" fill="#FFC53D">5</text>
+      <text x="230" y="550" text-anchor="middle" font-size="18" fill="#C9D6EA">SSH</text>
+      <rect x="316" y="468" width="140" height="100" rx="12" fill="#0F1D36" stroke="#FFB020" stroke-opacity="0.55" stroke-width="2"/>
+      <text x="386" y="522" text-anchor="middle" font-size="34" font-weight="700" fill="#FFC53D">6</text>
+      <text x="386" y="550" text-anchor="middle" font-size="18" fill="#C9D6EA">冷启动</text>
+    </g>
+
+    <rect x="70" y="610" width="320" height="40" rx="20" fill="#FFB020" fill-opacity="0.1" stroke="#FFB020" stroke-opacity="0.5" stroke-width="1.5"/>
+    <text x="230" y="636" text-anchor="middle" font-family="'PingFang SC',sans-serif" font-size="20" fill="#FFD98A">6 个坑 · 约 7-8 小时踩坑实录</text>
+  </g>
+</svg>

@@ -424,6 +424,14 @@ fn generate_storyboard_from_script(_task_id: &str, params: &VideoParams, script:
 pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &crate::Config) -> Result<(String, f64), SomaError> {
     let task_audio_dir = soma_core::utils::task_dir(task_id);
     let audio_file = task_audio_dir.join("audio.mp3").to_string_lossy().to_string();
+    generate_audio_to(task_id, params, script, &audio_file, conf)
+}
+
+/// 第5步变体：生成语音音频到指定路径
+///
+/// 与 `generate_audio` 功能相同，但允许指定输出音频文件路径。
+pub fn generate_audio_to(task_id: &str, params: &VideoParams, script: &str, output_path: &str, conf: &crate::Config) -> Result<(String, f64), SomaError> {
+    let audio_file = output_path.to_string();
 
     let voice_name = params.get_voice_name();
     let rate = params.get_voice_rate();
@@ -432,7 +440,76 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
         std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
     }
 
-    let result = if soma_tts::voices::is_siliconflow_voice(voice_name) {
+    let result = if params.get_tts_provider() == "voice_clone" {
+        let vc_conf = &conf.app.digital_human.voice_clone;
+        if vc_conf.get_ssh_host().is_empty() {
+            return Err(SomaError::Config(
+                "声音克隆未配置，请在 config.toml 中添加 [digital_human.voice_clone] 段".into(),
+            ));
+        }
+        if vc_conf.get_ssh_key_path().is_empty() {
+            return Err(SomaError::Config("声音克隆未配置 ssh_key_path".into()));
+        }
+        if vc_conf.get_remote_env_path().is_empty() {
+            return Err(SomaError::Config("声音克隆未配置 remote_env_path".into()));
+        }
+        if vc_conf.get_remote_model_path().is_empty() {
+            return Err(SomaError::Config("声音克隆未配置 remote_model_path".into()));
+        }
+        let ref_audio_raw = params.clone_reference_audio.as_deref().unwrap_or("");
+        if ref_audio_raw.is_empty() {
+            return Err(SomaError::Config(
+                "使用声音克隆时必须提供参考音频（clone_reference_audio 字段）".into(),
+            ));
+        }
+        let ref_audio = if std::path::Path::new(ref_audio_raw).is_absolute() || std::path::Path::new(ref_audio_raw).exists() {
+            ref_audio_raw.to_string()
+        } else {
+            soma_core::utils::storage_dir("voice_clone_refs", false)
+                .join(ref_audio_raw)
+                .to_string_lossy()
+                .to_string()
+        };
+        let ref_text = params.clone_reference_text.as_deref().unwrap_or("");
+        let clone_model = params.clone_model.as_deref().unwrap_or("");
+        let tts = soma_tts::voice_clone_tts::VoiceCloneTts::new(
+            vc_conf.clone(),
+            &ref_audio,
+            ref_text,
+            clone_model,
+        );
+        let max_retries = vc_conf.get_max_retries() as usize;
+        retry(max_retries, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            block_on_async(fut)?
+        })
+    } else if params.get_tts_provider() == "heygem" {
+        let hg_conf = &conf.app.digital_human.heygem;
+        let merchant_id = params.get_merchant_id().ok_or_else(|| {
+            SomaError::Config("HeyGem TTS 需要商户标识（merchant_id）".into())
+        })?;
+        let asset_store = crate::service::heygem_merchant::MerchantAssetStore::new(
+            hg_conf.get_assets_dir(),
+        );
+        let asset = asset_store.get_asset(merchant_id)?;
+        if asset.asset_status != soma_core::models::AssetStatus::Ready {
+            return Err(SomaError::Config(format!(
+                "商户 {} 模型未就绪，请先完成模型训练",
+                merchant_id
+            )));
+        }
+        let tts = soma_tts::heygem_tts::HeyGemTts::new(
+            hg_conf.clone(),
+            &asset.reference_audio,
+            &asset.reference_text,
+            merchant_id,
+        );
+        let max_retries = hg_conf.get_max_retries() as usize;
+        retry(max_retries, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            block_on_async(fut)?
+        })
+    } else if soma_tts::voices::is_siliconflow_voice(voice_name) {
         let sf_key = conf.app.siliconflow.api_key.as_deref().unwrap_or("");
         let tts = soma_tts::siliconflow_tts::SiliconflowTts::new(sf_key);
         retry(3, || {

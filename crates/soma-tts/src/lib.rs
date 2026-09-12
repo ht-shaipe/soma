@@ -11,6 +11,8 @@ pub mod siliconflow_tts;
 pub mod mimo_tts;
 pub mod elevenlabs_tts;
 pub mod gemini_tts;
+pub mod voice_clone_tts;
+pub mod heygem_tts;
 pub mod volcengine_tts;
 pub mod xfyun_tts;
 pub mod voices;

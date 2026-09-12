@@ -69,3 +69,140 @@ upload_post_api_key = ""
 upload_post_username = ""
 upload_post_platforms = []
 upload_post_auto_upload = false
+
+# 数字人口播视频生成配置
+# 输入：一张人像照片 + 一段文案 → 输出：口播视频（人物开口说话，口型与配音同步）
+[digital_human]
+# 数字人服务提供者（"heygen" 云端 API / "sadtalker" 本地推理 / "echomimic_v3" 本地 GPU / "heygem" HTTP API）
+provider = "heygen"
+# HeyGen API 密钥（https://app.heygen.com/ 获取）
+api_key = ""
+# HeyGen API 基础 URL（默认官方地址）
+base_url = "https://api.heygen.com"
+# 数字人模型名称（留空使用 HeyGen 默认模型）
+model = ""
+# 单次任务超时时间（秒）
+timeout = 300
+# 轮询间隔（秒，前30秒固定3秒，之后使用此值）
+poll_interval = 5
+# 最大重试次数
+max_retries = 3
+# 敏感词库文件路径（UTF-8 文本，每行一个词，# 开头为注释）
+sensitive_words_path = "resource/sensitive_words.txt"
+
+# SadTalker 本地数字人配置（provider = "sadtalker" 时生效）
+[digital_human.sadtalker]
+# Python 虚拟环境目录（SadTalker 项目根目录）
+env_path = ""
+# Python 解释器路径（默认 "python3"）
+python_path = "python3"
+# 封装脚本路径（默认 "{env_path}/sadtalker_runner.py"）
+script_path = ""
+# 模型权重目录
+model_path = ""
+# 推理设备（"cpu" 或 "cuda"）
+device = "cpu"
+# still 模式（仅上半身）
+still_mode = false
+# 全图增强
+full_enhancer = false
+# batch size
+batch_size = 2
+# 输出分辨率
+size = 256
+# 头部姿态风格
+pose_style = 0
+# 表情缩放系数
+exp_scale = 1.0
+# 单次推理超时（秒，默认 900）
+timeout = 900
+# 最大并发数（默认 1 串行）
+max_concurrent = 1
+# 提交前环境预检
+preflight_check = true
+
+# EchoMimicV3-Flash 本地数字人配置（provider = "echomimic_v3" 时生效，强制 GPU）
+[digital_human.echomimic_v3]
+# EchoMimicV3 项目根目录（含 echomimic_v3_runner.py 和 config/ 目录）
+env_path = ""
+# Python 解释器路径（默认 "python3"，建议指向 venv 内的 python）
+python_path = "python3"
+# 推理封装脚本路径（默认 "{env_path}/echomimic_v3_runner.py"）
+script_path = ""
+# 模型权重根目录（其下应有 flash/ 子目录，含 Wan2.1-Fun-V1.1-1.3B-InP、chinese-wav2vec2-base、transformer/）
+model_path = ""
+# 推理设备（强制 GPU，如 "cuda" 或 "cuda:0"）
+device = "cuda"
+# 输出分辨率（512 或 768，默认 768）
+resolution = 768
+# Flash 推理步数（默认 8）
+infer_steps = 8
+# 推理配置文件路径（默认 "{env_path}/config/prompts/flash.yaml"）
+config_path = ""
+# GPU 显存限制（GB，默认 24，最低 12）
+gpu_memory_limit = 24
+# 单次推理超时（秒，默认 600）
+timeout = 600
+# 最大并发数（默认 1 串行，GPU 推理建议串行）
+max_concurrent = 1
+# 最大重试次数（默认 3）
+max_retries = 3
+# 提交前环境预检（检查 GPU、CUDA、模型权重等）
+preflight_check = true
+# 模型下载源（"modelscope" 或 "huggingface"，默认 modelscope）
+model_source = "modelscope"
+
+# HeyGem/Duix.Avatar HTTP 数字人配置（provider = "heygem" 时生效）
+# Docker 部署：fun-asr + fish-speech-ziming + duix.avatar 三容器
+[digital_human.heygem]
+# TTS 声音合成服务 URL（Fish-Speech，端口 18180）
+tts_base_url = "http://127.0.0.1:18180"
+# 视频合成服务 URL（Duix.Avatar，端口 8383）
+video_base_url = "http://127.0.0.1:8383"
+# 单次任务超时时间（秒）
+timeout = 600
+# 轮询间隔（秒）
+poll_interval = 5
+# 最大重试次数
+max_retries = 3
+# 最大并发数
+max_concurrent = 2
+# TTS top_p 参数
+top_p = 0.7
+# TTS temperature 参数
+temperature = 0.7
+# TTS repetition_penalty 参数
+repetition_penalty = 1.5
+# 商户资产存储目录
+assets_dir = "./storage/heygem_assets"
+# 是否自动覆盖已有训练资产
+auto_overwrite = false
+# 是否执行环境预检
+preflight_check = true
+
+# Live2D 卡通口播配置（provider = "live2d" 时生效）
+# 纯 CPU 渲染，零 GPU 成本，TTS 默认 Edge TTS 免费额度
+# 部署要求：Python 3.8+、pip install live2d-py phonemizer（或 aeneas）、FFmpeg 已安装
+[digital_human.live2d]
+# 模型存储根目录（每个模型隔离在 {models_dir}/{model_id}/ 子目录）
+models_dir = "./storage/live2d_models"
+# Python 解释器路径
+python_path = "python3"
+# 渲染脚本路径
+script_path = "resource/live2d_runner.py"
+# 渲染帧率 [24, 60]
+fps = 30
+# 输出视频宽度 [256, 3840]
+width = 1080
+# 输出视频高度 [256, 3840]
+height = 1920
+# 默认模型标识（任务未指定 live2d_model_id 时使用）
+default_model = ""
+# 渲染超时（秒）
+timeout = 600
+# 最大重试次数
+max_retries = 3
+# 渲染线程数（受 CPU 核数约束）
+render_threads = 1
+# 是否执行环境预检
+preflight_check = true

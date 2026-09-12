@@ -395,6 +395,15 @@ impl Ffmpeg {
 
         // 如果启用字幕，使用 subtitles 滤镜加载 SRT 文件渲染字幕
         if subtitle_enabled && !subtitle_path.is_empty() {
+            // 检测 FFmpeg 是否支持 subtitles 滤镜（需要 libass）
+            let has_subtitles_filter = std::process::Command::new(&self.path)
+                .args(["-filters"])
+                .output()
+                .map(|o| String::from_utf8_lossy(&o.stdout).contains("subtitles"))
+                .unwrap_or(false);
+            if !has_subtitles_filter {
+                log::warn!("FFmpeg 不支持 subtitles 滤镜（缺少 libass），跳过字幕渲染");
+            } else {
             // 优先从字体目录查找字体文件，找不到则直接使用字体名称
             let font_path = soma_core::utils::font_dir().join(font_name);
             let font_path_str = if font_path.exists() {
@@ -450,9 +459,11 @@ impl Ffmpeg {
                 font_path_str.replace('\\', "\\\\").replace(':', "\\:"), font_size, ass_text_color, ass_stroke_color, stroke_width, alignment, margin_v, bg_style
             );
             let escaped_sub = subtitle_path.replace('\\', "/").replace(':', "\\:");
-            let sub_filter = format!("subtitles={}:force_style='{}'", escaped_sub, style);
+            let escaped_style = style.replace(',', "\\,").replace(':', "\\:");
+            let sub_filter = format!("subtitles={}:force_style={}", escaped_sub, escaped_style);
             cmd_args.push("-vf".to_string());
             cmd_args.push(sub_filter);
+            }
         }
 
         // 编码参数
@@ -686,6 +697,50 @@ impl Ffmpeg {
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", stderr)));
+        }
+        Ok(())
+    }
+
+    /// 拼接多个音频文件为一个
+    ///
+    /// - `audio_files`: 音频文件路径列表（按顺序拼接）
+    /// - `output_file`: 输出音频路径
+    pub fn concat_audios(&self, audio_files: &[String], output_file: &str) -> Result<(), SomaError> {
+        if audio_files.is_empty() {
+            return Err(SomaError::VideoGen("音频拼接输入为空".into()));
+        }
+        if audio_files.len() == 1 {
+            std::fs::copy(&audio_files[0], output_file)
+                .map_err(|e| SomaError::Ffmpeg(format!("复制音频失败: {}", e)))?;
+            return Ok(());
+        }
+
+        let output_dir = Path::new(output_file).parent().unwrap_or(Path::new("."));
+        let concat_list = output_dir.join("ffmpeg-audio-concat-list.txt");
+
+        let mut content = String::new();
+        for audio in audio_files {
+            let abs = std::fs::canonicalize(audio).unwrap_or_else(|_| PathBuf::from(audio));
+            let escaped = abs.to_string_lossy().replace('\\', "/").replace("'", "'\\''");
+            content.push_str(&format!("file '{}'\n", escaped));
+        }
+        std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
+
+        let result = run_with_timeout(std::process::Command::new(&self.path)
+            .args(&[
+                "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_list.to_string_lossy().as_ref(),
+                "-c", "copy",
+                output_file,
+            ]))?;
+
+        let _ = std::fs::remove_file(&concat_list);
+
+        if !result.status.success() {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            return Err(SomaError::Ffmpeg(format!("ffmpeg concat_audios failed: {}", stderr)));
         }
         Ok(())
     }

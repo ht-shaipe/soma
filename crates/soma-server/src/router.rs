@@ -35,6 +35,8 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
     let res = match param.module.to_lowercase().as_str() {
         "videos" => crate::handler::video::distribute(&param).await,
         "tasks" => crate::handler::video::distribute_tasks(&param).await,
+        "digital_human" => crate::handler::digital_human::distribute(&param).await,
+        "dh_tasks" => crate::handler::digital_human::distribute_tasks(&param).await,
         "scripts" => crate::handler::llm::distribute(&param).await,
         "terms" => crate::handler::llm::distribute_terms(&param).await,
         "social" => crate::handler::llm::distribute_social(&param).await,

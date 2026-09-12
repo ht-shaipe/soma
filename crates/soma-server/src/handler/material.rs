@@ -70,9 +70,90 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
 
 pub async fn distribute_portraits(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
+        "list" => list_portraits().await,
+        "delete" => delete_portrait(param).await,
         "upload" => Err(error!("人像上传请使用 /api/v1/portraits/upload 接口（multipart/form-data）")),
         _ => Err(error!("不支持的方法: portraits.{}", param.method)),
     }
+}
+
+/// 列出人像照片目录中的文件，按修改时间倒序排列
+async fn list_portraits() -> Result<Value> {
+    let portrait_dir = utils::storage_dir("portraits", false);
+
+    if !portrait_dir.exists() {
+        return Ok(value!({
+            "list": [],
+            "total": 0,
+        }));
+    }
+
+    let mut items: Vec<(std::time::SystemTime, Value)> = Vec::new();
+    let entries = std::fs::read_dir(&portrait_dir).map_err(|e| error!("读取目录失败: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        if !soma_core::models::DH_PORTRAIT_FILE_TYPES.contains(&ext.as_str()) {
+            continue;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let metadata = match path.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let size = metadata.len();
+        let modified = metadata.modified().unwrap_or(std::time::UNIX_EPOCH);
+        let uploaded_at = modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        items.push((
+            modified,
+            value!({
+                "name": name,
+                "path": path.to_string_lossy().to_string(),
+                "size": size,
+                "type": ext,
+                "uploadedAt": uploaded_at,
+            }),
+        ));
+    }
+
+    items.sort_by(|a, b| b.0.cmp(&a.0));
+    let list: Vec<Value> = items.into_iter().map(|(_, v)| v).collect();
+    let total = list.len();
+    Ok(value!({
+        "list": list,
+        "total": total,
+    }))
+}
+
+/// 删除指定人像照片
+async fn delete_portrait(param: &RequestParameter) -> Result<Value> {
+    let name = param.value.get_def_string("name", "");
+    if name.is_empty() {
+        return Err(error!("缺少参数: name"));
+    }
+
+    let safe_name = utils::sanitize_upload_filename(&name)
+        .map_err(|e| error!("文件名不合法: {}", e))?;
+
+    let portrait_dir = utils::storage_dir("portraits", false);
+    let dest_path = portrait_dir.join(&safe_name);
+
+    if !dest_path.exists() {
+        return Ok(value!({
+            "deleted": false,
+            "reason": "文件不存在",
+        }));
+    }
+
+    std::fs::remove_file(&dest_path).map_err(|e| error!("删除文件失败: {}", e))?;
+
+    Ok(value!({
+        "deleted": true,
+    }))
 }
 
 /// 处理素材文件上传（multipart/form-data）
@@ -158,6 +239,9 @@ pub async fn upload_audio(mut payload: Multipart) -> HttpResponse {
 }
 
 /// 处理人像图片上传（multipart/form-data）
+///
+/// 校验扩展名白名单（jpg/jpeg/png）与文件大小（≤ 10MB），
+/// 使用 UUID 命名保证唯一性，写入前检测磁盘可用空间。
 pub async fn upload_portrait(mut payload: Multipart) -> HttpResponse {
     let portrait_dir = utils::storage_dir("portraits", true);
     std::fs::create_dir_all(&portrait_dir).ok();
@@ -174,20 +258,44 @@ pub async fn upload_portrait(mut payload: Multipart) -> HttpResponse {
             continue;
         }
 
-        let ext = std::path::Path::new(&filename)
+        let safe_filename = match utils::sanitize_upload_filename(&filename) {
+            Ok(n) => n,
+            Err(_) => {
+                let resp = tube_web::response::get_error(error!("文件类型不合法"));
+                return resp.unwrap_or(HttpResponse::BadRequest().finish());
+            }
+        };
+
+        let ext = std::path::Path::new(&safe_filename)
             .extension()
             .and_then(|e| e.to_str())
-            .unwrap_or("png");
-        let hash = utils::md5(&filename);
-        let safe_name = format!("portrait-{}.{}", hash, ext);
-        let dest_path = portrait_dir.join(&safe_name);
+            .unwrap_or("")
+            .to_lowercase();
+
+        if !soma_core::models::DH_PORTRAIT_FILE_TYPES.contains(&ext.as_str()) {
+            let resp = tube_web::response::get_error(error!("仅支持 JPG/PNG 格式的人像照片"));
+            return resp.unwrap_or(HttpResponse::BadRequest().finish());
+        }
+
         let mut body = Vec::new();
         while let Some(Ok(chunk)) = field.next().await {
             body.extend_from_slice(&chunk);
         }
 
-        if std::fs::write(&dest_path, &body).is_ok() {
-            saved_name = safe_name;
+        if body.len() as u64 > soma_core::models::DH_PORTRAIT_MAX_SIZE {
+            let resp = tube_web::response::get_error(error!("照片大小不能超过 10MB"));
+            return resp.unwrap_or(HttpResponse::BadRequest().finish());
+        }
+
+        let uuid_name = format!("{}.{}", utils::get_uuid(), ext);
+        let dest_path = portrait_dir.join(&uuid_name);
+
+        match std::fs::write(&dest_path, &body) {
+            Ok(_) => saved_name = uuid_name,
+            Err(e) => {
+                let resp = tube_web::response::get_error(error!("存储空间不足，上传失败: {}", e));
+                return resp.unwrap_or(HttpResponse::BadRequest().finish());
+            }
         }
     }
 
