@@ -8,14 +8,14 @@
 
 ## 一、必须配置（核心功能依赖）
 
-| 配置项 | 用途 | 当前值 | 申请地址 | 备注 |
-|--------|------|--------|----------|------|
-| `llm.api_key` | LLM 脚本生成 | `""` ⚠️ | 见下方LLM表 | 至少配一个LLM |
-| `stock.pexels_api_key` | 素材视频搜索 | `""` ⚠️ | https://www.pexels.com/api/ | 免费，200次/时 |
-| `stock.pixabay_api_key` | 素材视频搜索 | `""` | https://pixabay.com/api/docs/ | 免费，100次/分 |
-| `stock.coverr_api_key` | 素材视频搜索 | `""` | https://coverr.co/api | 免费 |
+> LLM 与素材库 Key 均配置在 `[app]` 段，字段名为 `{provider}_api_key`（素材库为复数 `_api_keys` 数组，支持多 Key 轮换），由 `llm_provider` / `video_source` 指定当前启用项。
 
-> ⚠️ 当前 config.toml 中所有 API Key 均为空，核心功能（脚本生成 + 素材搜索）无法使用。
+| 配置项 | 用途 | 申请地址 | 备注 |
+|--------|------|----------|------|
+| `[app] llm_provider` + 对应 `{provider}_api_key` | LLM 脚本生成 | 见下方LLM表 | 至少配一个LLM |
+| `[app] pexels_api_keys` | 素材视频搜索 | https://www.pexels.com/api/ | 免费，200次/时，多 Key 轮换 |
+| `[app] pixabay_api_keys` | 素材视频搜索 | https://pixabay.com/api/docs/ | 免费，100次/分，多 Key 轮换 |
+| `[app] coverr_api_keys` | 素材视频搜索 | https://coverr.co/api | 免费，多 Key 轮换 |
 
 ---
 
@@ -68,11 +68,15 @@
 | TTS 引擎 | provider 值 | 所需 Key | 申请地址 | 免费？ |
 |----------|------------|----------|----------|--------|
 | **Edge TTS** (默认) | `edge` | 无需 Key | — | ✅ 免费 |
-| **Azure Speech** | `azure-v2` | `azure_speech_key` + `azure_speech_region` | https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices | 免费5小时/月 |
-| **SiliconFlow** | `siliconflow` | `siliconflow_key` | https://siliconflow.cn/ | 注册送额度 |
-| **ElevenLabs** | `elevenlabs` | `elevenlabs_key` | https://elevenlabs.io/app/sign-up | 免费1万字符/月 |
-| **MiMo TTS** | `mimo` | `mimo_key`（与 LLM 共用） | https://mimo.xiaomi.com/ | — |
-| **Gemini TTS** | `gemini` | `gemini_key`（与 LLM 共用） | https://aistudio.google.com/apikey | — |
+| **Azure Speech** | `azure-v2` | `[azure]` 段 `speech_key` + `speech_region` | https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices | 免费5小时/月 |
+| **SiliconFlow** | `siliconflow` | `[siliconflow]` 段 `api_key` | https://siliconflow.cn/ | 注册送额度 |
+| **ElevenLabs** | `elevenlabs` | `[elevenlabs]` 段 `api_key` | https://elevenlabs.io/app/sign-up | 免费1万字符/月 |
+| **MiMo TTS** | `mimo` | `[app]` 段 `mimo_api_key`（与 LLM 共用） | https://mimo.xiaomi.com/ | — |
+| **Gemini TTS** | `gemini` | `[app]` 段 `gemini_api_key`（与 LLM 共用） | https://aistudio.google.com/apikey | — |
+| **火山引擎** | `volcengine` | `[volcengine]` 段 `app_id` + `access_token` | https://console.volcengine.com/speech | 有免费额度 |
+| **科大讯飞** | `xfyun` | `[xfyun]` 段 `app_id` + `api_key` + `api_secret` | https://www.xfyun.cn | 注册送额度 |
+| **HeyGem**（Fish-Speech） | `heygem` | `[digital_human.heygem]` 段 `tts_base_url` | 本地 Docker 部署 | ✅ 自部署免费 |
+| **声音克隆** | `clone` | `[digital_human.voice_clone]` 段（SSH 远程 GPU） | 见「九、数字人口播配置」 | ✅ 自部署免费 |
 | **无语音** | `none` | 无需 Key | — | ✅ 静音模式 |
 
 语音前缀路由（在 voice_name 中使用前缀切换引擎）：
@@ -81,6 +85,8 @@
 - `mimo:` → MiMo TTS
 - `gemini:` → Gemini TTS
 - `azure:` → Azure TTS
+- `volcengine:` → 火山引擎 TTS
+- `xfyun:` → 科大讯飞 TTS
 - 无前缀 → Edge TTS
 
 ---
@@ -89,12 +95,12 @@
 
 | 供应商 | video_source 值 | 所需 Key | 申请地址 | 免费？ |
 |--------|----------------|----------|----------|--------|
-| **Pexels** | `pexels` | `pexels_api_key` | https://www.pexels.com/api/ | ✅ 免费，200次/时 |
-| **Pixabay** | `pixabay` | `pixabay_api_key` | https://pixabay.com/api/docs/ | ✅ 免费，100次/分 |
-| **Coverr** | `coverr` | `coverr_api_key` | https://coverr.co/api | ✅ 免费 |
-| **本地素材** | `local` | 无需 Key | — | ✅ 手动上传到 materials/ 目录 |
+| **Pexels** | `pexels` | `pexels_api_keys`（数组） | https://www.pexels.com/api/ | ✅ 免费，200次/时 |
+| **Pixabay** | `pixabay` | `pixabay_api_keys`（数组） | https://pixabay.com/api/docs/ | ✅ 免费，100次/分 |
+| **Coverr** | `coverr` | `coverr_api_keys`（数组） | https://coverr.co/api | ✅ 免费 |
+| **本地素材** | `local` | 无需 Key | — | ✅ 通过页面上传 |
 
-> 三个在线供应商均支持多 Key 轮换（后端 `pexels_api_keys` 为数组），可用于突破速率限制。
+> 三个在线供应商均支持多 Key 轮换（原子计数器轮换），可用于突破速率限制；下载素材按 MD5 去重。
 
 ---
 
@@ -262,25 +268,92 @@ minimax_video_model = "MiniMax-Hailuo-2.3"   # 可选 video-01 / T2V-01 / I2V-01
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `app.name` | `soma` | 应用名称 |
-| `app.version` | `0.1.0` | 版本号 |
+| `app.name` | `Soma` | 应用名称 |
 | `app.host` | `0.0.0.0` | 监听地址 |
 | `app.port` | `8090` | 监听端口 |
-| `app.storage_path` | `./storage` | 存储/输出目录 |
-| `app.concurrent_tasks` | `2` | 最大并发视频生成任务数 |
-| `ffmpeg.path` | `ffmpeg` | FFmpeg 路径（需系统安装） |
-| `ffmpeg.threads` | `4` | FFmpeg 线程数 |
-| `whisper.provider` | `edge` | 字幕生成引擎（edge/whisper） |
-| `whisper.model` | `""` | Whisper 模型大小（base/small/medium/large） |
-| `proxy.http` | `""` | HTTP 代理 |
-| `proxy.https` | `""` | HTTPS 代理 |
+| `app.storage_path` | `./storage` | 存储/输出目录（任务产物、SQLite、人像等） |
+| `app.max_concurrent_tasks` | `2` | 最大并发执行任务数 |
+| `app.max_queued_tasks` | `100` | 最大排队任务数 |
+| `app.ffmpeg_path` | `ffmpeg` | FFmpeg 路径（需系统安装） |
+| `app.video_codec` | `libx264` | FFmpeg 输出编码器 |
+| `app.subtitle_provider` | `edge-tts` | 字幕生成引擎（edge-tts / whisper） |
+| `whisper.model_size` | `base` | Whisper 模型大小（base/small/medium/large） |
+| `whisper.device` / `whisper.compute_type` | `cpu` / `int8` | Whisper 推理设备与精度 |
+| `proxy.http` / `proxy.https` | `""` | HTTP/HTTPS 代理 |
+| `app.enable_redis` | `false` | Redis 缓存开关（可选） |
 
 ---
 
 ## 八、系统依赖
 
 - **FFmpeg**：视频合成核心依赖，需系统安装（`brew install ffmpeg` / `apt install ffmpeg`）
+- **Python 3.8+**（数字人本地引擎需要）：SadTalker / EchoMimicV3 / Live2D / 声音克隆均通过 `resource/*_runner.py` 推理脚本驱动
 - **Ollama**（可选）：本地 LLM，安装后 `ollama pull llama3` 下载模型
+
+---
+
+## 九、数字人口播配置（可选）
+
+> 输入一张人像照片（≤10MB）+ 一段文案（≤1000 字），生成口型与配音同步的口播视频。文案不经过 LLM 改写，内置敏感词过滤（`sensitive_words_path`）。
+
+### 供应商一览
+
+| 供应商 | provider 值 | 部署形态 | 硬件要求 | 成本 |
+|--------|------------|---------|---------|------|
+| **HeyGen** | `heygen` | 云端 API | 无 | 付费（按量） |
+| **SadTalker** | `sadtalker` | 本地 Python 推理 | CPU 可跑，GPU 更快 | 免费 |
+| **EchoMimicV3-Flash** | `echomimic_v3` | 本地 Python 推理（Apache 2.0） | GPU ≥12G 显存 | 免费 |
+| **HeyGem** | `heygem` | Docker 三容器（fun-asr + fish-speech-ziming + duix.avatar） | CPU 可跑 | 免费 |
+| **Live2D 卡通数字人** | `live2d` | 纯 CPU 渲染 | 无需 GPU | 零成本 |
+
+### 主配置（`[digital_human]` 段）
+
+```toml
+[digital_human]
+provider = "live2d"        # heygen / sadtalker / echomimic_v3 / heygem / live2d
+api_key = ""               # 仅 heygen 需要（https://app.heygen.com/）
+base_url = ""              # 仅 heygen 需要
+timeout = 300              # 单次任务超时（秒）
+poll_interval = 5          # 轮询间隔（秒）
+max_retries = 3
+sensitive_words_path = "resource/sensitive_words.txt"
+```
+
+### 各引擎子段要点
+
+- **`[digital_human.sadtalker]`**：`env_path`（项目根）、`model_path`（权重目录）、`device`（cpu/cuda）、`still_mode`、`size`、`preflight_check`
+- **`[digital_human.echomimic_v3]`**：`env_path`（项目根，含 `echomimic_v3_runner.py`）、`model_path`（权重根目录，其下应有 flash/ 子目录）、`device`（强制 GPU）、`resolution`（512/768）、`infer_steps`（默认 8）、`gpu_memory_limit`（默认 24G，最低 12G）、`model_source`（modelscope/huggingface）
+- **`[digital_human.heygem]`**：`tts_base_url`（默认 `http://127.0.0.1:18180`）、`video_base_url`（默认 `http://127.0.0.1:8383`）、`assets_dir`（商户资产目录）
+- **`[digital_human.live2d]`**：`models_dir`（默认 `./storage/live2d_models`）、`script_path`（默认 `resource/live2d_runner.py`）、`fps`（24-60）、`width`/`height`（输出分辨率）、`default_model`；依赖 `pip install live2d-py phonemizer`
+
+### 声音克隆（`[digital_human.voice_clone]` 段）
+
+通过 SSH 调用远程 GPU 推理服务，支持 GPT-SoVITS / CosyVoice / Fish-Speech 三种克隆模型：
+
+```toml
+[digital_human.voice_clone]
+ssh_host = "gpu-server"          # 远程 GPU 服务器
+ssh_port = 22
+ssh_user = "root"
+ssh_key_path = "~/.ssh/id_rsa"
+remote_env_path = "/root/voice_clone"     # 远程推理环境目录
+default_clone_model = "gpt_sovits"        # gpt_sovits / cosyvoice / fish_speech
+```
+
+> 前端「声音克隆」面板或 `POST /api/v1/voices/clone` 上传参考音频即可训练音色，训练完成后在任务中选择使用。
+
+### 长文案分段（`[digital_human.segment]` 段）
+
+超过单段上限的文案自动切句分段，逐段 TTS + 口播渲染后 FFmpeg 拼接（单段默认 ≤5 秒 / 25 字，重试 3 次）：
+
+```toml
+[digital_human.segment]
+segment_max_duration = 5.0
+segment_max_chars = 25
+segment_retry_count = 3
+```
+
+> 选型调研与部署实践详见 [docs/README.md](../docs/README.md)（数字人方案评估、EchoMimicV3 GPU 部署踩坑、长视频分段与音画同步等）。
 
 ---
 
@@ -288,35 +361,38 @@ minimax_video_model = "MiniMax-Hailuo-2.3"   # 可选 video-01 / T2V-01 / I2V-01
 
 ### 方案 A：零成本全本地
 ```toml
-[llm]
-provider = "ollama"
-model = "llama3"
-
 [app]
-video_source = "local"   # 手动上传素材到 materials/ 目录
+llm_provider = "ollama"
+ollama_model_name = "llama3"
+video_source = "local"   # 素材通过页面上传
 ```
 
 ### 方案 B：最低成本 Cloud
 ```toml
-[llm]
-provider = "pollinations"   # 免费，无需 Key
-model = "openai"
-
-[stock]
-pexels_api_key = "你的Pexels Key"   # https://www.pexels.com/api/ 免费申请
+[app]
+llm_provider = "pollinations"   # 免费，无需 Key
+pexels_api_keys = ["你的Pexels Key"]   # https://www.pexels.com/api/ 免费申请
 ```
 
 ### 方案 C：推荐（性价比最优）
 ```toml
-[llm]
-provider = "deepseek"
-api_key = "你的DeepSeek Key"   # https://platform.deepseek.com/signup 注册送额度
-model = "deepseek-chat"
-base_url = "https://api.deepseek.com"
+[app]
+llm_provider = "deepseek"
+deepseek_api_key = "你的DeepSeek Key"   # https://platform.deepseek.com/signup 注册送额度
+deepseek_model_name = "deepseek-chat"
+pexels_api_keys = ["你的Pexels Key"]
+# TTS 默认使用 Edge TTS（免费，无需配置）
+```
 
-[tts]
-provider = "edge"             # 默认免费
+### 方案 D：数字人口播（零 GPU 成本）
+```toml
+[app]
+llm_provider = "deepseek"
+deepseek_api_key = "你的DeepSeek Key"
 
-[stock]
-pexels_api_key = "你的Pexels Key"
+[digital_human]
+provider = "live2d"        # 纯 CPU 卡通数字人，无需 GPU
+
+[digital_human.live2d]
+# 保持默认即可；模型通过页面上传或放入 models_dir
 ```
