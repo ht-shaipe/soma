@@ -130,6 +130,10 @@ async fn main() -> std::io::Result<()> {
                             .route(web::post().to(soma_server::handler::material::upload_portrait)),
                     )
                     .service(
+                        web::resource("/voices/clone")
+                            .route(web::post().to(soma_server::handler::voice::clone_voice)),
+                    )
+                    .service(
                         web::resource("/voices/preview")
                             .route(web::get().to(soma_server::handler::voice::preview_voice)),
                     )

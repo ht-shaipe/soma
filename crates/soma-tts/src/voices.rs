@@ -110,6 +110,7 @@ fn extract_voice_suffix(voice_name: &str, prefix: &str) -> Option<String> {
 ///
 /// SiliconFlow 语音名称格式为 `siliconflow:model:voice-with-gender`，
 /// 例如 `siliconflow:FunAudioLLM/CosyVoice2-0.5B:alice-Female`。
+/// 对于语音克隆的 URI，不会包含性别后缀，因此不做截断。
 ///
 /// - `voice_name` - SiliconFlow 格式的语音名称
 ///
@@ -119,8 +120,11 @@ pub fn extract_siliconflow_voice(voice_name: &str) -> Option<(String, String)> {
     if parts.len() >= 3 && parts[0] == "siliconflow" {
         let model = parts[1].to_string();
         let voice_with_gender = parts[2];
-        // 去除性别后缀，取纯语音名称
-        let voice = voice_with_gender.split('-').next().unwrap_or(voice_with_gender);
+        // 只去除 -Female / -Male 性别后缀，避免截断克隆声音的 URI
+        let voice = voice_with_gender
+            .strip_suffix("-Female")
+            .or_else(|| voice_with_gender.strip_suffix("-Male"))
+            .unwrap_or(voice_with_gender);
         Some((model.clone(), format!("{}:{}", model, voice)))
     } else {
         None
@@ -160,6 +164,40 @@ pub fn extract_elevenlabs_voice(voice_name: &str) -> Option<String> {
 pub fn extract_azure_voice(voice_name: &str) -> Option<String> {
     let parts: Vec<&str> = voice_name.splitn(2, ':').collect();
     if parts.len() >= 2 && parts[0] == "azure" {
+        Some(parts[1].to_string())
+    } else {
+        None
+    }
+}
+
+/// 判断是否为火山引擎语音（以 `volcengine:` 开头）
+pub fn is_volcengine_voice(voice_name: &str) -> bool {
+    voice_name.starts_with("volcengine:")
+}
+
+/// 判断是否为科大讯飞语音（以 `xfyun:` 开头）
+pub fn is_xfyun_voice(voice_name: &str) -> bool {
+    voice_name.starts_with("xfyun:")
+}
+
+/// 从火山引擎语音名称中提取 voice_id
+///
+/// 格式：`volcengine:voice-id`（如 `volcengine:BV700_streaming`）
+pub fn extract_volcengine_voice(voice_name: &str) -> Option<String> {
+    let parts: Vec<&str> = voice_name.splitn(2, ':').collect();
+    if parts.len() >= 2 && parts[0] == "volcengine" {
+        Some(parts[1].to_string())
+    } else {
+        None
+    }
+}
+
+/// 从科大讯飞语音名称中提取 vcn（声音名称）
+///
+/// 格式：`xfyun:vcn`（如 `xfyun:xiaoyan`）
+pub fn extract_xfyun_voice(voice_name: &str) -> Option<String> {
+    let parts: Vec<&str> = voice_name.splitn(2, ':').collect();
+    if parts.len() >= 2 && parts[0] == "xfyun" {
         Some(parts[1].to_string())
     } else {
         None

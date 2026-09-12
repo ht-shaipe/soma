@@ -24,6 +24,10 @@ pub struct AppConfig {
     pub siliconflow: SiliconflowSection,
     /// ElevenLabs TTS 配置
     pub elevenlabs: ElevenlabsSection,
+    /// 火山引擎 TTS 配置
+    pub volcengine: VolcengineSection,
+    /// 科大讯飞 TTS 配置
+    pub xfyun: XfyunSection,
     /// UI 界面与发布相关配置
     pub ui: UiSection,
 }
@@ -331,6 +335,28 @@ pub struct ElevenlabsSection {
     pub api_key: Option<String>,
     /// ElevenLabs 语音模型 ID
     pub model_id: Option<String>,
+}
+
+/// 火山引擎（字节豆包）TTS 语音合成配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VolcengineSection {
+    /// 火山引擎语音合成 App ID
+    pub app_id: Option<String>,
+    /// 火山引擎访问令牌
+    pub access_token: Option<String>,
+    /// 火山引擎集群名称，默认 "volcano_tts"
+    pub cluster: Option<String>,
+}
+
+/// 科大讯飞 TTS 语音合成配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct XfyunSection {
+    /// 讯飞开放平台 App ID
+    pub app_id: Option<String>,
+    /// 讯飞 API Key
+    pub api_key: Option<String>,
+    /// 讯飞 API Secret
+    pub api_secret: Option<String>,
 }
 
 /// UI 界面与视频发布相关配置

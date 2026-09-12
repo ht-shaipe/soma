@@ -110,12 +110,38 @@
     "elevenlabsApiKey": "ElevenLabs API Key",
     "elevenlabsModel": "ElevenLabs Model",
     "geminiApiKey": "Gemini API Key",
+    "volcengineTts": "Volcengine TTS (Doubao)",
+    "volcengineAppId": "Volcengine App ID",
+    "volcengineAccessToken": "Volcengine Access Token",
+    "xfyunTts": "iFlyTek TTS",
+    "xfyunAppId": "iFlyTek App ID",
+    "xfyunApiKey": "iFlyTek API Key",
+    "xfyunApiSecret": "iFlyTek API Secret",
     "voiceListFailed": "Failed to load voice list",
     "voicePreviewFailed": "Voice preview failed",
     "previewText": "Hello, this is a voice preview test.",
     "noVoicePreview": "Voice preview not supported",
     "uploadSuccess": "Upload successful",
-    "uploadFailed": "Upload failed"
+    "uploadFailed": "Upload failed",
+    "voiceClone": {
+      "title": "Voice Clone",
+      "engine": "Clone Engine",
+      "voiceName": "Voice Name",
+      "voiceNamePlaceholder": "Name your cloned voice",
+      "uploadAudio": "Upload Audio Sample",
+      "selectFile": "Select Audio File",
+      "uploadTip": "Record 10-30s of clear speech, supports mp3/wav/m4a/aac/flac/ogg",
+      "startClone": "Start Clone",
+      "clonedList": "Cloned Voices",
+      "use": "Use",
+      "cloneSuccess": "Voice cloned successfully",
+      "cloneFailed": "Voice clone failed",
+      "voiceSelected": "Voice selected",
+      "deleteConfirm": "Delete voice",
+      "noFile": "Please select an audio file first",
+      "noName": "Please enter a voice name",
+      "fileLimit": "Only one file can be uploaded"
+    }
   },
   "subtitle": {
     "title": "Subtitle Settings",
@@ -462,7 +488,10 @@
     "copy": "Copy",
     "copied": "Copied",
     "remove": "Remove",
-    "log": "Log"
+    "log": "Log",
+    "confirm": "Confirm",
+    "deleteSuccess": "Deleted successfully",
+    "deleteFailed": "Delete failed"
   },
   "portrait": {
     "imageOnly": "Please upload an image file",

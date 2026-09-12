@@ -11,8 +11,11 @@ pub mod siliconflow_tts;
 pub mod mimo_tts;
 pub mod elevenlabs_tts;
 pub mod gemini_tts;
+pub mod volcengine_tts;
+pub mod xfyun_tts;
 pub mod voices;
 pub mod subtitle;
+pub mod voice_clone;
 
 // 统一导出核心 trait 和常用工具函数，方便外部 crate 直接使用
 pub use provider::SomaTtsProvider;

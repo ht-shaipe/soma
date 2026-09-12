@@ -62,6 +62,12 @@ async fn get_config(_param: &RequestParameter) -> Result<Value> {
             "elevenlabs_model": conf.app.elevenlabs.model_id.as_deref().unwrap_or("eleven_multilingual_v2"),
             "mimo_key": app.mimo_api_key.as_deref().unwrap_or(""),
             "gemini_key": app.gemini_api_key.as_deref().unwrap_or(""),
+            "volcengine_app_id": conf.app.volcengine.app_id.as_deref().unwrap_or(""),
+            "volcengine_access_token": conf.app.volcengine.access_token.as_deref().unwrap_or(""),
+            "volcengine_cluster": conf.app.volcengine.cluster.as_deref().unwrap_or("volcano_tts"),
+            "xfyun_app_id": conf.app.xfyun.app_id.as_deref().unwrap_or(""),
+            "xfyun_api_key": conf.app.xfyun.api_key.as_deref().unwrap_or(""),
+            "xfyun_api_secret": conf.app.xfyun.api_secret.as_deref().unwrap_or(""),
         },
         "stock": {
             "pexels_api_key": app.pexels_api_keys.as_ref().and_then(|v| v.first()).unwrap_or(&String::new()).clone(),
@@ -226,6 +232,24 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
         }
         if let Some(key) = v.get("gemini_key").and_then(|k| k.as_str()) {
             app.gemini_api_key = Some(key.to_string());
+        }
+        if let Some(id) = v.get("volcengine_app_id").and_then(|k| k.as_str()) {
+            conf.app.volcengine.app_id = Some(id.to_string());
+        }
+        if let Some(token) = v.get("volcengine_access_token").and_then(|k| k.as_str()) {
+            conf.app.volcengine.access_token = Some(token.to_string());
+        }
+        if let Some(cluster) = v.get("volcengine_cluster").and_then(|k| k.as_str()) {
+            conf.app.volcengine.cluster = Some(cluster.to_string());
+        }
+        if let Some(id) = v.get("xfyun_app_id").and_then(|k| k.as_str()) {
+            conf.app.xfyun.app_id = Some(id.to_string());
+        }
+        if let Some(key) = v.get("xfyun_api_key").and_then(|k| k.as_str()) {
+            conf.app.xfyun.api_key = Some(key.to_string());
+        }
+        if let Some(secret) = v.get("xfyun_api_secret").and_then(|k| k.as_str()) {
+            conf.app.xfyun.api_secret = Some(secret.to_string());
         }
     }
 

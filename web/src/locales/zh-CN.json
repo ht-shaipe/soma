@@ -110,12 +110,38 @@
     "elevenlabsApiKey": "ElevenLabs API Key",
     "elevenlabsModel": "ElevenLabs Model",
     "geminiApiKey": "Gemini API Key",
+    "volcengineTts": "火山引擎 TTS (豆包)",
+    "volcengineAppId": "火山引擎 App ID",
+    "volcengineAccessToken": "火山引擎 Access Token",
+    "xfyunTts": "科大讯飞 TTS",
+    "xfyunAppId": "讯飞 App ID",
+    "xfyunApiKey": "讯飞 API Key",
+    "xfyunApiSecret": "讯飞 API Secret",
     "voiceListFailed": "语音列表加载失败",
     "voicePreviewFailed": "语音预览失败",
     "previewText": "你好，这是一段语音预览测试。",
     "noVoicePreview": "当前语音不支持预览",
     "uploadSuccess": "上传成功",
-    "uploadFailed": "上传失败"
+    "uploadFailed": "上传失败",
+    "voiceClone": {
+      "title": "语音克隆",
+      "engine": "克隆引擎",
+      "voiceName": "声音名称",
+      "voiceNamePlaceholder": "为克隆声音起一个名字",
+      "uploadAudio": "上传音频样本",
+      "selectFile": "选择音频文件",
+      "uploadTip": "录制 10-30 秒清晰的人声音频，支持 mp3/wav/m4a/aac/flac/ogg",
+      "startClone": "开始克隆",
+      "clonedList": "已克隆的声音",
+      "use": "使用",
+      "cloneSuccess": "语音克隆成功",
+      "cloneFailed": "语音克隆失败",
+      "voiceSelected": "已选择声音",
+      "deleteConfirm": "确认删除声音",
+      "noFile": "请先选择音频文件",
+      "noName": "请输入声音名称",
+      "fileLimit": "只能上传一个文件"
+    }
   },
   "subtitle": {
     "title": "字幕设置",
@@ -462,7 +488,10 @@
     "copy": "复制",
     "copied": "已复制",
     "remove": "移除",
-    "log": "日志"
+    "log": "日志",
+    "confirm": "确认",
+    "deleteSuccess": "删除成功",
+    "deleteFailed": "删除失败"
   },
   "portrait": {
     "imageOnly": "请上传图片文件",

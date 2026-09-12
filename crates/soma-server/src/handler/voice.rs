@@ -1,9 +1,13 @@
 /// 语音列表与预览 API 处理器
 ///
 /// - list: 返回各 TTS 引擎可用的语音列表
+/// - list_cloned: 返回已克隆的语音列表
+/// - delete_cloned: 删除已克隆的语音
 /// - preview: 生成语音预览音频并返回
 
 use actix_web::{HttpRequest, HttpResponse};
+use actix_multipart::Multipart;
+use futures::StreamExt;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use crate::Config;
@@ -11,6 +15,8 @@ use crate::Config;
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "list" => list_voices(param).await,
+        "list_cloned" => list_cloned_voices(param).await,
+        "delete_cloned" => delete_cloned_voice(param).await,
         _ => Err(error!("不支持的方法: {}", param.method)),
     }
 }
@@ -103,12 +109,53 @@ async fn list_voices(_param: &RequestParameter) -> Result<Value> {
         vec![]
     };
 
+    // 火山引擎语音
+    let volc_appid = conf.app.volcengine.app_id.as_deref().unwrap_or("");
+    let volc_token = conf.app.volcengine.access_token.as_deref().unwrap_or("");
+    let volc_voices = if !volc_appid.is_empty() && !volc_token.is_empty() {
+        vec![
+            value!({"name": "volcengine:BV700_streaming", "label": "灿灿 (火山引擎, 女, 中文)"}),
+            value!({"name": "volcengine:BV701_streaming", "label": "擎苍 (火山引擎, 男, 中文)"}),
+            value!({"name": "volcengine:BV705_streaming", "label": "炀炀 (火山引擎, 女, 中文)"}),
+            value!({"name": "volcengine:BV406_streaming", "label": "知性姐姐 (火山引擎, 女, 中文)"}),
+            value!({"name": "volcengine:BV407_streaming", "label": "知性小哥 (火山引擎, 男, 中文)"}),
+        ]
+    } else {
+        vec![]
+    };
+
+    // 科大讯飞语音
+    let xfyun_appid = conf.app.xfyun.app_id.as_deref().unwrap_or("");
+    let xfyun_key = conf.app.xfyun.api_key.as_deref().unwrap_or("");
+    let xfyun_voices = if !xfyun_appid.is_empty() && !xfyun_key.is_empty() {
+        vec![
+            value!({"name": "xfyun:xiaoyan", "label": "小燕 (讯飞, 女, 中文)"}),
+            value!({"name": "xfyun:aisjiuxu", "label": "许久 (讯飞, 男, 中文)"}),
+            value!({"name": "xfyun:aisxinying", "label": "小颖 (讯飞, 女, 中文)"}),
+            value!({"name": "xfyun:aisbabyxu", "label": "小X (讯飞, 男, 中文)"}),
+        ]
+    } else {
+        vec![]
+    };
+
     let mut all_voices = edge_voices;
     all_voices.extend(sf_voices);
     all_voices.extend(el_voices);
     all_voices.extend(mimo_voices);
     all_voices.extend(gemini_voices);
     all_voices.extend(azure_voices);
+    all_voices.extend(volc_voices);
+    all_voices.extend(xfyun_voices);
+
+    // 添加已克隆的声音
+    if let Ok(cloned) = soma_tts::voice_clone::list_cloned_voices() {
+        for v in &cloned {
+            all_voices.push(value!({
+                "name": soma_tts::voice_clone::cloned_voice_name(v),
+                "label": format!("{} ({}克隆)", v.name, v.engine),
+            }));
+        }
+    }
 
     Ok(value!({
         "voices": all_voices,
@@ -162,6 +209,18 @@ pub async fn preview_voice(req: HttpRequest) -> HttpResponse {
         let azure_key = conf.app.azure.speech_key.as_deref().unwrap_or("");
         let azure_region = conf.app.azure.speech_region.as_deref().unwrap_or("eastasia");
         let tts = soma_tts::azure_tts::AzureTts::new(azure_key, azure_region);
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+    } else if soma_tts::voices::is_volcengine_voice(&voice_name) {
+        let volc_appid = conf.app.volcengine.app_id.as_deref().unwrap_or("");
+        let volc_token = conf.app.volcengine.access_token.as_deref().unwrap_or("");
+        let volc_cluster = conf.app.volcengine.cluster.as_deref().unwrap_or("volcano_tts");
+        let tts = soma_tts::volcengine_tts::VolcengineTts::new(volc_appid, volc_token, volc_cluster);
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+    } else if soma_tts::voices::is_xfyun_voice(&voice_name) {
+        let xfyun_appid = conf.app.xfyun.app_id.as_deref().unwrap_or("");
+        let xfyun_key = conf.app.xfyun.api_key.as_deref().unwrap_or("");
+        let xfyun_secret = conf.app.xfyun.api_secret.as_deref().unwrap_or("");
+        let tts = soma_tts::xfyun_tts::XfyunTts::new(xfyun_appid, xfyun_key, xfyun_secret);
         local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else {
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
@@ -221,4 +280,226 @@ pub async fn preview_subtitle(req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok()
         .content_type("application/json")
         .body(json)
+}
+
+// ==================== 语音克隆相关 ====================
+
+/// 列出所有已克隆的声音
+async fn list_cloned_voices(_param: &RequestParameter) -> Result<Value> {
+    let voices = soma_tts::voice_clone::list_cloned_voices()
+        .map_err(|e| error!("获取克隆声音列表失败: {:?}", e))?;
+    let list: Vec<Value> = voices
+        .iter()
+        .map(|v| {
+            value!({
+                "id": v.id.clone(),
+                "name": v.name.clone(),
+                "engine": v.engine.to_string(),
+                "remoteId": v.remote_id.clone(),
+                "sourceFile": v.source_file.clone(),
+                "samplePath": v.sample_path.clone(),
+                "createdAt": v.created_at.clone(),
+                "voiceName": soma_tts::voice_clone::cloned_voice_name(v),
+            })
+        })
+        .collect();
+    Ok(value!({ "voices": list }))
+}
+
+/// 删除已克隆的声音
+async fn delete_cloned_voice(param: &RequestParameter) -> Result<Value> {
+    let id = param.value.get_def_string("id", "");
+    if id.is_empty() {
+        return Err(error!("缺少参数: id"));
+    }
+
+    // 先加载声音信息，用于远端删除
+    let voice = soma_tts::voice_clone::get_cloned_voice(&id)
+        .map_err(|e| error!("获取克隆声音失败: {:?}", e))?
+        .ok_or_else(|| error!("克隆声音不存在: {}", id))?;
+
+    // 获取对应引擎的认证配置
+    let conf = Config::get();
+    let auth = match voice.engine {
+        soma_tts::voice_clone::CloneEngine::Elevenlabs => {
+            soma_tts::voice_clone::CloneAuth {
+                api_key: conf.app.elevenlabs.api_key.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+        soma_tts::voice_clone::CloneEngine::Siliconflow => {
+            soma_tts::voice_clone::CloneAuth {
+                api_key: conf.app.siliconflow.api_key.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+        soma_tts::voice_clone::CloneEngine::Volcengine => {
+            soma_tts::voice_clone::CloneAuth {
+                app_id: conf.app.volcengine.app_id.as_deref().unwrap_or("").to_string(),
+                access_token: conf.app.volcengine.access_token.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+        soma_tts::voice_clone::CloneEngine::Xfyun => {
+            soma_tts::voice_clone::CloneAuth {
+                app_id: conf.app.xfyun.app_id.as_deref().unwrap_or("").to_string(),
+                api_key: conf.app.xfyun.api_key.as_deref().unwrap_or("").to_string(),
+                api_secret: conf.app.xfyun.api_secret.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+    };
+
+    // 尝试远端删除（失败不阻塞本地删除）
+    let _ = soma_tts::voice_clone::delete_voice(&voice.engine, &auth, &voice.remote_id).await;
+
+    // 删除本地元数据和音频样本
+    soma_tts::voice_clone::delete_cloned_voice_local(&id)
+        .map_err(|e| error!("删除克隆声音失败: {:?}", e))?;
+
+    Ok(value!({ "id": id, "deleted": true }))
+}
+
+/// 语音克隆端点（POST /api/v1/voices/clone，multipart/form-data）
+///
+/// 接收上传的音频文件和引擎/名称参数，调用对应引擎的克隆 API 创建自定义声音，
+/// 并将元数据持久化到本地 storage/voices/ 目录。
+pub async fn clone_voice(mut payload: Multipart) -> HttpResponse {
+    let mut engine_str = String::new();
+    let mut voice_name = String::new();
+    let mut audio_data: Vec<u8> = Vec::new();
+    let mut audio_filename = String::new();
+
+    while let Some(Ok(mut field)) = payload.next().await {
+        let field_name = match field.content_disposition() {
+            Some(cd) => cd.get_name().unwrap_or("").to_string(),
+            None => "".to_string(),
+        };
+
+        if field_name == "engine" || field_name == "name" {
+            let mut buf = Vec::new();
+            while let Some(Ok(chunk)) = field.next().await {
+                buf.extend_from_slice(&chunk);
+            }
+            let text = String::from_utf8_lossy(&buf).to_string();
+            if field_name == "engine" {
+                engine_str = text;
+            } else if field_name == "name" {
+                voice_name = text;
+            }
+        } else if field_name == "file" {
+            audio_filename = match field.content_disposition() {
+                Some(cd) => cd.get_filename().unwrap_or("audio.mp3").to_string(),
+                None => "audio.mp3".to_string(),
+            };
+            while let Some(Ok(chunk)) = field.next().await {
+                audio_data.extend_from_slice(&chunk);
+            }
+        }
+    }
+
+    if audio_data.is_empty() {
+        let resp = tube_web::response::get_error(error!("未接收到音频文件"));
+        return resp.unwrap_or(HttpResponse::BadRequest().finish());
+    }
+    if engine_str.is_empty() {
+        let resp = tube_web::response::get_error(error!("缺少参数: engine"));
+        return resp.unwrap_or(HttpResponse::BadRequest().finish());
+    }
+    if voice_name.is_empty() {
+        voice_name = "cloned_voice".to_string();
+    }
+
+    let engine: soma_tts::voice_clone::CloneEngine = match engine_str.parse() {
+        Ok(e) => e,
+        Err(e) => {
+            let resp = tube_web::response::get_error(error!("{}", e));
+            return resp.unwrap_or(HttpResponse::BadRequest().finish());
+        }
+    };
+
+    let conf = Config::get();
+    let auth = match engine {
+        soma_tts::voice_clone::CloneEngine::Elevenlabs => {
+            soma_tts::voice_clone::CloneAuth {
+                api_key: conf.app.elevenlabs.api_key.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+        soma_tts::voice_clone::CloneEngine::Siliconflow => {
+            soma_tts::voice_clone::CloneAuth {
+                api_key: conf.app.siliconflow.api_key.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+        soma_tts::voice_clone::CloneEngine::Volcengine => {
+            soma_tts::voice_clone::CloneAuth {
+                app_id: conf.app.volcengine.app_id.as_deref().unwrap_or("").to_string(),
+                access_token: conf.app.volcengine.access_token.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+        soma_tts::voice_clone::CloneEngine::Xfyun => {
+            soma_tts::voice_clone::CloneAuth {
+                app_id: conf.app.xfyun.app_id.as_deref().unwrap_or("").to_string(),
+                api_key: conf.app.xfyun.api_key.as_deref().unwrap_or("").to_string(),
+                api_secret: conf.app.xfyun.api_secret.as_deref().unwrap_or("").to_string(),
+                ..Default::default()
+            }
+        }
+    };
+
+    // 调用引擎克隆 API
+    let remote_id = match soma_tts::voice_clone::clone_voice(
+        &engine,
+        &auth,
+        &voice_name,
+        &audio_data,
+        &audio_filename,
+    )
+    .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            let resp = tube_web::response::get_error(error!("语音克隆失败: {:?}", e));
+            return resp.unwrap_or(HttpResponse::InternalServerError().finish());
+        }
+    };
+
+    // 保存音频样本到本地
+    let voices_dir = soma_core::utils::storage_dir("voices", true);
+    let voice_id = uuid::Uuid::new_v4().to_string();
+    let sample_filename = format!("{}_{}", voice_id, audio_filename);
+    let sample_path = voices_dir.join(&sample_filename);
+    if let Err(e) = std::fs::write(&sample_path, &audio_data) {
+        let resp = tube_web::response::get_error(error!("保存音频样本失败: {}", e));
+        return resp.unwrap_or(HttpResponse::InternalServerError().finish());
+    }
+
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let cloned = soma_tts::voice_clone::ClonedVoice {
+        id: voice_id.clone(),
+        name: voice_name.clone(),
+        engine: engine.clone(),
+        remote_id: remote_id.clone(),
+        source_file: audio_filename.clone(),
+        sample_path: sample_path.to_string_lossy().to_string(),
+        created_at: now,
+    };
+
+    if let Err(e) = soma_tts::voice_clone::save_cloned_voice(&cloned) {
+        let resp = tube_web::response::get_error(error!("保存克隆声音失败: {:?}", e));
+        return resp.unwrap_or(HttpResponse::InternalServerError().finish());
+    }
+
+    let result = value!({
+        "id": voice_id,
+        "name": voice_name,
+        "engine": engine.to_string(),
+        "remoteId": remote_id,
+        "sourceFile": audio_filename,
+        "voiceName": soma_tts::voice_clone::cloned_voice_name(&cloned),
+    });
+    let resp = tube_web::response::get_success(&result);
+    resp.unwrap_or(HttpResponse::Ok().finish())
 }

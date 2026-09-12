@@ -473,6 +473,24 @@ pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
             block_on_async(fut)?
         })
+    } else if soma_tts::voices::is_volcengine_voice(voice_name) {
+        let volc_appid = conf.app.volcengine.app_id.as_deref().unwrap_or("");
+        let volc_token = conf.app.volcengine.access_token.as_deref().unwrap_or("");
+        let volc_cluster = conf.app.volcengine.cluster.as_deref().unwrap_or("volcano_tts");
+        let tts = soma_tts::volcengine_tts::VolcengineTts::new(volc_appid, volc_token, volc_cluster);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            block_on_async(fut)?
+        })
+    } else if soma_tts::voices::is_xfyun_voice(voice_name) {
+        let xfyun_appid = conf.app.xfyun.app_id.as_deref().unwrap_or("");
+        let xfyun_key = conf.app.xfyun.api_key.as_deref().unwrap_or("");
+        let xfyun_secret = conf.app.xfyun.api_secret.as_deref().unwrap_or("");
+        let tts = soma_tts::xfyun_tts::XfyunTts::new(xfyun_appid, xfyun_key, xfyun_secret);
+        retry(3, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(&tts, script, voice_name, rate, std::path::Path::new(&audio_file));
+            block_on_async(fut)?
+        })
     } else {
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
         retry(3, || {

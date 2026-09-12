@@ -234,6 +234,12 @@ export interface AppConfig {
     elevenlabs_model?: string
     mimo_key?: string
     gemini_key?: string
+    volcengine_app_id?: string
+    volcengine_access_token?: string
+    volcengine_cluster?: string
+    xfyun_app_id?: string
+    xfyun_api_key?: string
+    xfyun_api_secret?: string
   }
   stock: {
     pexels_api_key: string

@@ -13,9 +13,16 @@
         <el-option :label="$t('audio.geminiTts')" value="gemini" />
         <el-option :label="$t('audio.mimoTts')" value="mimo" />
         <el-option :label="$t('audio.elevenlabsTts')" value="elevenlabs" />
+        <el-option :label="$t('audio.volcengineTts')" value="volcengine" />
+        <el-option :label="$t('audio.xfyunTts')" value="xfyun" />
       </el-select>
     </div>
     <VoiceSelector v-if="store.ttsServer !== 'none'" />
+    <el-collapse style="margin-top: 8px">
+      <el-collapse-item :title="$t('audio.voiceClone.title')" name="clone">
+        <VoiceClonePanel />
+      </el-collapse-item>
+    </el-collapse>
     <div v-if="store.ttsServer === 'azure-v2'" class="form-row">
       <div class="form-label">{{ $t('audio.azureSpeechKey') }}</div>
       <el-input v-model="azureSpeechKey" type="password" show-password @change="onSaveTtsConfig" />
@@ -47,6 +54,26 @@
     <div v-if="store.ttsServer === 'gemini'" class="form-row">
       <div class="form-label">{{ $t('audio.geminiApiKey') }}</div>
       <el-input v-model="geminiKey" type="password" show-password @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'volcengine'" class="form-row">
+      <div class="form-label">{{ $t('audio.volcengineAppId') }}</div>
+      <el-input v-model="volcAppId" @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'volcengine'" class="form-row">
+      <div class="form-label">{{ $t('audio.volcengineAccessToken') }}</div>
+      <el-input v-model="volcAccessToken" type="password" show-password @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'xfyun'" class="form-row">
+      <div class="form-label">{{ $t('audio.xfyunAppId') }}</div>
+      <el-input v-model="xfyunAppId" @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'xfyun'" class="form-row">
+      <div class="form-label">{{ $t('audio.xfyunApiKey') }}</div>
+      <el-input v-model="xfyunApiKey" type="password" show-password @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'xfyun'" class="form-row">
+      <div class="form-label">{{ $t('audio.xfyunApiSecret') }}</div>
+      <el-input v-model="xfyunApiSecret" type="password" show-password @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer !== 'none'" class="form-row">
       <div class="form-label">{{ $t('audio.speechVolume') }}</div>
@@ -92,6 +119,7 @@ import { useVideoParamsStore } from '@/stores/videoParams'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import VoiceSelector from './VoiceSelector.vue'
+import VoiceClonePanel from './VoiceClonePanel.vue'
 import BgmSelector from './BgmSelector.vue'
 
 const store = useVideoParamsStore()
@@ -105,6 +133,11 @@ const mimoKey = ref('')
 const elevenlabsKey = ref('')
 const elevenlabsModel = ref('eleven_multilingual_v2')
 const geminiKey = ref('')
+const volcAppId = ref('')
+const volcAccessToken = ref('')
+const xfyunAppId = ref('')
+const xfyunApiKey = ref('')
+const xfyunApiSecret = ref('')
 
 function loadTtsKeys() {
   const tts = configStore.config.tts
@@ -115,6 +148,11 @@ function loadTtsKeys() {
   elevenlabsKey.value = tts.elevenlabs_key || ''
   elevenlabsModel.value = tts.elevenlabs_model || 'eleven_multilingual_v2'
   geminiKey.value = tts.gemini_key || ''
+  volcAppId.value = tts.volcengine_app_id || ''
+  volcAccessToken.value = tts.volcengine_access_token || ''
+  xfyunAppId.value = tts.xfyun_app_id || ''
+  xfyunApiKey.value = tts.xfyun_api_key || ''
+  xfyunApiSecret.value = tts.xfyun_api_secret || ''
 }
 
 function onSaveTtsConfig() {
@@ -126,6 +164,11 @@ function onSaveTtsConfig() {
     elevenlabs_key: elevenlabsKey.value,
     elevenlabs_model: elevenlabsModel.value,
     gemini_key: geminiKey.value,
+    volcengine_app_id: volcAppId.value,
+    volcengine_access_token: volcAccessToken.value,
+    xfyun_app_id: xfyunAppId.value,
+    xfyun_api_key: xfyunApiKey.value,
+    xfyun_api_secret: xfyunApiSecret.value,
   })
   configStore.save()
 }
