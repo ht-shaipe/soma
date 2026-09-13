@@ -1,3 +1,4 @@
+// 素材管理 API：素材目录列表、素材/音频/人像上传
 import api, { extractData } from './index'
 import type { MaterialInfo } from '@/types'
 

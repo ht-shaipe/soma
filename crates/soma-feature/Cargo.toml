@@ -1,0 +1,26 @@
+[package]
+name = "soma-feature"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Soma 功能点（Feature）抽象层：统一注册、调用、进度上报与产物管理"
+
+[dependencies]
+soma-core = { workspace = true }
+soma-tts = { workspace = true }
+soma-stock = { workspace = true }
+soma-video = { workspace = true }
+ai-llm-kit = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+regex = "1"
+log = "0.4"
+lazy_static = { workspace = true }
+
+tube = { workspace = true }
+tube_value = { workspace = true }

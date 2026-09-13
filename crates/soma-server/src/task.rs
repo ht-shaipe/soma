@@ -5,7 +5,7 @@
 /// 队列也满时返回错误。任务完成后自动从队列中取下一个任务执行。
 
 use soma_core::error::SomaError;
-use soma_core::models::{TaskStatus, VideoParams, DigitalHumanParams};
+use soma_core::models::{TaskStatus, VideoParams, DigitalHumanParams, ImageStoryParams};
 use crate::state;
 use crate::service;
 use std::sync::Mutex;
@@ -36,7 +36,7 @@ pub struct TaskQueue {
     queue: VecDeque<QueuedTask>,
 }
 
-/// 排队中的任务信息（视频任务或数字人任务）
+/// 排队中的任务信息（视频任务、数字人任务或图片故事任务）
 enum QueuedTask {
     Video {
         task_id: String,
@@ -46,6 +46,10 @@ enum QueuedTask {
     DigitalHuman {
         task_id: String,
         params: DigitalHumanParams,
+    },
+    ImageStory {
+        task_id: String,
+        params: ImageStoryParams,
     },
 }
 
@@ -68,6 +72,15 @@ fn spawn_task(task: QueuedTask) {
                     service::digital_human::run_task(&task_id, &params)
                 }));
                 handle_dh_task_result(&task_id, result);
+                lock_queue().task_done();
+            });
+        }
+        QueuedTask::ImageStory { task_id, params } => {
+            std::thread::spawn(move || {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    service::image_story::run_task(&task_id, &params)
+                }));
+                handle_image_story_task_result(&task_id, result);
                 lock_queue().task_done();
             });
         }
@@ -128,6 +141,25 @@ fn handle_dh_task_result(
     }
 }
 
+/// 处理图片故事任务执行结果
+fn handle_image_story_task_result(
+    task_id: &str,
+    result: std::thread::Result<Result<(), SomaError>>,
+) {
+    match result {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
+            log::error!("image story task {} failed: {:?}", task_id, e);
+            state::update_image_story_task_data(task_id, Some(TaskStatus::Failed.as_i32()), None, None, Some(format!("{:?}", e)));
+        }
+        Err(panic_val) => {
+            let msg = panic_msg(panic_val);
+            log::error!("image story task {} panicked: {}", task_id, msg);
+            state::update_image_story_task_data(task_id, Some(TaskStatus::Failed.as_i32()), None, None, Some(format!("pipeline panicked: {}", msg)));
+        }
+    }
+}
+
 /// 从 panic 值提取消息
 fn panic_msg(panic_val: Box<dyn std::any::Any + Send>) -> String {
     if let Some(s) = panic_val.downcast_ref::<&str>() {
@@ -152,6 +184,11 @@ impl TaskQueue {
     /// 添加数字人任务到队列
     pub fn add_dh_task(&mut self, task_id: String, params: DigitalHumanParams) -> Result<(), SomaError> {
         self.enqueue(QueuedTask::DigitalHuman { task_id, params })
+    }
+
+    /// 添加图片故事任务到队列
+    pub fn add_image_story_task(&mut self, task_id: String, params: ImageStoryParams) -> Result<(), SomaError> {
+        self.enqueue(QueuedTask::ImageStory { task_id, params })
     }
 
     /// 通用入队逻辑：并发有空位则立即执行，否则入队等待，队列满则报错
@@ -202,4 +239,9 @@ pub fn add_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
 /// 向全局任务队列添加新数字人任务
 pub fn add_dh_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaError> {
     lock_queue().add_dh_task(task_id.to_string(), params.clone())
+}
+
+/// 向全局任务队列添加新图片故事任务
+pub fn add_image_story_task(task_id: &str, params: &ImageStoryParams) -> Result<(), SomaError> {
+    lock_queue().add_image_story_task(task_id.to_string(), params.clone())
 }

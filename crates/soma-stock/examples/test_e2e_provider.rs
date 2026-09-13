@@ -1,3 +1,7 @@
+//! 素材供应商端到端示例：对指定来源执行一次真实搜索并打印结果。
+//!
+//! 用法：`cargo run -p soma-stock --example test_e2e_provider`（需已配置对应密钥）。
+
 use soma_core::config::AppConfig;
 
 fn main() {

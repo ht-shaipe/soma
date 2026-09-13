@@ -1,3 +1,4 @@
+// 领域类型定义：与后端 serde 结构一一对应（camelCase 序列化）
 export interface VideoParams {
   video_subject: string
   video_script?: string

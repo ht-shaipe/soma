@@ -1,3 +1,4 @@
+// 音乐管理 API：BGM 列表与音乐文件上传
 import api, { extractData } from './index'
 import type { MusicInfo } from '@/types'
 

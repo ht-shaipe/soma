@@ -1,3 +1,4 @@
+// LLM 能力 API：脚本生成、关键词提取、社交元数据、需求理解与分镜脚本
 import api, { extractData } from './index'
 import type { StoryboardScene } from '@/types'
 

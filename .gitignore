@@ -19,6 +19,7 @@ web/dist-ssr/
 .claude
 .opencode
 .codeartsdoer
+**/.odsidian
 
 # Logs
 logs/

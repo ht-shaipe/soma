@@ -1,3 +1,4 @@
+// 流媒体 API：任务视频播放/下载地址获取，静态资源 URL 拼装
 import api, { extractData } from './index'
 
 export function getStreamUrl(taskId: string, index?: number) {

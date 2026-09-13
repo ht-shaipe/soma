@@ -22,6 +22,7 @@ use tube_web::{
 /// - "materials" → 素材文件管理
 /// - "stream" → 视频流播放/下载
 /// - "config" → 配置读写
+/// - "features" → 功能点列表/裸调用/历史记录
 ///
 /// 参数：
 /// - `req`: HTTP 请求
@@ -49,6 +50,9 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
         "voices" => crate::handler::voice::distribute(&param).await,
         "upload" => crate::handler::upload::distribute(&param).await,
         "portraits" => crate::handler::material::distribute_portraits(&param).await,
+        "features" => crate::handler::features::distribute(&param).await,
+        "system" => crate::handler::system::distribute(&param).await,
+        "image_story" => crate::handler::image_story::distribute(&param).await,
         _ => Err(error!("请求方法{}.{}系统未提供。", param.module, param.method)),
     };
 

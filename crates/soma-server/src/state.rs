@@ -3,7 +3,7 @@
 /// 通过 TaskStore trait 抽象任务存储，支持内存和 Redis 后端。
 /// 提供任务的创建、查询、更新、删除等 CRUD 操作。
 
-use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams, AiVideoSegmentLog, DigitalHumanTaskInfo, DigitalHumanParams};
+use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams, AiVideoSegmentLog, DigitalHumanTaskInfo, DigitalHumanParams, ImageStoryTaskInfo, ImageStoryParams};
 use crate::store::{TaskStore, InMemoryTaskStore, SqliteTaskStore};
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -415,5 +415,57 @@ pub fn update_dh_task(task_id: &str, state: Option<i32>, progress: Option<u32>) 
     let progress_val = progress;
     lock_store().update_dh(task_id, Box::new(move |task| {
         task.update(state_val, progress_val);
+    }));
+}
+
+// ===== 图片故事任务管理函数 =====
+
+/// 创建图片故事任务条目（状态 Processing）
+pub fn create_image_story_task_entry(task_id: &str, params: ImageStoryParams) {
+    let task = ImageStoryTaskInfo::new(task_id.to_string(), params);
+    lock_store().create_image_story(task);
+}
+
+/// 获取图片故事任务
+pub fn get_image_story_task(task_id: &str) -> Option<ImageStoryTaskInfo> {
+    lock_store().get_image_story(task_id)
+}
+
+/// 获取全部图片故事任务（分页）
+pub fn get_all_image_story_tasks(page: usize, page_size: usize) -> (Vec<ImageStoryTaskInfo>, usize) {
+    let mut tasks = lock_store().get_all_image_story();
+    tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    let total = tasks.len();
+    let start = (page.saturating_sub(1)) * page_size;
+    let end = (start + page_size).min(total);
+    if start < total {
+        (tasks[start..end].to_vec(), total)
+    } else {
+        (vec![], total)
+    }
+}
+
+/// 删除图片故事任务
+pub fn delete_image_story_task(task_id: &str) -> bool {
+    lock_store().delete_image_story(task_id)
+}
+
+/// 设置图片故事任务状态
+pub fn set_image_story_task_state(task_id: &str, state: TaskStatus) {
+    let state_val = state.as_i32();
+    lock_store().update_image_story(task_id, Box::new(move |task| {
+        task.state = state_val;
+        task.updated_at = chrono::Utc::now();
+    }));
+}
+
+/// 更新图片故事任务数据
+pub fn update_image_story_task_data(task_id: &str, state: Option<i32>, progress: Option<u32>, video_path: Option<String>, error_message: Option<String>) {
+    lock_store().update_image_story(task_id, Box::new(move |task| {
+        if let Some(s) = state { task.state = s; }
+        if let Some(p) = progress { task.progress = p; }
+        if let Some(ref v) = video_path { task.video_path = Some(v.clone()); }
+        if let Some(ref e) = error_message { task.error_message = Some(e.clone()); }
+        task.updated_at = chrono::Utc::now();
     }));
 }

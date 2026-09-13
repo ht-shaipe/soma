@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 soma-core = { workspace = true }
+soma-feature = { workspace = true }
 soma-tts = { workspace = true }
 soma-stock = { workspace = true }
 soma-video = { workspace = true }
@@ -26,6 +27,7 @@ actix-multipart = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+schemars = { workspace = true }
 toml = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 uuid = { workspace = true }

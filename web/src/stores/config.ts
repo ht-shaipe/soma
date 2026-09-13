@@ -1,3 +1,4 @@
+// 全局配置 Pinia store：配置加载/更新/保存，UI 语言偏好持久化
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AppConfig } from '@/types'

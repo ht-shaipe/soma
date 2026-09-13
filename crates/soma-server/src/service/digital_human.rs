@@ -8,6 +8,11 @@
 
 use soma_core::error::SomaError;
 use soma_core::models::{TaskStatus, VideoParams, DigitalHumanParams};
+use soma_feature::context::FeatureContext;
+use soma_feature::descriptor::{FeatureKind, FeatureMeta};
+use soma_feature::envelope::ArtifactKind;
+use soma_feature::feature::TypedFeature;
+use soma_feature::progress::ProgressReporter;
 use crate::state;
 use crate::Config;
 
@@ -85,87 +90,34 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
     let task_dir = soma_core::utils::task_dir(task_id);
     let provider = conf.app.digital_human.get_provider();
 
-    let portrait_path = if provider == "heygem" {
-        let merchant_id = params.get_merchant_id().ok_or_else(|| {
-            let msg = "HeyGem 数字人需要商户标识（merchant_id）".to_string();
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(msg.clone()),
-                ..Default::default()
-            });
-            SomaError::Config(msg)
-        })?;
-        let hg_conf = &conf.app.digital_human.heygem;
-        let asset_store = crate::service::heygem_merchant::MerchantAssetStore::new(
-            hg_conf.get_assets_dir(),
-        );
-        if !asset_store.check_ready(merchant_id)? {
-            let msg = format!("商户 {} 模型未就绪，请先完成模型训练", merchant_id);
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(msg.clone()),
-                ..Default::default()
-            });
-            return Err(SomaError::VideoGen(msg));
-        }
-        let asset = asset_store.get_asset(merchant_id)?;
+    let portrait_path = resolve_portrait_source(params, &conf).map_err(|e| {
         state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-            merchant_id: Some(merchant_id.to_string()),
+            state: Some(TaskStatus::Failed.as_i32()),
+            error_message: Some(format!("{:?}", e)),
             ..Default::default()
         });
-        std::path::PathBuf::from(asset.silent_video_path)
+        e
+    })?;
+    // 记录模型来源（供任务详情展示）
+    if provider == "heygem" {
+        if let Some(mid) = params.get_merchant_id() {
+            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
+                merchant_id: Some(mid.to_string()),
+                ..Default::default()
+            });
+        }
     } else if provider == "live2d" {
-        let l2d_conf = &conf.app.digital_human.live2d;
-        let model_id = params
+        let lid = params
             .get_live2d_model_id()
             .map(|s| s.to_string())
-            .or_else(|| {
-                let dm = l2d_conf.get_default_model();
-                if dm.is_empty() { None } else { Some(dm.to_string()) }
-            })
-            .ok_or_else(|| {
-                let msg = "未指定 Live2D 模型，请配置 default_model 或在任务参数中指定 live2d_model_id".to_string();
-                state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                    state: Some(TaskStatus::Failed.as_i32()),
-                    error_message: Some(msg.clone()),
-                    ..Default::default()
-                });
-                SomaError::Config(msg)
-            })?;
-        let model_store = crate::service::live2d_model::Live2DModelStore::new(
-            l2d_conf.get_models_dir(),
-        );
-        if !model_store.check_model_ready(&model_id)? {
-            let msg = format!("Live2D 模型 {} 不存在或未就绪", model_id);
+            .unwrap_or_else(|| conf.app.digital_human.live2d.get_default_model().to_string());
+        if !lid.is_empty() {
             state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(msg.clone()),
+                live2d_model_id: Some(lid),
                 ..Default::default()
             });
-            return Err(SomaError::VideoGen(msg));
         }
-        let model_path = model_store.get_model_path(&model_id)?;
-        state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-            live2d_model_id: Some(model_id.clone()),
-            ..Default::default()
-        });
-        log::info!("Live2D 模型就绪: task_id={}, model_id={}", task_id, model_id);
-        model_path
-    } else {
-        let p = soma_core::utils::storage_dir("portraits", false)
-            .join(&params.portrait_image);
-        if !p.exists() {
-            let msg = "人像照片不存在，请重新上传".to_string();
-            log::error!("数字人任务失败: task_id={}, {}", task_id, msg);
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(msg.clone()),
-                ..Default::default()
-            });
-            return Err(SomaError::Stock(msg));
-        }
-        p
-    };
+    }
 
     if provider == "echomimic_v3" || provider == "heygem" || provider == "live2d" {
         match crate::service::segment_dh_video::run_segment_flow(
@@ -636,5 +588,332 @@ mod tests {
             "tts_provider": "azure"
         }"#);
         assert_eq!(params.get_tts_provider(), "azure");
+    }
+}
+
+
+// ============ digitalhuman.video 功能点（纳入统一功能点注册表） ============
+
+/// digitalhuman.video 入参（字段与 [`DigitalHumanParams`] 一致）
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct DhVideoInput {
+    /// 数字人口播参数（人像照片、口播文案、语音与字幕配置等）
+    #[serde(flatten)]
+    pub params: DigitalHumanParams,
+}
+
+/// digitalhuman.video 出参
+#[derive(Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct DhVideoOutput {
+    /// 数字人任务 ID（可在任务中心查看详情，进度经 dh_tasks 接口轮询）
+    pub task_id: String,
+    /// 最终合成视频路径
+    pub final_video_path: Option<String>,
+    /// 配音音频路径
+    pub audio_file: Option<String>,
+    /// 字幕文件路径
+    pub subtitle_path: Option<String>,
+    /// 音频时长（秒）
+    pub audio_duration: Option<f64>,
+}
+
+/// 数字人口播视频生成：人像 + 文案 → 口播视频
+///
+/// 复用既有数字人任务体系（创建任务条目 → 同步执行三阶段流水线），
+/// 运行 ID 即数字人任务 ID，任务历史与功能点历史双轨可查。
+pub struct DigitalHumanVideoFeature;
+
+impl TypedFeature for DigitalHumanVideoFeature {
+    type Input = DhVideoInput;
+    type Output = DhVideoOutput;
+
+    fn meta(&self) -> FeatureMeta {
+        FeatureMeta {
+            id: "digitalhuman.video".into(),
+            name: "数字人口播".into(),
+            description: "根据人像照片与文案生成口型同步的口播视频（Live2D/HeyGem 等引擎）".into(),
+            kind: FeatureKind::DigitalHuman,
+        }
+    }
+
+    fn run(
+        &self,
+        ctx: &mut FeatureContext,
+        input: DhVideoInput,
+        _progress: &dyn ProgressReporter,
+    ) -> Result<DhVideoOutput, SomaError> {
+        let task_id = ctx.run_id().to_string();
+        let params = input.params;
+
+        // 创建数字人任务条目（Processing），进度经既有 dh_tasks 接口上报
+        state::create_dh_task_entry(&task_id, params.clone());
+
+        // 同步执行完整口播流水线（音频 → 口播视频 → 合成）
+        match run_task(&task_id, &params) {
+            Ok(()) => {
+                let task = state::get_dh_task(&task_id).ok_or_else(|| {
+                    SomaError::Feature(format!("数字人任务 {} 状态缺失", task_id))
+                })?;
+                if let Some(ref p) = task.final_video_path {
+                    ctx.add_artifact("digital_human.mp4", p, ArtifactKind::Video);
+                }
+                if let Some(ref a) = task.audio_file {
+                    ctx.add_artifact("audio.mp3", a, ArtifactKind::Audio);
+                }
+                Ok(DhVideoOutput {
+                    task_id,
+                    final_video_path: task.final_video_path.clone(),
+                    audio_file: task.audio_file.clone(),
+                    subtitle_path: task.subtitle_path.clone(),
+                    audio_duration: task.audio_duration,
+                })
+            }
+            Err(e) => {
+                state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(format!("{:?}", e)),
+                    ..Default::default()
+                });
+                Err(e)
+            }
+        }
+    }
+}
+
+
+// ============ 人像来源解析（供 run_task 与独立功能点复用） ============
+
+/// 解析数字人的人像来源（按 provider 分派，纯解析不触任务状态）
+///
+/// - heygem：商户静默视频资产
+/// - live2d：已就绪的 Live2D 模型目录
+/// - 其他（sadtalker/echomimic 等）：storage/portraits/ 下的人像照片
+pub fn resolve_portrait_source(
+    params: &DigitalHumanParams,
+    conf: &Config,
+) -> Result<std::path::PathBuf, SomaError> {
+    let provider = conf.app.digital_human.get_provider();
+    match provider {
+        "heygem" => {
+            let merchant_id = params
+                .get_merchant_id()
+                .ok_or_else(|| SomaError::Config("HeyGem 数字人需要商户标识（merchant_id）".into()))?;
+            let hg_conf = &conf.app.digital_human.heygem;
+            let asset_store = crate::service::heygem_merchant::MerchantAssetStore::new(
+                hg_conf.get_assets_dir(),
+            );
+            if !asset_store.check_ready(merchant_id)? {
+                return Err(SomaError::VideoGen(format!(
+                    "商户 {merchant_id} 模型未就绪，请先完成模型训练"
+                )));
+            }
+            let asset = asset_store.get_asset(merchant_id)?;
+            Ok(std::path::PathBuf::from(asset.silent_video_path))
+        }
+        "live2d" => {
+            let l2d_conf = &conf.app.digital_human.live2d;
+            let model_id = params
+                .get_live2d_model_id()
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    let dm = l2d_conf.get_default_model();
+                    if dm.is_empty() { None } else { Some(dm.to_string()) }
+                })
+                .ok_or_else(|| {
+                    SomaError::Config(
+                        "未指定 Live2D 模型，请配置 default_model 或在任务参数中指定 live2d_model_id".into(),
+                    )
+                })?;
+            let model_store = crate::service::live2d_model::Live2DModelStore::new(
+                l2d_conf.get_models_dir(),
+            );
+            if !model_store.check_model_ready(&model_id)? {
+                return Err(SomaError::VideoGen(format!(
+                    "Live2D 模型 {model_id} 不存在或未就绪"
+                )));
+            }
+            model_store.get_model_path(&model_id)
+        }
+        _ => {
+            let p = soma_core::utils::storage_dir("portraits", false).join(&params.portrait_image);
+            if !p.exists() {
+                return Err(SomaError::Stock("人像照片不存在，请重新上传".into()));
+            }
+            Ok(p)
+        }
+    }
+}
+
+// ============ digitalhuman.portrait / digitalhuman.compose 原子功能点 ============
+
+/// digitalhuman.portrait 入参
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct DhPortraitInput {
+    /// 数字人口播参数（portrait_image / merchant_id / live2d_model_id 等）
+    #[serde(flatten)]
+    pub params: DigitalHumanParams,
+    /// 已合成的配音音频文件路径（可来自 tts.synthesize 产物）
+    pub audio_file: String,
+    /// 输出口播视频路径；缺省写入产物目录 portrait_video.mp4
+    #[serde(default)]
+    pub output_path: Option<String>,
+}
+
+/// digitalhuman.portrait 出参
+#[derive(Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct DhPortraitOutput {
+    /// 裸口播视频路径（未合成字幕/BGM）
+    pub portrait_video: String,
+    /// 引擎提供者（heygem/live2d/sadtalker 等）
+    pub provider: String,
+    /// 关联的数字人任务 ID（进度可经 dh_tasks 轮询）
+    pub task_id: String,
+}
+
+/// 口播视频生成：人像（照片/静默视频/Live2D 模型）+ 配音 → 口型同步的裸口播视频
+pub struct DigitalHumanPortraitFeature;
+
+impl TypedFeature for DigitalHumanPortraitFeature {
+    type Input = DhPortraitInput;
+    type Output = DhPortraitOutput;
+
+    fn meta(&self) -> FeatureMeta {
+        FeatureMeta {
+            id: "digitalhuman.portrait".into(),
+            name: "口播视频生成".into(),
+            description: "人像 + 配音音频 → 口型同步的裸口播视频（不含字幕/BGM 合成）".into(),
+            kind: FeatureKind::DigitalHuman,
+        }
+    }
+
+    fn run(
+        &self,
+        ctx: &mut FeatureContext,
+        input: DhPortraitInput,
+        _progress: &dyn ProgressReporter,
+    ) -> Result<DhPortraitOutput, SomaError> {
+        let task_id = ctx.run_id().to_string();
+        let conf = Config::get();
+        let provider = conf.app.digital_human.get_provider().to_string();
+
+        state::create_dh_task_entry(&task_id, input.params.clone());
+
+        let fail = |e: &SomaError| {
+            state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
+                state: Some(TaskStatus::Failed.as_i32()),
+                error_message: Some(format!("{:?}", e)),
+                ..Default::default()
+            });
+        };
+
+        let portrait_path = match resolve_portrait_source(&input.params, &conf) {
+            Ok(p) => p,
+            Err(e) => {
+                fail(&e);
+                return Err(e);
+            }
+        };
+        let save_path = match input.output_path {
+            Some(ref p) if !p.is_empty() => p.clone(),
+            _ => ctx
+                .artifact_path("portrait_video.mp4")
+                .to_string_lossy()
+                .to_string(),
+        };
+
+        match generate_portrait_video_stage(
+            &task_id,
+            &input.params,
+            &portrait_path,
+            &input.audio_file,
+            &save_path,
+            &conf,
+            None,
+        ) {
+            Ok(video) => {
+                ctx.add_artifact("portrait_video.mp4", &video, ArtifactKind::Video);
+                state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
+                    portrait_video_path: Some(video.clone()),
+                    audio_file: Some(input.audio_file.clone()),
+                    progress: Some(90),
+                    ..Default::default()
+                });
+                Ok(DhPortraitOutput {
+                    portrait_video: video,
+                    provider,
+                    task_id,
+                })
+            }
+            Err(e) => {
+                fail(&e);
+                Err(e)
+            }
+        }
+    }
+}
+
+/// digitalhuman.compose 入参
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct DhComposeInput {
+    /// 视频参数（字幕样式 / BGM / 音量等，与任务参数同构）
+    pub params: VideoParams,
+    /// 口播视频路径（可来自 digitalhuman.portrait 产物）
+    pub portrait_video: String,
+    /// 配音音频文件路径
+    pub audio_file: String,
+    /// 字幕文件路径；空表示不加字幕
+    #[serde(default)]
+    pub subtitle_path: String,
+    /// 输出文件路径；缺省写入产物目录 final.mp4
+    #[serde(default)]
+    pub output_path: Option<String>,
+}
+
+/// digitalhuman.compose 出参
+#[derive(Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct DhComposeOutput {
+    /// 最终成品视频路径
+    pub final_video: String,
+}
+
+/// 口播视频合成：口播视频 + 配音 + 字幕 + BGM → 成品视频
+pub struct DigitalHumanComposeFeature;
+
+impl TypedFeature for DigitalHumanComposeFeature {
+    type Input = DhComposeInput;
+    type Output = DhComposeOutput;
+
+    fn meta(&self) -> FeatureMeta {
+        FeatureMeta {
+            id: "digitalhuman.compose".into(),
+            name: "口播视频合成".into(),
+            description: "为裸口播视频合成字幕与 BGM，输出成品视频".into(),
+            kind: FeatureKind::DigitalHuman,
+        }
+    }
+
+    fn run(
+        &self,
+        ctx: &mut FeatureContext,
+        input: DhComposeInput,
+        _progress: &dyn ProgressReporter,
+    ) -> Result<DhComposeOutput, SomaError> {
+        let task_id = ctx.run_id().to_string();
+        let conf = Config::get();
+        let final_path = match input.output_path {
+            Some(ref p) if !p.is_empty() => p.clone(),
+            _ => ctx.artifact_path("final.mp4").to_string_lossy().to_string(),
+        };
+        compose_final_video_stage(
+            &task_id,
+            &input.params,
+            &input.portrait_video,
+            &input.audio_file,
+            &input.subtitle_path,
+            &final_path,
+            &conf,
+        )?;
+        ctx.add_artifact("final.mp4", &final_path, ArtifactKind::Video);
+        Ok(DhComposeOutput { final_video: final_path })
     }
 }

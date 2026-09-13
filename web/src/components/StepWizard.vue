@@ -961,11 +961,11 @@ async function onGenerate() {
 .step-header h3 {
   margin: 0 0 6px;
   font-size: 20px;
-  color: #303133;
+  color: var(--soma-text);
 }
 
 .step-desc {
-  color: #909399;
+  color: var(--soma-text-dim);
   font-size: 14px;
   margin: 0;
 }
@@ -977,7 +977,7 @@ async function onGenerate() {
 .intent-parsing-hint {
   text-align: center;
   margin-top: 12px;
-  color: #409eff;
+  color: var(--soma-accent);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -988,7 +988,7 @@ async function onGenerate() {
 .intent-parsed-hint {
   text-align: center;
   margin-top: 12px;
-  color: #67c23a;
+  color: var(--soma-success);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -1003,7 +1003,7 @@ async function onGenerate() {
 
 .storyboard-item {
   padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--soma-line);
 }
 
 .storyboard-item:last-child {
@@ -1018,35 +1018,35 @@ async function onGenerate() {
 }
 
 .scene-duration {
-  color: #909399;
+  color: var(--soma-text-dim);
   font-size: 12px;
 }
 
 .scene-camera {
-  color: #409eff;
+  color: var(--soma-accent);
   font-size: 12px;
 }
 
 .scene-transition {
-  color: #67c23a;
+  color: var(--soma-success);
   font-size: 12px;
 }
 
 .scene-narration {
   font-size: 13px;
-  color: #303133;
+  color: var(--soma-text);
   margin-bottom: 2px;
 }
 
 .scene-visual-desc {
   font-size: 12px;
-  color: #606266;
+  color: var(--soma-text-dim);
   margin-bottom: 2px;
 }
 
 .scene-visual-prompt {
   font-size: 11px;
-  color: #909399;
+  color: var(--soma-text-dim);
   font-style: italic;
   word-break: break-all;
 }
@@ -1080,12 +1080,12 @@ async function onGenerate() {
 }
 
 .platform-card:hover {
-  border-color: #409eff;
+  border-color: var(--soma-accent);
 }
 
 .platform-selected {
-  border-color: #67c23a;
-  background: #f0f9eb;
+  border-color: var(--soma-success);
+  background: rgba(52, 211, 153, 0.12);
 }
 
 .platform-inner {
@@ -1102,7 +1102,7 @@ async function onGenerate() {
 }
 
 .platform-hint {
-  color: #909399;
+  color: var(--soma-text-dim);
   font-size: 12px;
   margin: 4px 0 0;
 }
@@ -1124,7 +1124,7 @@ async function onGenerate() {
   align-items: center;
   margin-top: 24px;
   padding: 16px 8px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--soma-line);
 }
 
 .spacer {

@@ -1,3 +1,4 @@
+// 系统配置 API：全局配置读取与保存
 import api, { extractData } from './index'
 import type { AppConfig } from '@/types'
 

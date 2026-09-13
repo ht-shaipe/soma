@@ -1,3 +1,4 @@
+// 视频任务 API：任务创建/草稿/启动/查询/删除/停止，素材预取与音频、旁白生成
 import api, { extractData } from './index'
 import type { VideoParams, TaskInfo, StoryboardScene } from '@/types'
 

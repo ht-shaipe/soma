@@ -1,3 +1,4 @@
+// 任务 Pinia store：任务列表轮询、当前任务进度跟踪、草稿恢复
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { TaskInfo, VideoParams, StoryboardScene } from '@/types'

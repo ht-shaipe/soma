@@ -14,21 +14,29 @@ use crate::error::SomaError;
 pub struct AppConfig {
     /// 应用基本配置（视频源、LLM、字幕等）
     pub app: AppSection,
-    /// Whisper 语音识别模型配置
+    /// Whisper 语音识别模型配置（缺失时使用默认值）
+    #[serde(default)]
     pub whisper: WhisperSection,
-    /// 网络代理配置
+    /// 网络代理配置（缺失时使用默认值）
+    #[serde(default)]
     pub proxy: ProxySection,
-    /// Azure 语音服务配置
+    /// Azure 语音服务配置（缺失时使用默认值）
+    #[serde(default)]
     pub azure: AzureSection,
-    /// SiliconFlow TTS 配置
+    /// SiliconFlow TTS 配置（缺失时使用默认值）
+    #[serde(default)]
     pub siliconflow: SiliconflowSection,
-    /// ElevenLabs TTS 配置
+    /// ElevenLabs TTS 配置（缺失时使用默认值）
+    #[serde(default)]
     pub elevenlabs: ElevenlabsSection,
-    /// 火山引擎 TTS 配置
+    /// 火山引擎 TTS 配置（缺失时使用默认值）
+    #[serde(default)]
     pub volcengine: VolcengineSection,
-    /// 科大讯飞 TTS 配置
+    /// 科大讯飞 TTS 配置（缺失时使用默认值）
+    #[serde(default)]
     pub xfyun: XfyunSection,
-    /// UI 界面与发布相关配置
+    /// UI 界面与发布相关配置（缺失时使用默认值）
+    #[serde(default)]
     pub ui: UiSection,
     /// 数字人口播视频生成配置
     #[serde(default)]
@@ -413,38 +421,49 @@ pub struct Live2DConfig {
 }
 
 impl Live2DConfig {
+    /// 获取 Live2D 模型存放目录（缺省 `storage/live2d_models`）
     pub fn get_models_dir(&self) -> &str {
         self.models_dir.as_deref().unwrap_or("./storage/live2d_models")
     }
+    /// 获取 Live2D 渲染所用 Python 解释器路径
     pub fn get_python_path(&self) -> &str {
         self.python_path.as_deref().unwrap_or("python3")
     }
+    /// 获取 Live2D 渲染脚本路径
     pub fn get_script_path(&self) -> &str {
         self.script_path.as_deref().unwrap_or("resource/live2d_runner.py")
     }
+    /// 获取 Live2D 渲染帧率（FPS）
     pub fn get_fps(&self) -> u32 {
         self.fps.unwrap_or(30).clamp(24, 60)
     }
+    /// 获取 Live2D 渲染画面宽度（像素）
     pub fn get_width(&self) -> u32 {
         self.width.unwrap_or(1080).clamp(256, 3840)
     }
+    /// 获取 Live2D 渲染画面高度（像素）
     pub fn get_height(&self) -> u32 {
         self.height.unwrap_or(1920).clamp(256, 3840)
     }
+    /// 获取默认 Live2D 模型标识
     pub fn get_default_model(&self) -> &str {
         self.default_model.as_deref().unwrap_or("")
     }
+    /// 获取 Live2D 渲染超时（秒）
     pub fn get_timeout(&self) -> u64 {
         self.timeout.unwrap_or(600)
     }
+    /// 获取 Live2D 渲染失败重试次数
     pub fn get_max_retries(&self) -> u32 {
         self.max_retries.unwrap_or(3)
     }
+    /// 获取 Live2D 渲染线程数
     pub fn get_render_threads(&self) -> u32 {
         let requested = self.render_threads.unwrap_or(1);
         let max = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
         requested.clamp(1, max)
     }
+    /// 获取是否启用渲染前环境预检
     pub fn get_preflight_check(&self) -> bool {
         self.preflight_check.unwrap_or(true)
     }
@@ -483,39 +502,51 @@ pub struct HeyGemConfig {
 }
 
 impl HeyGemConfig {
+    /// 获取 HeyGem TTS 服务地址
     pub fn get_tts_base_url(&self) -> &str {
         self.tts_base_url.as_deref().unwrap_or("http://127.0.0.1:18180")
     }
+    /// 获取 HeyGem 视频合成服务地址
     pub fn get_video_base_url(&self) -> &str {
         self.video_base_url.as_deref().unwrap_or("http://127.0.0.1:8383")
     }
+    /// 获取 Live2D 渲染超时（秒）
     pub fn get_timeout(&self) -> u64 {
         self.timeout.unwrap_or(600)
     }
+    /// 获取 HeyGem 任务轮询间隔（秒）
     pub fn get_poll_interval(&self) -> u64 {
         self.poll_interval.unwrap_or(5)
     }
+    /// 获取 Live2D 渲染失败重试次数
     pub fn get_max_retries(&self) -> u32 {
         self.max_retries.unwrap_or(3)
     }
+    /// 获取 HeyGem 最大并发任务数
     pub fn get_max_concurrent(&self) -> u32 {
         self.max_concurrent.unwrap_or(2)
     }
+    /// 获取 HeyGem TTS 采样 top_p 参数
     pub fn get_top_p(&self) -> f64 {
         self.top_p.unwrap_or(0.7)
     }
+    /// 获取 HeyGem TTS 采样温度
     pub fn get_temperature(&self) -> f64 {
         self.temperature.unwrap_or(0.7)
     }
+    /// 获取 HeyGem TTS 重复惩罚系数
     pub fn get_repetition_penalty(&self) -> f64 {
         self.repetition_penalty.unwrap_or(1.5)
     }
+    /// 获取 HeyGem 商户资产目录（静默视频/参考音频）
     pub fn get_assets_dir(&self) -> &str {
         self.assets_dir.as_deref().unwrap_or("./storage/heygem_assets")
     }
+    /// 获取合成产物是否自动覆盖同名文件
     pub fn get_auto_overwrite(&self) -> bool {
         self.auto_overwrite.unwrap_or(false)
     }
+    /// 获取是否启用渲染前环境预检
     pub fn get_preflight_check(&self) -> bool {
         self.preflight_check.unwrap_or(true)
     }

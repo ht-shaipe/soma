@@ -1,85 +1,139 @@
 <template>
   <div class="tasks-view">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px">
-      <h2>{{ $t('task.title') }}</h2>
-      <el-button :icon="Refresh" @click="onRefresh">
+    <div class="tv-toolbar">
+      <el-radio-group v-model="taskType" size="large" @change="onTypeChange">
+        <el-radio-button value="video">{{ $t('task.typeVideo') }}</el-radio-button>
+        <el-radio-button value="digital">{{ $t('task.typeDigital') }}</el-radio-button>
+        <el-radio-button value="image">{{ $t('task.typeImage') }}</el-radio-button>
+      </el-radio-group>
+      <el-input
+        v-model="keyword"
+        :placeholder="$t('task.search')"
+        :prefix-icon="Search"
+        clearable
+        size="large"
+        class="tv-search"
+      />
+      <el-button :icon="Refresh" size="large" @click="onRefresh">
         {{ $t('task.refresh') }}
       </el-button>
     </div>
 
-    <el-table :data="taskStore.tasks" stripe style="width: 100%" :empty-text="$t('task.noTasks')">
-      <el-table-column prop="taskId" :label="$t('task.taskId')" width="220">
-        <template #default="{ row }">
-          <el-text size="small" truncated>{{ row.taskId }}</el-text>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('task.subject')" min-width="140">
-        <template #default="{ row }">
-          <el-text truncated>{{ row.params?.video_subject || '—' }}</el-text>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('task.script')" min-width="120">
-        <template #default="{ row }">
-          <el-text truncated>{{ row.script ? row.script.substring(0, 50) + '...' : '—' }}</el-text>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('task.aspect')" width="80" align="center">
-        <template #default="{ row }">
-          {{ row.params?.video_aspect || '—' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="state" :label="$t('task.status')" width="140">
-        <template #default="{ row }">
+    <el-empty v-if="taskType === 'video' && filteredTasks.length === 0" :description="$t('task.noTasks')" />
+
+    <div v-else-if="taskType === 'video'" class="tv-grid">
+      <div v-for="row in filteredTasks" :key="row.taskId" class="tv-card">
+        <div class="tv-card-top">
+          <div class="tv-card-subject">{{ row.params?.video_subject || $t('task.untitled') }}</div>
           <TaskStatusTag :state="row.state" :progress="row.progress" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="progress" :label="$t('task.progress')" width="100">
-        <template #default="{ row }">
-          <el-progress :percentage="row.progress" :status="getProgressStatus(row.state)" :stroke-width="10" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="createdAt" :label="$t('task.createdAt')" width="170">
-        <template #default="{ row }">
-          {{ formatDate(row.createdAt) }}
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('task.video')" width="70" align="center">
-        <template #default="{ row }">
+        </div>
+
+        <div class="tv-card-id">{{ row.taskId.slice(0, 8) }} · {{ formatDate(row.createdAt) }}</div>
+
+        <p class="tv-card-script">
+          {{ row.script ? row.script.substring(0, 76) + (row.script.length > 76 ? '…' : '') : '—' }}
+        </p>
+
+        <div class="tv-card-progress">
+          <el-progress
+            :percentage="row.progress"
+            :status="getProgressStatus(row.state)"
+            :stroke-width="7"
+            :show-text="false"
+          />
+          <div class="tv-card-progress-meta">
+            <span class="tv-aspect">{{ row.params?.video_aspect || '—' }}</span>
+            <span>{{ row.progress }}%</span>
+          </div>
+        </div>
+
+        <div class="tv-card-actions">
           <el-button
             v-if="row.combinedVideos && row.combinedVideos.length > 0"
             type="primary"
             size="small"
-            circle
+            round
             @click="onPlayVideo(row)"
           >
             <el-icon><VideoPlay /></el-icon>
+            {{ $t('task.video') }}
           </el-button>
-          <span v-else>—</span>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('task.actions')" width="300" fixed="right">
-        <template #default="{ row }">
-          <el-button v-if="isTaskStuck(row)" type="danger" size="small" text @click="onStopTask(row)">
-            <el-icon><VideoPause /></el-icon>
-            {{ $t('task.stop') }}
-          </el-button>
-          <el-button v-if="isTaskEditable(row)" type="warning" size="small" text @click="onContinueEdit(row)">
-            <el-icon><Edit /></el-icon>
-            {{ $t('task.continueEdit') }}
-          </el-button>
-          <el-button type="primary" size="small" text @click="onViewDetail(row)">
+          <el-button size="small" round @click="onViewDetail(row)">
             <el-icon><View /></el-icon>
             {{ $t('task.detail') }}
           </el-button>
-          <el-button type="danger" size="small" text @click="onDeleteTask(row)">
-            <el-icon><Delete /></el-icon>
-            {{ $t('task.delete') }}
+          <el-button v-if="isTaskEditable(row)" size="small" round @click="onContinueEdit(row)">
+            <el-icon><Edit /></el-icon>
+            {{ $t('task.continueEdit') }}
           </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+          <el-button v-if="isTaskStuck(row)" size="small" round type="warning" @click="onStopTask(row)">
+            <el-icon><VideoPause /></el-icon>
+            {{ $t('task.stop') }}
+          </el-button>
+          <div class="tv-spacer" />
+          <el-button size="small" circle type="danger" plain @click="onDeleteTask(row)">
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </div>
+      </div>
+    </div>
 
-    <el-drawer v-model="detailVisible" :title="$t('task.detailTitle')" size="500px">
+    <!-- 数字人任务 -->
+    <template v-if="taskType === 'digital'">
+      <el-empty v-if="digitalTasks.length === 0" :description="$t('task.noTasks')" />
+      <div v-else class="tv-grid">
+        <div v-for="row in digitalTasks" :key="row.taskId" class="tv-card">
+          <div class="tv-card-top">
+            <div class="tv-card-subject">{{ row.params?.narration_text || $t('task.untitled') }}</div>
+            <TaskStatusTag :state="row.state" :progress="row.progress" />
+          </div>
+          <div class="tv-card-id">{{ row.taskId.slice(0, 8) }} · {{ formatDate(row.createdAt) }}</div>
+          <div class="tv-card-progress">
+            <el-progress :percentage="row.progress" :status="getProgressStatus(row.state)" :stroke-width="7" :show-text="false" />
+          </div>
+          <div class="tv-card-actions">
+            <el-button v-if="row.finalVideoPath" type="primary" size="small" round @click="playMedia(row.finalVideoPath)">
+              <el-icon><VideoPlay /></el-icon>
+              {{ $t('task.video') }}
+            </el-button>
+            <div class="tv-spacer" />
+            <el-button size="small" circle type="danger" plain @click="deleteGeneric('/dh_tasks/delete', row.taskId, loadCurrent)">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- 图片故事任务 -->
+    <template v-if="taskType === 'image'">
+      <el-empty v-if="imageTasks.length === 0" :description="$t('task.noTasks')" />
+      <div v-else class="tv-grid">
+        <div v-for="row in imageTasks" :key="row.taskId" class="tv-card">
+          <div class="tv-card-top">
+            <div class="tv-card-subject">{{ row.params?.story_subject || $t('task.untitled') }}</div>
+            <TaskStatusTag :state="row.state" :progress="row.progress" />
+          </div>
+          <div class="tv-card-id">{{ row.taskId.slice(0, 8) }} · {{ formatDate(row.createdAt) }}</div>
+          <div class="tv-card-progress">
+            <el-progress :percentage="row.progress" :status="getProgressStatus(row.state)" :stroke-width="7" :show-text="false" />
+          </div>
+          <div v-if="row.errorMessage" class="tv-card-script">{{ row.errorMessage }}</div>
+          <div class="tv-card-actions">
+            <el-button v-if="row.videoPath" type="primary" size="small" round @click="playMedia(row.videoPath)">
+              <el-icon><VideoPlay /></el-icon>
+              {{ $t('task.video') }}
+            </el-button>
+            <div class="tv-spacer" />
+            <el-button size="small" circle type="danger" plain @click="deleteGeneric('/image_story/delete', row.taskId, loadCurrent)">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <el-drawer v-model="detailVisible" :title="$t('task.detailTitle')" size="520px">
       <template v-if="detailTask">
         <el-descriptions :column="1" border>
           <el-descriptions-item :label="$t('task.taskId')">{{ detailTask.taskId }}</el-descriptions-item>
@@ -106,7 +160,7 @@
             :key="v"
             controls
             :src="getStaticUrl(v)"
-            style="width: 100%; margin-bottom: 8px;"
+            style="width: 100%; margin-bottom: 8px; border-radius: 10px; background: #000;"
           />
         </div>
         <div v-if="detailTask.errorMessage" style="margin-top: 16px;">
@@ -118,14 +172,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, VideoPlay, VideoPause, Delete, View, Edit } from '@element-plus/icons-vue'
+import { Refresh, VideoPlay, VideoPause, Delete, View, Edit, Search } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
 import { TaskStateCode, isTaskDraft, isTaskFailed, isTaskProcessing } from '@/types'
 import type { TaskInfo } from '@/types'
 import { getStaticUrl } from '@/api/stream'
 import { stopTask } from '@/api/video'
+import api, { extractData } from '@/api'
 import TaskStatusTag from '@/components/TaskStatusTag.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -135,13 +190,76 @@ const router = useRouter()
 const { t } = useI18n()
 const detailVisible = ref(false)
 const detailTask = ref<TaskInfo | null>(null)
+const keyword = ref('')
+
+// 任务类型页签：video / digital / image
+const taskType = ref<'video' | 'digital' | 'image'>('video')
+const digitalTasks = ref<any[]>([])
+const imageTasks = ref<any[]>([])
 
 onMounted(() => {
   taskStore.fetchTasks()
 })
 
+function loadCurrent() {
+  if (taskType.value === 'video') taskStore.fetchTasks()
+  else if (taskType.value === 'digital') loadDigital()
+  else loadImage()
+}
+
+async function loadDigital() {
+  try {
+    const res = await api.post('/dh_tasks/list', { page: 1, pageSize: 100 }).then(extractData<any>)
+    digitalTasks.value = res?.list || res || []
+  } catch (e) {
+    ElMessage.error((e as Error).message || '加载失败')
+  }
+}
+
+async function loadImage() {
+  try {
+    const res = await api.post('/image_story/list', { page: 1, pageSize: 100 }).then(extractData<any>)
+    imageTasks.value = res?.list || res || []
+  } catch (e) {
+    ElMessage.error((e as Error).message || '加载失败')
+  }
+}
+
+function onTypeChange() {
+  loadCurrent()
+}
+
+async function deleteGeneric(path: string, taskId: string, reload: () => void) {
+  try {
+    await ElMessageBox.confirm(t('task.deleteConfirm'), t('common.warning'), {
+      confirmButtonText: t('common.ok'),
+      cancelButtonText: t('common.cancel'),
+      type: 'warning',
+    })
+    await api.post(path, { taskId })
+    ElMessage.success(t('common.success'))
+    reload()
+  } catch {
+    // cancelled
+  }
+}
+
+function playMedia(path: string) {
+  window.open(getStaticUrl(path), '_blank')
+}
+
+const filteredTasks = computed(() => {
+  const k = keyword.value.trim().toLowerCase()
+  if (!k) return taskStore.tasks
+  return taskStore.tasks.filter(
+    (t) =>
+      (t.params?.video_subject || '').toLowerCase().includes(k) ||
+      t.taskId.toLowerCase().includes(k)
+  )
+})
+
 function onRefresh() {
-  taskStore.fetchTasks()
+  loadCurrent()
 }
 
 function getProgressStatus(state: number) {
@@ -214,3 +332,103 @@ function onContinueEdit(row: TaskInfo) {
   router.push({ name: 'home', query: { resume: row.taskId } })
 }
 </script>
+
+<style scoped>
+.tasks-view {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tv-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  .tv-search {
+    max-width: 420px;
+  }
+}
+
+.tv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 16px;
+}
+
+.tv-card {
+  border: 1px solid var(--soma-line);
+  border-radius: var(--soma-radius);
+  background: var(--soma-glass);
+  backdrop-filter: blur(14px);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.tv-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(91, 140, 255, 0.4);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38);
+}
+
+.tv-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tv-card-subject {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tv-card-id {
+  font-size: 11px;
+  color: var(--soma-text-faint);
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+}
+
+.tv-card-script {
+  font-size: 12.5px;
+  color: var(--soma-text-dim);
+  line-height: 1.65;
+  min-height: 34px;
+  margin: 0;
+}
+
+.tv-card-progress {
+  margin: 4px 0 2px;
+}
+
+.tv-card-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--soma-text-faint);
+  margin-top: 4px;
+
+  .tv-aspect {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+.tv-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+
+  .tv-spacer {
+    flex: 1;
+  }
+}
+</style>

@@ -153,7 +153,7 @@ pub async fn save_video(video_url: &str, save_dir: &str) -> Result<String, SomaE
 /// 此函数是视频素材采集的入口，供上层剪辑流程调用。
 ///
 /// # 参数
-/// - `task_id`: 任务 ID，用于确定素材保存路径
+/// - `save_dir`: 素材保存目录（由调用方显式指定，不存在时自动创建）
 /// - `search_terms`: 搜索关键词列表，每个关键词独立搜索
 /// - `source`: 素材源名称（"pixabay"、"coverr" 或默认 pexels）
 /// - `video_aspect`: 视频宽高比要求
@@ -162,12 +162,11 @@ pub async fn save_video(video_url: &str, save_dir: &str) -> Result<String, SomaE
 /// - `pexels_keys`: Pexels API 密钥列表
 /// - `pixabay_keys`: Pixabay API 密钥列表
 /// - `coverr_keys`: Coverr API 密钥列表
-/// - `material_directory`: 素材保存目录，空字符串使用默认缓存目录，"task" 使用任务专属目录
 ///
 /// # 返回
 /// 下载成功的视频文件路径列表，按下载顺序排列
 pub async fn download_videos(
-    task_id: &str,
+    save_dir: &str,
     search_terms: &[String],
     source: &str,
     video_aspect: &VideoAspect,
@@ -176,15 +175,10 @@ pub async fn download_videos(
     pexels_keys: &[String],
     pixabay_keys: &[String],
     coverr_keys: &[String],
-    material_directory: &str,
 ) -> Result<Vec<String>, SomaError> {
-    let save_dir = if material_directory.is_empty() {
-        soma_core::utils::storage_dir("cache_videos", true).to_string_lossy().to_string()
-    } else if material_directory == "task" {
-        soma_core::utils::task_dir(task_id).to_string_lossy().to_string()
-    } else {
-        material_directory.to_string()
-    };
+    if !std::path::Path::new(save_dir).exists() {
+        std::fs::create_dir_all(save_dir).map_err(SomaError::Io)?;
+    }
 
     // 按关键词分组搜索，保持脚本顺序
     let mut candidate_groups: Vec<Vec<MaterialInfo>> = Vec::new();
@@ -251,8 +245,11 @@ pub async fn download_videos(
 /// 4. 提交失败重试3次
 /// 5. 并发下载完成的视频
 /// 6. 部分失败容忍（尽可能返回已成功的视频）
+///
+/// # 参数
+/// - `save_dir`: 生成视频的保存目录（由调用方显式指定，不存在时自动创建）
 pub async fn generate_ai_videos(
-    task_id: &str,
+    save_dir: &str,
     search_terms: &[String],
     source: &str,
     video_aspect: &VideoAspect,
@@ -270,8 +267,7 @@ pub async fn generate_ai_videos(
     };
     let timeout = conf.app.video_gen_timeout.unwrap_or(300);
 
-    let save_dir = soma_core::utils::task_dir(task_id).to_string_lossy().to_string();
-    let dir = std::path::Path::new(&save_dir);
+    let dir = std::path::Path::new(save_dir);
     if !dir.exists() {
         std::fs::create_dir_all(dir).map_err(SomaError::Io)?;
     }

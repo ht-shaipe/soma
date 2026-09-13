@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 
 /// 任务状态枚举
 ///
@@ -136,7 +137,7 @@ impl VideoAspect {
 /// 分镜脚本的单个场景
 ///
 /// 对应设计文档③分镜脚本中的完整镜头制作指令。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct StoryboardScene {
     /// 场景编号（从 1 开始）
     pub scene_id: u32,
@@ -169,7 +170,7 @@ pub struct StoryboardScene {
 }
 
 /// 素材信息，记录单个视频素材的来源和属性
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MaterialInfo {
     /// 素材提供者，如 "pexels"、"pixabay"、"coverr"、"local"，默认 "pexels"
     #[serde(default = "default_provider")]
@@ -188,7 +189,7 @@ fn default_provider() -> String {
 }
 
 /// 视频生成任务参数，由用户提交时传入
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VideoParams {
     /// 视频主题/标题
     pub video_subject: String,
@@ -479,7 +480,7 @@ impl TaskInfo {
 }
 
 /// AI 视频生成单段日志，记录每个分镜场景的提示词和生成状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AiVideoSegmentLog {
     /// 场景编号（对应 StoryboardScene.scene_id）
     pub scene_id: u32,
@@ -523,7 +524,7 @@ pub const FILE_TYPE_IMAGES: &[&str] = &["jpg", "jpeg", "png", "bmp"];
 /// 与 `VideoParams` 区别：输入为单张人像照片 + 一段文案，
 /// 输出为口播视频（人物开口说话，口型与配音同步），
 /// 不经过 LLM 文案改写，文案原样朗读。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DigitalHumanParams {
     /// 人像照片文件名（位于 `storage/portraits/` 目录下），必填
     pub portrait_image: String,
@@ -879,3 +880,156 @@ pub const DH_NARRATION_TEXT_MAX_LEN: usize = 1000;
 pub const DH_PORTRAIT_MAX_SIZE: u64 = 10 * 1024 * 1024;
 /// 支持的人像照片扩展名
 pub const DH_PORTRAIT_FILE_TYPES: &[&str] = &["jpg", "jpeg", "png"];
+
+/// 图片故事场景，包含一张图片和对应的文字描述
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ImageStoryScene {
+    /// 场景编号（从 1 开始）
+    pub scene_id: u32,
+    /// 图片文件路径或URL
+    pub image_path: String,
+    /// 图片文字描述（用于AI生成视频）
+    pub description: String,
+    /// 场景时长（秒），可选，默认使用全局设置
+    #[serde(default)]
+    pub duration: Option<u32>,
+    /// 镜头运动方式：push_in / pull_out / pan_left / pan_right / static 等
+    #[serde(default)]
+    pub camera_movement: Option<String>,
+    /// 转场方式：cut / fade / dissolve 等
+    #[serde(default)]
+    pub transition: Option<String>,
+}
+
+/// 图片故事视频生成任务参数
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ImageStoryParams {
+    /// 故事主题/标题
+    pub story_subject: String,
+    /// 故事场景列表（包含图片和文字描述）
+    pub scenes: Vec<ImageStoryScene>,
+    /// 画面宽高比，如 "16:9"、"9:16"、"1:1"
+    #[serde(default)]
+    pub video_aspect: Option<String>,
+    /// 单个场景时长（秒），默认 4 秒
+    #[serde(default)]
+    pub scene_duration: Option<u32>,
+    /// AI视频生成提供商，如 "cogvideox"、"kling"、"minimax"
+    #[serde(default)]
+    pub ai_provider: Option<String>,
+    /// 是否启用字幕叠加
+    #[serde(default)]
+    pub subtitle_enabled: Option<bool>,
+    /// 字幕位置，"top"/"bottom"/"custom"
+    #[serde(default)]
+    pub subtitle_position: Option<String>,
+    /// 背景音乐类型，如 "random"、"none"
+    #[serde(default)]
+    pub bgm_type: Option<String>,
+    /// 自定义背景音乐文件路径
+    #[serde(default)]
+    pub bgm_file: Option<String>,
+    /// 背景音乐音量（0.0~1.0）
+    #[serde(default)]
+    pub bgm_volume: Option<f32>,
+    /// TTS语音名称（可选，为场景旁白配音）
+    #[serde(default)]
+    pub voice_name: Option<String>,
+    /// 视频编码器名称
+    #[serde(default)]
+    pub video_encoder: Option<String>,
+}
+
+impl ImageStoryParams {
+    /// 获取视频宽高比，无法识别时默认竖屏 9:16
+    pub fn get_video_aspect(&self) -> VideoAspect {
+        self.video_aspect
+            .as_deref()
+            .and_then(VideoAspect::from_str)
+            .unwrap_or(VideoAspect::Portrait)
+    }
+
+    /// 获取单个场景时长（秒），默认 4 秒
+    pub fn get_scene_duration(&self) -> u32 {
+        self.scene_duration.unwrap_or(4)
+    }
+
+    /// 获取AI视频生成提供商，默认 "cogvideox"
+    pub fn get_ai_provider(&self) -> &str {
+        self.ai_provider.as_deref().unwrap_or("cogvideox")
+    }
+
+    /// 获取背景音乐音量，默认 0.2
+    pub fn get_bgm_volume(&self) -> f32 {
+        self.bgm_volume.unwrap_or(0.2)
+    }
+
+    /// 获取是否启用字幕叠加，默认 true
+    pub fn get_subtitle_enabled(&self) -> bool {
+        self.subtitle_enabled.unwrap_or(true)
+    }
+}
+
+/// 图片故事任务信息，记录单个图片故事任务的完整生命周期数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageStoryTaskInfo {
+    /// 任务唯一 ID
+    pub task_id: String,
+    /// 任务生成参数
+    pub params: ImageStoryParams,
+    /// 当前任务状态码（对应 TaskStatus 的 i32 值）
+    pub state: i32,
+    /// 任务进度百分比（0~100）
+    pub progress: u32,
+    /// 生成的视频文件路径
+    pub video_path: Option<String>,
+    /// 错误信息（任务失败时填充）
+    pub error_message: Option<String>,
+    /// 任务创建时间（UTC）
+    pub created_at: DateTime<Utc>,
+    /// 任务最后更新时间（UTC）
+    pub updated_at: DateTime<Utc>,
+}
+
+impl ImageStoryTaskInfo {
+    /// 创建新任务，初始状态为 Processing、进度 0
+    pub fn new(task_id: String, params: ImageStoryParams) -> Self {
+        Self::with_status(task_id, params, TaskStatus::Processing)
+    }
+
+    /// 创建新任务，指定初始状态
+    pub fn with_status(task_id: String, params: ImageStoryParams, status: TaskStatus) -> Self {
+        let now = Utc::now();
+        Self {
+            task_id,
+            params,
+            state: status.as_i32(),
+            progress: 0,
+            video_path: None,
+            error_message: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// 更新任务状态和/或进度，同时刷新 updated_at 时间戳
+    pub fn update(&mut self, state: Option<i32>, progress: Option<u32>) {
+        if let Some(s) = state {
+            self.state = s;
+        }
+        if let Some(p) = progress {
+            self.progress = p;
+        }
+        self.updated_at = Utc::now();
+    }
+
+    /// 判断任务是否已失败
+    pub fn is_failed(&self) -> bool {
+        self.state == TaskStatus::Failed.as_i32()
+    }
+
+    /// 判断任务是否已完成
+    pub fn is_completed(&self) -> bool {
+        self.state == TaskStatus::Completed.as_i32()
+    }
+}

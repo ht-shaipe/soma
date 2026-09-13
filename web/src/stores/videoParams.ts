@@ -1,3 +1,4 @@
+// 创作参数 Pinia store：向导分步草稿参数与任务提交载荷组装
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import type { VideoParams, StoryboardScene, TaskInfo } from '@/types'

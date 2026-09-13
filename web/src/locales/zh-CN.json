@@ -7,7 +7,11 @@
     "home": "视频生成",
     "tasks": "任务列表",
     "settings": "系统设置",
-    "guide": "使用指南"
+    "guide": "使用指南",
+    "workbench": "功能点工作台",
+    "imageStory": "图片故事",
+    "groupCreate": "创作",
+    "groupManage": "管理"
   },
   "script": {
     "title": "文案设置",
@@ -222,10 +226,16 @@
     "statusCompose": "视频合成",
     "statusVideo": "视频合成",
     "statusCompleted": "已完成",
-    "statusFailed": "失败"
+    "statusFailed": "失败",
+    "subtitle": "创作任务与产物",
+    "search": "搜索任务主题或 ID",
+    "untitled": "未命名任务",
+    "typeVideo": "视频任务",
+    "typeDigital": "数字人任务",
+    "typeImage": "图片故事"
   },
   "settings": {
-    "title": "系统设置",
+    "title": "环境状态",
     "llm": {
       "title": "LLM 配置",
       "provider": "LLM 提供商",
@@ -275,7 +285,16 @@
     },
     "save": "保存配置",
     "saveSuccess": "配置保存成功",
-    "saveFailed": "配置保存失败"
+    "saveFailed": "配置保存失败",
+    "subtitle": "服务与密钥配置",
+    "dirty": "有未保存的更改",
+    "clean": "所有更改已保存",
+    "status": {
+      "configured": "已配置",
+      "notConfigured": "待配置"
+    },
+    "desc": "FFmpeg、配音引擎、存储与各服务密钥体检",
+    "rerun": "重新检测"
   },
   "guide": {
     "title": "新手引导",
@@ -496,5 +515,49 @@
   "portrait": {
     "imageOnly": "请上传图片文件",
     "imageSizeLimit": "图片大小不能超过 5MB"
+  },
+  "header": {
+    "theme": "切换主题"
+  },
+  "workbench": {
+    "subtitle": "每个功能点可独立运行，产物自动归档",
+    "search": "搜索功能点名称或 ID",
+    "refresh": "刷新功能点列表",
+    "use": "立即使用",
+    "schemaReady": "Schema 就绪",
+    "noFeatures": "未加载到功能点，请检查后端服务",
+    "inputParams": "入参",
+    "noParams": "该功能点无需入参",
+    "arrayHint": "输入后回车添加，可多个",
+    "run": "运行",
+    "running": "运行中…",
+    "history": "历史",
+    "viewHistory": "查看历史",
+    "result": "运行结果",
+    "runSuccess": "运行成功",
+    "runFailed": "运行失败",
+    "artifacts": "产物文件",
+    "outputData": "输出数据",
+    "copyPath": "复制路径",
+    "noHistory": "暂无运行记录",
+    "kind": {
+      "llm": "LLM 文本生成",
+      "tts": "语音合成",
+      "subtitle": "字幕",
+      "material": "素材",
+      "videoCompose": "视频合成",
+      "digitalHuman": "数字人",
+      "utility": "工具",
+      "audio": "音频处理",
+      "videoTool": "视频处理"
+    },
+    "selectHint": "从列表选择或直接输入",
+    "jsonHint": "JSON 对象，如 {\"video_subject\": \"主题\", \"subtitle_enabled\": true}",
+    "jsonArrayHint": "JSON 数组，如 [{\"provider\": \"local\", \"url\": \"/path/a.mp4\", \"duration\": 2}]\n提示：简单字段建议直接用工作台外的方式填写"
+  },
+  "imageStory": {
+    "subtitle": "图片故事视频生成",
+    "title": "图片故事",
+    "desc": "上传多张图片，添加文字描述，AI将根据图片和描述生成视频"
   }
 }

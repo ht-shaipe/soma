@@ -7,7 +7,11 @@
     "home": "Video Generation",
     "tasks": "Task List",
     "settings": "Settings",
-    "guide": "Guide"
+    "guide": "Guide",
+    "workbench": "Feature Workbench",
+    "imageStory": "Image Story",
+    "groupCreate": "Create",
+    "groupManage": "Manage"
   },
   "script": {
     "title": "Script Settings",
@@ -222,10 +226,16 @@
     "statusCompose": "Compositing Video",
     "statusVideo": "Compositing Video",
     "statusCompleted": "Completed",
-    "statusFailed": "Failed"
+    "statusFailed": "Failed",
+    "subtitle": "Creation tasks & artifacts",
+    "search": "Search by subject or ID",
+    "untitled": "Untitled task",
+    "typeVideo": "Video",
+    "typeDigital": "Digital Human",
+    "typeImage": "Image Story"
   },
   "settings": {
-    "title": "System Settings",
+    "title": "Environment",
     "llm": {
       "title": "LLM Configuration",
       "provider": "LLM Provider",
@@ -275,7 +285,16 @@
     },
     "save": "Save Configuration",
     "saveSuccess": "Configuration saved successfully",
-    "saveFailed": "Failed to save configuration"
+    "saveFailed": "Failed to save configuration",
+    "subtitle": "Service & API key settings",
+    "dirty": "Unsaved changes",
+    "clean": "All changes saved",
+    "status": {
+      "configured": "Configured",
+      "notConfigured": "Not configured"
+    },
+    "desc": "FFmpeg, TTS engine, storage and API key health",
+    "rerun": "Re-run"
   },
   "guide": {
     "title": "Getting Started Guide",
@@ -496,5 +515,49 @@
   "portrait": {
     "imageOnly": "Please upload an image file",
     "imageSizeLimit": "Image size cannot exceed 5MB"
+  },
+  "header": {
+    "theme": "Toggle theme"
+  },
+  "workbench": {
+    "subtitle": "Run each feature standalone; artifacts are archived automatically",
+    "search": "Search features by name or ID",
+    "refresh": "Refresh features",
+    "use": "Use",
+    "schemaReady": "Schema ready",
+    "noFeatures": "No features loaded, please check the backend",
+    "inputParams": "Input",
+    "noParams": "This feature needs no input",
+    "arrayHint": "Type and press Enter, multiple allowed",
+    "run": "Run",
+    "running": "Running…",
+    "history": "History",
+    "viewHistory": "History",
+    "result": "Run result",
+    "runSuccess": "Run succeeded",
+    "runFailed": "Run failed",
+    "artifacts": "Artifacts",
+    "outputData": "Output data",
+    "copyPath": "Copy path",
+    "noHistory": "No runs yet",
+    "kind": {
+      "llm": "LLM Text",
+      "tts": "Speech",
+      "subtitle": "Subtitle",
+      "material": "Material",
+      "videoCompose": "Compose",
+      "digitalHuman": "Digital Human",
+      "utility": "Utility",
+      "audio": "Audio",
+      "videoTool": "Video Tools"
+    },
+    "selectHint": "Pick from list or type your own",
+    "jsonHint": "JSON object, e.g. {\"video_subject\": \"topic\", \"subtitle_enabled\": true}",
+    "jsonArrayHint": "JSON array, e.g. [{\"provider\": \"local\", \"url\": \"/path/a.mp4\", \"duration\": 2}]\nTip: fill simple fields outside the workbench"
+  },
+  "imageStory": {
+    "subtitle": "Image Story Video Generation",
+    "title": "Image Story",
+    "desc": "Upload multiple images, add text descriptions, AI will generate video based on images and descriptions"
   }
 }

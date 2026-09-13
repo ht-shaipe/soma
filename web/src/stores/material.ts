@@ -1,3 +1,4 @@
+// 素材 Pinia store：素材与音乐目录列表加载
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { MusicInfo, MaterialInfo } from '@/types'

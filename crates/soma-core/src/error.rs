@@ -44,6 +44,9 @@ pub enum SomaError {
     /// AI 视频生成失败（智谱/可灵/MiniMax 等 API 错误）
     #[error("AI视频生成失败: {0}")]
     VideoGen(String),
+    /// 功能点（Feature）注册或执行失败
+    #[error("功能点错误: {0}")]
+    Feature(String),
     /// IO 错误（文件读写、目录操作等），自动从 std::io::Error 转换
     #[error("IO 错误: {0}")]
     Io(#[from] std::io::Error),

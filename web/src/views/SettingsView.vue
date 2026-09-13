@@ -1,35 +1,76 @@
 <template>
   <div class="settings-view">
-    <h2 style="margin-bottom: 20px">{{ $t('settings.title') }}</h2>
+    <!-- 左侧锚点导航 -->
+    <aside class="set-nav">
+      <div
+        v-for="sec in sections"
+        :key="sec.key"
+        class="set-nav-item"
+        :class="{ 'is-active': activeSection === sec.key }"
+        @click="scrollTo(sec.key)"
+      >
+        <span class="set-nav-dot" :class="sec.status" />
+        <span>{{ $t(sec.label) }}</span>
+      </div>
+    </aside>
 
-    <el-row :gutter="16">
-      <el-col :xs="24" :sm="24" :md="12" :lg="12">
-        <el-card class="panel-card" shadow="hover">
-          <template #header>{{ $t('settings.llm.title') }}</template>
+    <!-- 右侧内容分区 -->
+    <div class="set-body">
+      <!-- 环境状态 -->
+      <section class="set-section">
+        <div class="sec-head">
+          <div class="sec-icon system"><el-icon :size="20"><CircleCheck /></el-icon></div>
+          <div class="sec-titles">
+            <div class="sec-title">{{ $t('settings.env.title') }}</div>
+            <div class="sec-desc">{{ $t('settings.env.desc') }}</div>
+          </div>
+          <el-button size="small" :loading="envLoading" @click="runPreflight">{{ $t('settings.env.rerun') }}</el-button>
+        </div>
+        <div v-if="envChecks.length" class="sec-fields env-list">
+          <div v-for="c in envChecks" :key="c.name" class="env-row">
+            <span class="env-dot" :class="c.ok ? 'ok' : 'bad'" />
+            <span class="env-name">{{ c.name }}</span>
+            <span class="env-detail">{{ c.detail }}</span>
+            <span v-if="!c.ok" class="env-hint">{{ c.hint }}</span>
+          </div>
+        </div>
+      </section>
+      <!-- ── 大语言模型 ── -->
+      <section id="sec-llm" class="set-section">
+        <div class="sec-head">
+          <div class="sec-icon llm"><el-icon :size="20"><MagicStick /></el-icon></div>
+          <div class="sec-titles">
+            <div class="sec-title">{{ $t('settings.llm.title') }}</div>
+            <div class="sec-desc">{{ $t('settings.desc.llm') }}</div>
+          </div>
+          <el-tag :type="sections[0].status === 'ok' ? 'success' : 'warning'" round effect="light">
+            {{ sections[0].status === 'ok' ? $t('settings.status.configured') : $t('settings.status.notConfigured') }}
+          </el-tag>
+        </div>
+        <div class="sec-fields">
           <div class="form-row">
             <div class="form-label">{{ $t('settings.llm.provider') }}</div>
             <el-select v-model="llmProvider" style="width: 100%" @change="onProviderChange">
               <el-option-group v-for="group in providerGroups" :key="group.label" :label="group.label">
-                <el-option
-                  v-for="p in group.providers"
-                  :key="p.value"
-                  :label="p.label"
-                  :value="p.value"
-                />
+                <el-option v-for="p in group.providers" :key="p.value" :label="p.label" :value="p.value" />
               </el-option-group>
             </el-select>
           </div>
-          <div v-if="currentProviderInfo?.needApiKey" class="form-row">
-            <div class="form-label">{{ $t('settings.llm.apiKey') }}</div>
-            <el-input v-model="llmApiKey" type="password" show-password />
+          <div class="form-grid">
+            <div v-if="currentProviderInfo?.needApiKey" class="form-row">
+              <div class="form-label">{{ $t('settings.llm.apiKey') }}</div>
+              <el-input v-model="llmApiKey" type="password" show-password />
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.llm.model') }}</div>
+              <el-select v-model="llmModel" filterable allow-create default-first-option style="width: 100%">
+                <el-option v-for="m in llmModelSuggestions" :key="m" :label="m" :value="m" />
+              </el-select>
+            </div>
           </div>
           <div class="form-row">
             <div class="form-label">{{ $t('settings.llm.baseUrl') }}</div>
             <el-input v-model="llmBaseUrl" />
-          </div>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.llm.model') }}</div>
-            <el-input v-model="llmModel" />
           </div>
           <div v-if="currentProviderInfo?.needSecretKey" class="form-row">
             <div class="form-label">{{ $t('settings.llm.secretKey') }}</div>
@@ -39,19 +80,23 @@
             <div class="form-label">{{ $t('settings.llm.accountId') }}</div>
             <el-input v-model="llmAccountId" />
           </div>
-          <el-alert
-            v-if="currentProviderInfo?.tip"
-            :title="currentProviderInfo.tip"
-            type="info"
-            :closable="false"
-            style="margin-top: 8px"
-          />
-        </el-card>
-      </el-col>
+          <el-alert v-if="currentProviderInfo?.tip" :title="currentProviderInfo.tip" type="info" :closable="false" />
+        </div>
+      </section>
 
-      <el-col :xs="24" :sm="24" :md="12" :lg="12">
-        <el-card class="panel-card" shadow="hover">
-          <template #header>{{ $t('settings.tts.title') }}</template>
+      <!-- ── 语音合成 ── -->
+      <section id="sec-tts" class="set-section">
+        <div class="sec-head">
+          <div class="sec-icon tts"><el-icon :size="20"><Microphone /></el-icon></div>
+          <div class="sec-titles">
+            <div class="sec-title">{{ $t('settings.tts.title') }}</div>
+            <div class="sec-desc">{{ $t('settings.desc.tts') }}</div>
+          </div>
+          <el-tag :type="sections[1].status === 'ok' ? 'success' : 'warning'" round effect="light">
+            {{ sections[1].status === 'ok' ? $t('settings.status.configured') : $t('settings.status.notConfigured') }}
+          </el-tag>
+        </div>
+        <div class="sec-fields">
           <div class="form-row">
             <div class="form-label">{{ $t('settings.tts.defaultServer') }}</div>
             <el-select v-model="ttsProvider" style="width: 100%">
@@ -63,21 +108,23 @@
               <el-option label="ElevenLabs TTS" value="elevenlabs" />
             </el-select>
           </div>
-          <div v-if="ttsProvider === 'azure-v2'" class="form-row">
-            <div class="form-label">{{ $t('settings.tts.azureKey') }}</div>
-            <el-input v-model="azureSpeechKey" type="password" show-password />
-          </div>
-          <div v-if="ttsProvider === 'azure-v2'" class="form-row">
-            <div class="form-label">{{ $t('settings.tts.azureRegion') }}</div>
-            <el-input v-model="azureSpeechRegion" />
-          </div>
-          <div v-if="ttsProvider === 'siliconflow'" class="form-row">
-            <div class="form-label">{{ $t('settings.tts.siliconflowKey') }}</div>
-            <el-input v-model="siliconflowKey" type="password" show-password />
-          </div>
-          <div v-if="ttsProvider === 'elevenlabs'" class="form-row">
-            <div class="form-label">{{ $t('settings.tts.elevenlabsKey') }}</div>
-            <el-input v-model="elevenlabsKey" type="password" show-password />
+          <div class="form-grid">
+            <div v-if="ttsProvider === 'azure-v2'" class="form-row">
+              <div class="form-label">{{ $t('settings.tts.azureKey') }}</div>
+              <el-input v-model="azureSpeechKey" type="password" show-password />
+            </div>
+            <div v-if="ttsProvider === 'azure-v2'" class="form-row">
+              <div class="form-label">{{ $t('settings.tts.azureRegion') }}</div>
+              <el-input v-model="azureSpeechRegion" />
+            </div>
+            <div v-if="ttsProvider === 'siliconflow'" class="form-row">
+              <div class="form-label">{{ $t('settings.tts.siliconflowKey') }}</div>
+              <el-input v-model="siliconflowKey" type="password" show-password />
+            </div>
+            <div v-if="ttsProvider === 'elevenlabs'" class="form-row">
+              <div class="form-label">{{ $t('settings.tts.elevenlabsKey') }}</div>
+              <el-input v-model="elevenlabsKey" type="password" show-password />
+            </div>
           </div>
           <div v-if="ttsProvider === 'elevenlabs'" class="form-row">
             <div class="form-label">{{ $t('settings.tts.elevenlabsModel') }}</div>
@@ -91,31 +138,53 @@
             <div class="form-label">{{ $t('settings.tts.mimoKey') }}</div>
             <el-input v-model="mimoKey" type="password" show-password />
           </div>
-        </el-card>
+        </div>
+      </section>
 
-        <el-card class="panel-card" shadow="hover">
-          <template #header>{{ $t('settings.stock.title') }}</template>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.stock.pexelsKey') }}</div>
-            <el-input v-model="pexelsApiKey" type="password" show-password />
+      <!-- ── 素材服务 ── -->
+      <section id="sec-stock" class="set-section">
+        <div class="sec-head">
+          <div class="sec-icon stock"><el-icon :size="20"><PictureFilled /></el-icon></div>
+          <div class="sec-titles">
+            <div class="sec-title">{{ $t('settings.stock.title') }}</div>
+            <div class="sec-desc">{{ $t('settings.desc.stock') }}</div>
           </div>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.stock.pixabayKey') }}</div>
-            <el-input v-model="pixabayApiKey" type="password" show-password />
+          <el-tag :type="sections[2].status === 'ok' ? 'success' : 'warning'" round effect="light">
+            {{ sections[2].status === 'ok' ? $t('settings.status.configured') : $t('settings.status.notConfigured') }}
+          </el-tag>
+        </div>
+        <div class="sec-fields">
+          <div class="form-grid">
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.stock.pexelsKey') }}</div>
+              <el-input v-model="pexelsApiKey" type="password" show-password />
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.stock.pixabayKey') }}</div>
+              <el-input v-model="pixabayApiKey" type="password" show-password />
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.stock.coverrKey') }}</div>
+              <el-input v-model="coverrApiKey" type="password" show-password />
+            </div>
           </div>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.stock.coverrKey') }}</div>
-            <el-input v-model="coverrApiKey" type="password" show-password />
-          </div>
-        </el-card>
+        </div>
+      </section>
 
-        <el-card class="panel-card" shadow="hover">
-          <template #header>{{ $t('settings.aivideo.title') }}</template>
-          <el-alert
-            type="info"
-            :closable="false"
-            style="margin-bottom: 12px"
-          >
+      <!-- ── AI 视频生成 ── -->
+      <section id="sec-aivideo" class="set-section">
+        <div class="sec-head">
+          <div class="sec-icon aivideo"><el-icon :size="20"><VideoCamera /></el-icon></div>
+          <div class="sec-titles">
+            <div class="sec-title">{{ $t('settings.aivideo.title') }}</div>
+            <div class="sec-desc">{{ $t('settings.desc.aivideo') }}</div>
+          </div>
+          <el-tag :type="sections[3].status === 'ok' ? 'success' : 'warning'" round effect="light">
+            {{ sections[3].status === 'ok' ? $t('settings.status.configured') : $t('settings.status.notConfigured') }}
+          </el-tag>
+        </div>
+        <div class="sec-fields">
+          <el-alert type="info" :closable="false" class="!mb-4">
             <template #title>{{ $t('settings.aivideo.hint') }}</template>
           </el-alert>
           <el-collapse>
@@ -183,32 +252,48 @@
             <div class="form-label">{{ $t('settings.aivideo.timeout') }}</div>
             <el-input-number v-model="videoGenTimeout" :min="60" :max="900" :step="30" style="width: 100%" />
           </div>
-        </el-card>
+        </div>
+      </section>
 
-        <el-card class="panel-card" shadow="hover">
-          <template #header>{{ $t('settings.system.title') }}</template>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.system.ffmpegPath') }}</div>
-            <el-input v-model="ffmpegPath" />
+      <!-- ── 系统与存储 ── -->
+      <section id="sec-system" class="set-section">
+        <div class="sec-head">
+          <div class="sec-icon system"><el-icon :size="20"><Setting /></el-icon></div>
+          <div class="sec-titles">
+            <div class="sec-title">{{ $t('settings.system.title') }}</div>
+            <div class="sec-desc">{{ $t('settings.desc.system') }}</div>
           </div>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.system.threads') }}</div>
-            <el-input-number v-model="ffmpegThreads" :min="1" :max="32" style="width: 100%" />
+          <el-tag :type="sections[4].status === 'ok' ? 'success' : 'warning'" round effect="light">
+            {{ sections[4].status === 'ok' ? $t('settings.status.configured') : $t('settings.status.notConfigured') }}
+          </el-tag>
+        </div>
+        <div class="sec-fields">
+          <div class="form-grid">
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.system.ffmpegPath') }}</div>
+              <el-input v-model="ffmpegPath" />
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.system.threads') }}</div>
+              <el-input-number v-model="ffmpegThreads" :min="1" :max="32" style="width: 100%" />
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.system.storagePath') }}</div>
+              <el-input v-model="storagePath" />
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.system.concurrentTasks') }}</div>
+              <el-input-number v-model="concurrentTasks" :min="1" :max="10" style="width: 100%" />
+            </div>
           </div>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.system.storagePath') }}</div>
-            <el-input v-model="storagePath" />
-          </div>
-          <div class="form-row">
-            <div class="form-label">{{ $t('settings.system.concurrentTasks') }}</div>
-            <el-input-number v-model="concurrentTasks" :min="1" :max="10" style="width: 100%" />
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </section>
+    </div>
 
-    <div style="margin-top: 16px; text-align: center">
-      <el-button type="primary" size="large" @click="onSave" style="width: 300px">
+    <!-- 底部保存栏 -->
+    <div class="save-bar" :class="{ dirty: isDirty }">
+      <span class="save-hint">{{ isDirty ? $t('settings.dirty') : $t('settings.clean') }}</span>
+      <el-button type="primary" size="large" :disabled="!isDirty" :loading="saving" @click="onSave">
         {{ $t('settings.save') }}
       </el-button>
     </div>
@@ -216,9 +301,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MagicStick, Microphone, PictureFilled, VideoCamera, Setting, CircleCheck } from '@element-plus/icons-vue'
 import { useConfigStore } from '@/stores/config'
+import api, { extractData } from '@/api'
 import { useI18n } from 'vue-i18n'
 import type { LlmProviderOption } from '@/types'
 
@@ -267,6 +354,24 @@ const llmProvider = ref(configStore.config.llm.provider)
 const llmApiKey = ref(configStore.config.llm.api_key)
 const llmBaseUrl = ref(configStore.config.llm.base_url)
 const llmModel = ref(configStore.config.llm.model)
+
+/** 各提供商常用模型建议（下拉可搜索、可自填任意模型名） */
+const SUGGESTED_MODELS: Record<string, string[]> = {
+  openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'o4-mini'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  qwen: ['qwen-turbo', 'qwen-plus', 'qwen-max'],
+  moonshot: ['moonshot-v1-8k', 'moonshot-v1-32k'],
+  zhipu: ['glm-4-flash', 'glm-4-plus'],
+  doubao: ['doubao-pro-32k', 'doubao-lite-32k'],
+  gemini: ['gemini-2.0-flash', 'gemini-1.5-pro'],
+  groq: ['llama3-8b-8192', 'llama-3.1-70b-versatile'],
+  minimax: ['abab6.5s-chat'],
+  ollama: ['llama3', 'qwen2.5:7b'],
+}
+const llmModelSuggestions = computed(() => {
+  const v = llmProvider.value
+  return SUGGESTED_MODELS[v] ?? (currentProviderInfo.value?.defaultModel ? [currentProviderInfo.value.defaultModel] : [])
+})
 const llmSecretKey = ref(configStore.config.llm.secret_key || '')
 const llmAccountId = ref(configStore.config.llm.account_id || '')
 
@@ -327,6 +432,11 @@ watch(() => configStore.config, (cfg) => {
   concurrentTasks.value = cfg.app.concurrent_tasks
 }, { deep: true })
 
+// 配置从后端重新加载后，同步基线
+watch(() => configStore.config, () => {
+  refreshBaseline()
+}, { flush: 'post' })
+
 const currentProviderInfo = computed(() => {
   for (const group of providerGroups.value) {
     const found = group.providers.find(p => p.value === llmProvider.value)
@@ -344,52 +454,366 @@ function onProviderChange(value: string) {
   }
 }
 
-async function onSave() {
-  configStore.updateLlmConfig({
-    provider: llmProvider.value,
-    api_key: llmApiKey.value,
-    base_url: llmBaseUrl.value,
-    model: llmModel.value,
-    secret_key: llmSecretKey.value,
-    account_id: llmAccountId.value,
-  })
-  configStore.updateTtsConfig({
-    provider: ttsProvider.value,
-    azure_speech_key: azureSpeechKey.value,
-    azure_speech_region: azureSpeechRegion.value,
-    siliconflow_key: siliconflowKey.value,
-    elevenlabs_key: elevenlabsKey.value,
-    elevenlabs_model: elevenlabsModel.value,
-    mimo_key: mimoKey.value,
-  })
-  configStore.updateStockConfig({
-    pexels_api_key: pexelsApiKey.value,
-    pixabay_api_key: pixabayApiKey.value,
-    coverr_api_key: coverrApiKey.value,
-  })
-  configStore.updateAiVideoConfig({
-    zhipu_video_api_key: zhipuVideoApiKey.value,
-    zhipu_video_model: zhipuVideoModel.value,
-    kling_access_key: klingAccessKey.value,
-    kling_secret_key: klingSecretKey.value,
-    kling_video_model: klingVideoModel.value,
-    minimax_video_api_key: minimaxVideoApiKey.value,
-    minimax_video_model: minimaxVideoModel.value,
-    video_gen_timeout: videoGenTimeout.value,
-  })
-  configStore.updateFfmpegConfig({
-    path: ffmpegPath.value,
-    threads: ffmpegThreads.value,
-  })
-  configStore.updateAppConfig({
-    storage_path: storagePath.value,
-    concurrent_tasks: concurrentTasks.value,
-  })
-  const ok = await configStore.save()
-  if (ok) {
-    ElMessage.success(t('settings.saveSuccess'))
-  } else {
-    ElMessage.error(t('settings.saveFailed'))
+const llmOk = computed(() => {
+  if (currentProviderInfo.value && !currentProviderInfo.value.needApiKey) return true
+  return !!llmApiKey.value.trim()
+})
+const ttsOk = computed(() => {
+  if (ttsProvider.value === 'edge-tts') return true
+  if (ttsProvider.value === 'azure-v2') return !!azureSpeechKey.value.trim()
+  if (ttsProvider.value === 'siliconflow') return !!siliconflowKey.value.trim()
+  if (ttsProvider.value === 'elevenlabs') return !!elevenlabsKey.value.trim()
+  if (ttsProvider.value === 'mimo') return !!mimoKey.value.trim()
+  return true
+})
+const stockOk = computed(() => !!pexelsApiKey.value.trim() || !!pixabayApiKey.value.trim() || !!coverrApiKey.value.trim())
+const aivideoOk = computed(() => !!zhipuVideoApiKey.value.trim() || !!klingAccessKey.value.trim() || !!minimaxVideoApiKey.value.trim())
+const systemOk = computed(() => !!ffmpegPath.value.trim())
+
+// 分区状态（响应式，供徽标与导航使用）
+const sections = computed(() => [
+  { key: 'llm', label: 'settings.llm.title', desc: 'settings.desc.llm', status: llmOk.value ? 'ok' : 'todo' },
+  { key: 'tts', label: 'settings.tts.title', desc: 'settings.desc.tts', status: ttsOk.value ? 'ok' : 'todo' },
+  { key: 'stock', label: 'settings.stock.title', desc: 'settings.desc.stock', status: stockOk.value ? 'ok' : 'todo' },
+  { key: 'aivideo', label: 'settings.aivideo.title', desc: 'settings.desc.aivideo', status: aivideoOk.value ? 'ok' : 'todo' },
+  { key: 'system', label: 'settings.system.title', desc: 'settings.desc.system', status: systemOk.value ? 'ok' : 'todo' },
+])
+
+// ── 未保存更改检测（以最近一次保存/加载的表单快照为基线）──
+const savedBaseline = ref('')
+function refreshBaseline() {
+  savedBaseline.value = formSnapshot()
+}
+function formSnapshot(): string {
+  return JSON.stringify([
+    {
+      provider: llmProvider.value, api_key: llmApiKey.value, base_url: llmBaseUrl.value,
+      model: llmModel.value, secret_key: llmSecretKey.value, account_id: llmAccountId.value,
+    },
+    {
+      provider: ttsProvider.value, azure_speech_key: azureSpeechKey.value,
+      azure_speech_region: azureSpeechRegion.value, siliconflow_key: siliconflowKey.value,
+      elevenlabs_key: elevenlabsKey.value, elevenlabs_model: elevenlabsModel.value, mimo_key: mimoKey.value,
+    },
+    { pexels_api_key: pexelsApiKey.value, pixabay_api_key: pixabayApiKey.value, coverr_api_key: coverrApiKey.value },
+    {
+      zhipu_video_api_key: zhipuVideoApiKey.value, zhipu_video_model: zhipuVideoModel.value,
+      kling_access_key: klingAccessKey.value, kling_secret_key: klingSecretKey.value,
+      kling_video_model: klingVideoModel.value, minimax_video_api_key: minimaxVideoApiKey.value,
+      minimax_video_model: minimaxVideoModel.value, video_gen_timeout: videoGenTimeout.value,
+    },
+    { path: ffmpegPath.value, threads: ffmpegThreads.value },
+    { storage_path: storagePath.value, concurrent_tasks: concurrentTasks.value },
+  ])
+}
+const isDirty = computed(() => formSnapshot() !== savedBaseline.value)
+
+// ── 环境检测（M2.5）──
+const envChecks = ref<Array<{ name: string; ok: boolean; detail: string; hint: string }>>([])
+const envLoading = ref(false)
+
+async function runPreflight() {
+  envLoading.value = true
+  try {
+    const res = await api.post('/system/preflight', {}).then(extractData<{ checks: any[] }>)
+    envChecks.value = (res?.checks as any[]) || []
+  } catch (e) {
+    ElMessage.error((e as Error).message || '环境检测失败')
+  } finally {
+    envLoading.value = false
   }
 }
+
+const saving = ref(false)
+async function onSave() {
+  saving.value = true
+  try {
+    configStore.updateLlmConfig({
+      provider: llmProvider.value,
+      api_key: llmApiKey.value,
+      base_url: llmBaseUrl.value,
+      model: llmModel.value,
+      secret_key: llmSecretKey.value,
+      account_id: llmAccountId.value,
+    })
+    configStore.updateTtsConfig({
+      provider: ttsProvider.value,
+      azure_speech_key: azureSpeechKey.value,
+      azure_speech_region: azureSpeechRegion.value,
+      siliconflow_key: siliconflowKey.value,
+      elevenlabs_key: elevenlabsKey.value,
+      elevenlabs_model: elevenlabsModel.value,
+      mimo_key: mimoKey.value,
+    })
+    configStore.updateStockConfig({
+      pexels_api_key: pexelsApiKey.value,
+      pixabay_api_key: pixabayApiKey.value,
+      coverr_api_key: coverrApiKey.value,
+    })
+    configStore.updateAiVideoConfig({
+      zhipu_video_api_key: zhipuVideoApiKey.value,
+      zhipu_video_model: zhipuVideoModel.value,
+      kling_access_key: klingAccessKey.value,
+      kling_secret_key: klingSecretKey.value,
+      kling_video_model: klingVideoModel.value,
+      minimax_video_api_key: minimaxVideoApiKey.value,
+      minimax_video_model: minimaxVideoModel.value,
+      video_gen_timeout: videoGenTimeout.value,
+    })
+    configStore.updateFfmpegConfig({
+      path: ffmpegPath.value,
+      threads: ffmpegThreads.value,
+    })
+    configStore.updateAppConfig({
+      storage_path: storagePath.value,
+      concurrent_tasks: concurrentTasks.value,
+    })
+    const ok = await configStore.save()
+    if (ok) {
+      refreshBaseline()
+      ElMessage.success(t('settings.saveSuccess'))
+    } else {
+      ElMessage.error(t('settings.saveFailed'))
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+// ── 锚点导航 + 滚动高亮 ──
+const activeSection = ref('llm')
+let observer: IntersectionObserver | null = null
+
+function scrollTo(key: string) {
+  document.getElementById(`sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+onMounted(() => {
+  refreshBaseline()
+  runPreflight()
+  observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          activeSection.value = entry.target.id.replace('sec-', '')
+        }
+      }
+    },
+    { rootMargin: '-20% 0px -70% 0px' },
+  )
+  for (const sec of sections.value) {
+    const el = document.getElementById(`sec-${sec.key}`)
+    if (el) observer.observe(el)
+  }
+})
+
+onBeforeUnmount(() => observer?.disconnect())
 </script>
+
+<style scoped>
+.settings-view {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding-bottom: 90px;
+}
+
+/* 左侧锚点导航 */
+.set-nav {
+  width: 168px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.set-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--soma-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.set-nav-item:hover {
+  color: var(--soma-text);
+  background: var(--soma-glass);
+}
+
+.set-nav-item.is-active {
+  color: var(--soma-text);
+  background: var(--soma-gradient-soft);
+  border: 1px solid rgba(91, 140, 255, 0.3);
+  font-weight: 600;
+}
+
+.set-nav-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--soma-warning);
+  flex-shrink: 0;
+}
+
+.set-nav-dot.ok {
+  background: var(--soma-success);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+}
+
+/* 内容分区 */
+.set-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.set-section {
+  scroll-margin-top: 20px;
+}
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.sec-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sec-icon.llm { background: rgba(91, 140, 255, 0.14); color: #7ba3ff; }
+.sec-icon.tts { background: rgba(94, 234, 212, 0.12); color: #5eead4; }
+.sec-icon.stock { background: rgba(244, 114, 182, 0.12); color: #f472b6; }
+.sec-icon.aivideo { background: rgba(167, 139, 250, 0.12); color: #a78bfa; }
+.sec-icon.system { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+
+.sec-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.sec-title {
+  font-size: 15.5px;
+  font-weight: 650;
+}
+
+.sec-desc {
+  font-size: 12.5px;
+  color: var(--soma-text-faint);
+  margin-top: 2px;
+}
+
+.sec-fields {
+  border: 1px solid var(--soma-line);
+  border-radius: var(--soma-radius);
+  background: var(--soma-glass);
+  backdrop-filter: blur(14px);
+  padding: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  column-gap: 16px;
+}
+
+/* 底部保存栏 */
+.save-bar {
+  position: fixed;
+  left: calc(232px + 28px);
+  right: 28px;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-radius: var(--soma-radius) var(--soma-radius) 0 0;
+  background: rgba(16, 22, 42, 0.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--soma-line);
+  border-bottom: none;
+  transition: border-color 0.2s ease;
+}
+
+.save-bar.dirty {
+  border-color: rgba(91, 140, 255, 0.45);
+}
+
+.save-hint {
+  flex: 1;
+  font-size: 13px;
+  color: var(--soma-text-faint);
+}
+
+.save-bar.dirty .save-hint {
+  color: var(--soma-accent);
+}
+
+html:not(.dark) .save-bar {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.env-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.env-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.env-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.env-dot.ok {
+  background: var(--soma-success);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+}
+
+.env-dot.bad {
+  background: var(--soma-danger);
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.6);
+}
+
+.env-name {
+  font-weight: 600;
+  min-width: 110px;
+}
+
+.env-detail {
+  color: var(--soma-text-dim);
+  flex: 1;
+  min-width: 160px;
+}
+
+.env-hint {
+  color: var(--soma-warning);
+  font-size: 12px;
+}
+</style>
