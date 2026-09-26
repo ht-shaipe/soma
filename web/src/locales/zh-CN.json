@@ -303,8 +303,18 @@
       "configured": "已配置",
       "notConfigured": "待配置"
     },
-    "desc": "FFmpeg、配音引擎、存储与各服务密钥体检",
-    "rerun": "重新检测"
+    "env": {
+      "title": "环境状态",
+      "desc": "FFmpeg、配音引擎、存储与各服务密钥体检",
+      "rerun": "重新检测"
+    },
+    "desc": {
+      "llm": "配置脚本生成所用的大语言模型（25+ 提供商）",
+      "tts": "配置配音引擎、默认引擎与各服务商密钥",
+      "stock": "配置素材站 API Key（Pexels / Pixabay / Coverr）",
+      "aivideo": "配置 AI 视频生成服务（智谱 / 可灵 / MiniMax）",
+      "system": "配置 FFmpeg 路径、并发任务数与存储路径"
+    }
   },
   "guide": {
     "title": "新手引导",

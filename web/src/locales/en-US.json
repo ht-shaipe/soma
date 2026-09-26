@@ -303,8 +303,18 @@
       "configured": "Configured",
       "notConfigured": "Not configured"
     },
-    "desc": "FFmpeg, TTS engine, storage and API key health",
-    "rerun": "Re-run"
+    "env": {
+      "title": "Environment Status",
+      "desc": "FFmpeg, TTS engine, storage and API key health",
+      "rerun": "Re-check"
+    },
+    "desc": {
+      "llm": "Large language model for script generation (25+ providers)",
+      "tts": "TTS engines, default engine and provider API keys",
+      "stock": "Stock site API keys (Pexels / Pixabay / Coverr)",
+      "aivideo": "AI video generation services (Zhipu / Kling / MiniMax)",
+      "system": "FFmpeg path, task concurrency and storage path"
+    }
   },
   "guide": {
     "title": "Getting Started Guide",
