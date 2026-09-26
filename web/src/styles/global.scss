@@ -438,13 +438,100 @@ body {
 }
 
 // ── 浅色主题（可切换）────────────────────────────────────
+// 令牌级切换：--soma-* 与 --el-* 全量覆盖（此前仅覆盖少量组件，
+// 导致浅色下白字面板、EP 弹窗/下拉/输入框保持深色）
 html:not(.dark) {
+  // 画布与面板
+  --soma-bg-0: #f3f5fb;
+  --soma-bg-1: #ffffff;
+  --soma-glass: rgba(255, 255, 255, 0.78);
+  --soma-glass-strong: rgba(255, 255, 255, 0.92);
+  --soma-line: rgba(20, 30, 60, 0.1);
+  --soma-line-strong: rgba(20, 30, 60, 0.16);
+  --soma-shadow: 0 12px 34px rgba(28, 42, 80, 0.08);
+
+  // 状态色（浅底加深保证可读）
+  --soma-success: #10b981;
+  --soma-warning: #d97706;
+  --soma-danger: #ef4444;
+
+  // 文本
+  --soma-text: #1c2540;
+  --soma-text-dim: #55618a;
+  --soma-text-faint: #8892ad;
+
+  // Element Plus 浅色对齐（覆盖 ：root 中的深色值）
+  --el-bg-color: #ffffff;
+  --el-bg-color-overlay: #ffffff;
+  --el-bg-color-page: #f2f3f5;
+  --el-fill-color: #f0f2f5;
+  --el-fill-color-light: #f5f7fa;
+  --el-fill-color-lighter: #fafafa;
+  --el-fill-color-blank: #ffffff;
+  --el-border-color: #dcdfe6;
+  --el-border-color-light: #e4e7ed;
+  --el-border-color-lighter: #ebeef5;
+  --el-border-color-extra-light: #f2f6fc;
+  --el-text-color-primary: #303133;
+  --el-text-color-regular: #606266;
+  --el-text-color-secondary: #909399;
+  --el-text-color-placeholder: #a8abb2;
+  --el-color-primary-dark-2: #3d63c4;
+
   body {
-    background-color: #f3f5fb;
+    background-color: var(--soma-bg-0);
     background-image:
       radial-gradient(1000px 500px at -8% -12%, rgba(91, 140, 255, 0.12), transparent 60%),
       radial-gradient(860px 460px at 105% -8%, rgba(155, 107, 255, 0.1), transparent 58%);
-    color: #2a3245;
+    color: var(--soma-text);
+  }
+
+  // 深色精修组件的浅色对齐
+  .el-input__wrapper,
+  .el-textarea__inner,
+  .el-select__wrapper {
+    background-color: #ffffff;
+  }
+
+  .el-table {
+    --el-table-header-bg-color: rgba(20, 30, 60, 0.04);
+    --el-table-row-hover-bg-color: rgba(91, 140, 255, 0.06);
+  }
+
+  .el-descriptions {
+    --el-descriptions-item-bordered-label-background: #fafafa;
+  }
+
+  .panel-card {
+    background: var(--soma-glass);
+    border-color: var(--soma-line);
+
+    .el-card__header {
+      background: rgba(20, 30, 60, 0.02);
+    }
+  }
+
+  .api-key-list .key-text {
+    background: rgba(20, 30, 60, 0.04);
+  }
+
+  .el-dialog {
+    box-shadow: 0 18px 48px rgba(28, 42, 80, 0.18);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(20, 30, 60, 0.18);
+
+    &:hover {
+      background: rgba(20, 30, 60, 0.3);
+    }
+  }
+
+  // 彩色芯片图标：淡彩色在白底上对比度不足，统一加深增饱和
+  .wb-card-icon,
+  .tb-card-icon,
+  .sec-icon {
+    filter: brightness(0.72) saturate(1.5);
   }
 
   .app-sidebar {
@@ -467,16 +554,6 @@ html:not(.dark) {
     }
   }
 
-  .app-content {
-    color: #2a3245;
-  }
-
-  .panel-card {
-    background: rgba(255, 255, 255, 0.86);
-    border-color: rgba(20, 30, 60, 0.09);
-    box-shadow: 0 12px 34px rgba(28, 42, 80, 0.08);
-  }
-
   .nav-item {
     color: #55618a;
 
@@ -496,12 +573,12 @@ html:not(.dark) {
   .logo-version,
   .footer-hint,
   .page-subtitle {
-    color: #8892ad;
+    color: var(--soma-text-faint);
   }
 
   .section-title,
   .step-header h3 {
-    color: #1c2540;
+    color: var(--soma-text);
   }
 
   .log-section .log-container {

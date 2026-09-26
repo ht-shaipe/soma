@@ -60,7 +60,7 @@ function statusLabel(status: string) {
 .ai-video-logs-title {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -70,14 +70,14 @@ function statusLabel(status: string) {
 .ai-video-logs-list {
   max-height: 320px;
   overflow-y: auto;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;
   padding: 4px 0;
 }
 
 .ai-video-log-item {
   padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .ai-video-log-item:last-child {
@@ -93,15 +93,15 @@ function statusLabel(status: string) {
 
 .ai-video-log-status {
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-secondary);
 }
 
 .ai-video-log-prompt {
   font-size: 12px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   word-break: break-all;
   line-height: 1.5;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   padding: 6px 8px;
   border-radius: 3px;
   margin-bottom: 2px;
@@ -109,7 +109,7 @@ function statusLabel(status: string) {
 
 .ai-video-log-message {
   font-size: 11px;
-  color: #f56c6c;
+  color: var(--el-color-danger);
   margin-top: 2px;
 }
 </style>

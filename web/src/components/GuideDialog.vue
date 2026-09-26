@@ -324,23 +324,23 @@ defineExpose({ open, shouldShowOnFirstUse })
 .step-panel h3 {
   margin: 0 0 8px;
   font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .step-panel h4 {
   font-size: 15px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .step-desc {
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.6;
   margin: 0 0 12px;
   font-size: 14px;
 }
 
 .flow-chart {
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -373,7 +373,7 @@ defineExpose({ open, shouldShowOnFirstUse })
 
 .flow-arrow {
   font-size: 18px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-weight: bold;
 }
 
@@ -384,7 +384,7 @@ defineExpose({ open, shouldShowOnFirstUse })
 }
 
 .prereq-list code {
-  background: #f0f2f5;
+  background: var(--el-fill-color);
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 12px;
@@ -395,7 +395,7 @@ defineExpose({ open, shouldShowOnFirstUse })
 }
 
 .guide-link {
-  color: #409eff;
+  color: var(--el-color-primary);
   text-decoration: none;
   font-size: 12px;
   word-break: break-all;
@@ -409,13 +409,13 @@ defineExpose({ open, shouldShowOnFirstUse })
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
   margin-top: 8px;
 }
 
 .step-panel :deep(.el-timeline-item__content p) {
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 13px;
   margin: 4px 0 0;
 }
