@@ -37,6 +37,7 @@ async fn get_config(_param: &RequestParameter) -> Result<Value> {
             "ffmpeg_path": app.ffmpeg_path.as_deref().unwrap_or("ffmpeg"),
             "imagemagick_path": app.imagemagick_path.as_deref().unwrap_or(""),
             "subtitle_provider": app.subtitle_provider.as_deref().unwrap_or("edge"),
+            "narration_emotion_tags": app.narration_emotion_tags.unwrap_or(false),
             "enable_redis": app.enable_redis.unwrap_or(false),
             "redis_host": app.redis_host.as_deref().unwrap_or("127.0.0.1"),
             "redis_port": app.redis_port.unwrap_or(6379),
@@ -68,6 +69,9 @@ async fn get_config(_param: &RequestParameter) -> Result<Value> {
             "xfyun_app_id": conf.app.xfyun.app_id.as_deref().unwrap_or(""),
             "xfyun_api_key": conf.app.xfyun.api_key.as_deref().unwrap_or(""),
             "xfyun_api_secret": conf.app.xfyun.api_secret.as_deref().unwrap_or(""),
+            "fishspeech_base_url": conf.app.fishspeech.get_base_url(),
+            "fishspeech_api_key": conf.app.fishspeech.get_api_key(),
+            "fishspeech_reference_id": conf.app.fishspeech.get_reference_id(),
         },
         "stock": {
             "pexels_api_key": app.pexels_api_keys.as_ref().and_then(|v| v.first()).unwrap_or(&String::new()).clone(),
@@ -176,6 +180,9 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
         if let Some(tv) = v.get("tls_verify").and_then(|b| b.as_bool()) {
             app.tls_verify = Some(tv);
         }
+        if let Some(net) = v.get("narration_emotion_tags").and_then(|b| b.as_bool()) {
+            app.narration_emotion_tags = Some(net);
+        }
     }
 
     if let Some(v) = param.value.get("llm") {
@@ -250,6 +257,15 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
         }
         if let Some(secret) = v.get("xfyun_api_secret").and_then(|k| k.as_str()) {
             conf.app.xfyun.api_secret = Some(secret.to_string());
+        }
+        if let Some(url) = v.get("fishspeech_base_url").and_then(|u| u.as_str()) {
+            conf.app.fishspeech.base_url = Some(url.to_string());
+        }
+        if let Some(key) = v.get("fishspeech_api_key").and_then(|k| k.as_str()) {
+            conf.app.fishspeech.api_key = Some(key.to_string());
+        }
+        if let Some(id) = v.get("fishspeech_reference_id").and_then(|i| i.as_str()) {
+            conf.app.fishspeech.reference_id = Some(id.to_string());
         }
     }
 

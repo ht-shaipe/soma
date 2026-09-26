@@ -210,6 +210,7 @@ export interface AppConfig {
     ffmpeg_path?: string
     imagemagick_path?: string
     subtitle_provider?: string
+    narration_emotion_tags?: boolean
     enable_redis?: boolean
     redis_host?: string
     redis_port?: number
@@ -241,6 +242,9 @@ export interface AppConfig {
     xfyun_app_id?: string
     xfyun_api_key?: string
     xfyun_api_secret?: string
+    fishspeech_base_url?: string
+    fishspeech_api_key?: string
+    fishspeech_reference_id?: string
   }
   stock: {
     pexels_api_key: string

@@ -35,6 +35,9 @@ pub struct AppConfig {
     /// 科大讯飞 TTS 配置（缺失时使用默认值）
     #[serde(default)]
     pub xfyun: XfyunSection,
+    /// Fish-Speech S2 TTS 配置（缺失时使用默认值）
+    #[serde(default)]
+    pub fishspeech: FishspeechSection,
     /// UI 界面与发布相关配置（缺失时使用默认值）
     #[serde(default)]
     pub ui: UiSection,
@@ -239,6 +242,11 @@ pub struct AppSection {
     // ── 字幕 ──
     /// 字幕服务提供者，如 "edge"、"whisper"
     pub subtitle_provider: Option<String>,
+    /// 是否在旁白文案中注入 Fish-Speech 风格的情感标签（如 [whisper] [excited]）
+    ///
+    /// 开启后 LLM 生成旁白时会插入情感标签；使用 fishspeech 引擎合成时标签生效，
+    /// 其他引擎会在合成前自动剥离标签。
+    pub narration_emotion_tags: Option<bool>,
 
     // ── 工具路径 ──
     /// ImageMagick 可执行文件路径
@@ -346,6 +354,60 @@ pub struct ElevenlabsSection {
     pub api_key: Option<String>,
     /// ElevenLabs 语音模型 ID
     pub model_id: Option<String>,
+}
+
+/// Fish-Speech S2 TTS 语音合成配置
+///
+/// 对应 TOML 配置文件的 `[fishspeech]` 段。
+/// 同时兼容自部署的 S2 API Server（如 `http://gpu-host:8080`）
+/// 与 Fish Audio 云端 API（`https://api.fish.audio`，需配合平台 API Key）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FishspeechSection {
+    /// API 服务基础 URL，自部署如 "http://192.168.1.100:8080"，
+    /// 云端为 "https://api.fish.audio"
+    pub base_url: Option<String>,
+    /// API 密钥（自部署服务未启用 --api-key 时可留空；云端必填）
+    pub api_key: Option<String>,
+    /// 默认参考音色 ID（服务端 references 目录名或 fish.audio 平台的音色 ID），留空使用模型默认音色
+    pub reference_id: Option<String>,
+    /// 音频格式：wav / pcm / mp3 / opus，默认 "mp3"
+    pub format: Option<String>,
+    /// 是否对中英文文本做数字归一化以提升稳定性，默认 true
+    pub normalize: Option<bool>,
+    /// 请求超时时间（秒），默认 120
+    pub timeout: Option<u64>,
+}
+
+impl FishspeechSection {
+    /// 获取 API 基础 URL，默认 Fish Audio 云端 "https://api.fish.audio"
+    pub fn get_base_url(&self) -> &str {
+        self.base_url.as_deref().unwrap_or("https://api.fish.audio")
+    }
+
+    /// 获取 API 密钥（可为空，自部署未启用鉴权时无需填写）
+    pub fn get_api_key(&self) -> &str {
+        self.api_key.as_deref().unwrap_or("")
+    }
+
+    /// 获取默认参考音色 ID（可为空）
+    pub fn get_reference_id(&self) -> &str {
+        self.reference_id.as_deref().unwrap_or("")
+    }
+
+    /// 获取音频格式，默认 "mp3"
+    pub fn get_format(&self) -> &str {
+        self.format.as_deref().unwrap_or("mp3")
+    }
+
+    /// 是否启用文本数字归一化，默认 true
+    pub fn get_normalize(&self) -> bool {
+        self.normalize.unwrap_or(true)
+    }
+
+    /// 获取请求超时时间（秒），默认 120
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.unwrap_or(120)
+    }
 }
 
 /// 数字人口播视频生成配置段
@@ -1076,6 +1138,11 @@ impl AppConfig {
     /// 获取字幕服务提供者名称，默认 "edge"（Edge TTS）
     pub fn get_subtitle_provider(&self) -> &str {
         self.app.subtitle_provider.as_deref().unwrap_or("edge")
+    }
+
+    /// 获取是否在旁白文案中注入 Fish-Speech 风格情感标签，默认 false
+    pub fn get_narration_emotion_tags(&self) -> bool {
+        self.app.narration_emotion_tags.unwrap_or(false)
     }
 
     /// 获取 Edge TTS 超时时间，仅当值大于 0 时有效

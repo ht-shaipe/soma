@@ -41,13 +41,16 @@ pub fn generate_subtitle_to(
             ws.compute_type.as_deref().unwrap_or("int8"),
         )?;
         let mut cues = soma_tts::subtitle::file_to_subtitles(output_path);
-        soma_tts::subtitle::correct_subtitle(&mut cues, text);
+        let plain_text = soma_tts::fishspeech_tts::strip_emotion_tags(text);
+        soma_tts::subtitle::correct_subtitle(&mut cues, &plain_text);
         soma_tts::subtitle::create_subtitle_file(&cues, output_path)?;
     } else {
         let codec = video_encoder.unwrap_or(conf.get_video_codec());
         let ffmpeg = soma_video::Ffmpeg::new(&conf.get_ffmpeg_binary(), n_threads, codec);
         let audio_dur = ffmpeg.get_audio_duration(audio_file)?;
-        let cues = soma_tts::edge_tts::generate_subtitle_cues_from_text(text, audio_dur);
+        // 文本可能包含 Fish-Speech 情感标签，字幕中不应显示
+        let plain_text = soma_tts::fishspeech_tts::strip_emotion_tags(text);
+        let cues = soma_tts::edge_tts::generate_subtitle_cues_from_text(&plain_text, audio_dur);
         soma_tts::subtitle::create_subtitle_file(&cues, output_path)?;
     }
 

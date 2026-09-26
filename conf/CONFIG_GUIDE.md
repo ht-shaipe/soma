@@ -75,6 +75,7 @@
 | **Gemini TTS** | `gemini` | `[app]` 段 `gemini_api_key`（与 LLM 共用） | https://aistudio.google.com/apikey | — |
 | **火山引擎** | `volcengine` | `[volcengine]` 段 `app_id` + `access_token` | https://console.volcengine.com/speech | 有免费额度 |
 | **科大讯飞** | `xfyun` | `[xfyun]` 段 `app_id` + `api_key` + `api_secret` | https://www.xfyun.cn | 注册送额度 |
+| **Fish-Speech S2** | `fishspeech` | `[fishspeech]` 段 `base_url`（自部署）或 `api_key`（云端） | https://fish.audio | 自部署免费 / 云端按量 |
 | **HeyGem**（Fish-Speech） | `heygem` | `[digital_human.heygem]` 段 `tts_base_url` | 本地 Docker 部署 | ✅ 自部署免费 |
 | **声音克隆** | `clone` | `[digital_human.voice_clone]` 段（SSH 远程 GPU） | 见「九、数字人口播配置」 | ✅ 自部署免费 |
 | **无语音** | `none` | 无需 Key | — | ✅ 静音模式 |
@@ -87,7 +88,43 @@
 - `azure:` → Azure TTS
 - `volcengine:` → 火山引擎 TTS
 - `xfyun:` → 科大讯飞 TTS
+- `fishspeech:` → Fish-Speech S2（前缀后可带参考音色 ID，如 `fishspeech:my-voice`；纯 `fishspeech:` 用配置默认音色）
 - 无前缀 → Edge TTS
+
+### Fish-Speech S2 详细配置（[fishspeech] 段）
+
+两种部署形态任选其一：
+
+**方式一：自部署（免费，需 GPU）**
+
+```bash
+# fish-speech 仓库（https://github.com/fishaudio/fish-speech）
+python tools/api_server.py \
+  --llama-checkpoint-path checkpoints/s2-pro \
+  --listen 0.0.0.0:8080
+```
+
+```toml
+[fishspeech]
+base_url = "http://GPU主机IP:8080"
+api_key = ""   # 服务端未启用 --api-key 时留空
+```
+
+**方式二：Fish Audio 云端（按量付费）**
+
+```toml
+[fishspeech]
+base_url = "https://api.fish.audio"   # 默认值
+api_key = "fa-xxxxxxxx"               # https://fish.audio 平台获取
+reference_id = ""                     # 可选：指定云端参考音色 ID
+```
+
+其他可选参数：`format`（默认 mp3）、`normalize`（默认 true，数字朗读更稳定）、`timeout`（默认 120 秒）。
+
+**旁白情感标签**（`[app]` 段 `narration_emotion_tags = true`）：
+开启后 LLM 生成旁白时会插入 `[whisper]` `[excited]` `[pause]` `[sad]` `[laughing]` `[emphasis]` `[sigh]` `[surprised]` 等风格标签——Fish-Speech S2 会将其渲染为真实情绪表达；使用其他 TTS 引擎时标签会自动剥离，不影响合成与字幕。
+
+> ⚠️ 注意：fish-speech 代码与权重采用 FISH AUDIO RESEARCH LICENSE（非 MIT），商用需另行获得授权。
 
 ---
 

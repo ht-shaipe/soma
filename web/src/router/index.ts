@@ -16,6 +16,12 @@ const router = createRouter({
       meta: { titleKey: 'nav.workbench', subtitleKey: 'workbench.subtitle' },
     },
     {
+      path: '/toolbox',
+      name: 'toolbox',
+      component: () => import('@/views/ToolboxView.vue'),
+      meta: { titleKey: 'nav.toolbox', subtitleKey: 'toolbox.subtitle' },
+    },
+    {
       path: '/image-story',
       name: 'image-story',
       component: () => import('@/views/ImageStoryView.vue'),

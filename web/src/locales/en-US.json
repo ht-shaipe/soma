@@ -9,6 +9,7 @@
     "settings": "Settings",
     "guide": "Guide",
     "workbench": "Feature Workbench",
+    "toolbox": "Toolbox",
     "imageStory": "Image Story",
     "groupCreate": "Create",
     "groupManage": "Manage"
@@ -121,6 +122,10 @@
     "xfyunAppId": "iFlyTek App ID",
     "xfyunApiKey": "iFlyTek API Key",
     "xfyunApiSecret": "iFlyTek API Secret",
+    "fishspeechTts": "Fish-Speech S2",
+    "fishspeechBaseUrl": "API URL (self-hosted or https://api.fish.audio)",
+    "fishspeechApiKey": "API Key (optional for self-hosted)",
+    "fishspeechRefId": "Reference voice ID (optional)",
     "voiceListFailed": "Failed to load voice list",
     "voicePreviewFailed": "Voice preview failed",
     "previewText": "Hello, this is a voice preview test.",
@@ -246,14 +251,19 @@
       "accountId": "Account ID"
     },
     "tts": {
-      "title": "TTS Configuration",
-      "defaultServer": "Default TTS Server",
+      "title": "TTS Settings",
+      "defaultServer": "Default TTS Service",
       "azureKey": "Azure Speech Key",
       "azureRegion": "Azure Speech Region",
       "siliconflowKey": "SiliconFlow API Key",
       "elevenlabsKey": "ElevenLabs API Key",
       "elevenlabsModel": "ElevenLabs Model",
-      "mimoKey": "MiMo API Key"
+      "mimoKey": "MiMo API Key",
+      "fishspeechBaseUrl": "API URL",
+      "fishspeechApiKey": "API Key",
+      "fishspeechRefId": "Reference voice ID (optional)",
+      "fishspeechHint": "Self-hosted: python tools/api_server.py --listen 0.0.0.0:8080, then fill http://IP:8080; Cloud: https://api.fish.audio with platform API key",
+      "emotionTags": "Inject emotion tags into narration ([whisper] [excited], rendered by Fish-Speech)"
     },
     "stock": {
       "title": "Stock Source API Keys",
@@ -527,6 +537,7 @@
     "schemaReady": "Schema ready",
     "noFeatures": "No features loaded, please check the backend",
     "inputParams": "Input",
+    "advancedSettings": "Advanced Settings",
     "noParams": "This feature needs no input",
     "arrayHint": "Type and press Enter, multiple allowed",
     "run": "Run",
@@ -559,5 +570,76 @@
     "subtitle": "Image Story Video Generation",
     "title": "Image Story",
     "desc": "Upload multiple images, add text descriptions, AI will generate video based on images and descriptions"
+  },
+  "toolbox": {
+    "subtitle": "Standalone utilities",
+    "use": "Use",
+    "result": "Result",
+    "tools": {
+      "download": {
+        "title": "Video Download",
+        "desc": "Universal video download via yt-dlp, 1000+ sites, audio extraction supported"
+      },
+      "douyin": {
+        "title": "Douyin Direct",
+        "desc": "Query video details and user posts via signed Douyin Web API (browser cookie required)"
+      },
+      "subtitle": {
+        "title": "Subtitle Tools",
+        "desc": "Subtitle format conversion, multi-file merge, LLM translation and correction"
+      },
+      "jianying": {
+        "title": "JianYing Draft",
+        "desc": "Generate JianYing (CapCut) draft from video/audio files, openable in the editor"
+      },
+      "notify": {
+        "title": "Notification",
+        "desc": "Push messages to Bark / DingTalk / Telegram"
+      },
+      "dataexport": {
+        "title": "Data Export",
+        "desc": "Export JSON data as CSV / JSON / JSONL files"
+      }
+    },
+    "f": {
+      "url": "Video URL",
+      "saveDir": "Save directory",
+      "audioOnly": "Audio only",
+      "proxy": "Proxy (optional)",
+      "awemeId": "Video ID / URL",
+      "secUserId": "sec_uid / profile URL",
+      "count": "Count",
+      "cookie": "Cookie (optional)",
+      "inputPath": "Input file path",
+      "paths": "Subtitle files (one per line)",
+      "outputPath": "Output file path",
+      "targetLang": "Target language",
+      "name": "Draft name",
+      "videos": "Video files (one per line)",
+      "audio": "Audio file (optional)",
+      "outputDir": "Output directory",
+      "width": "Width",
+      "height": "Height",
+      "channel": "Channel",
+      "webhook": "Webhook URL",
+      "secret": "Secret (optional)",
+      "title": "Title",
+      "body": "Body",
+      "data": "JSON data (array)",
+      "format": "Format"
+    },
+    "a": {
+      "info": "Info",
+      "download": "Download",
+      "detail": "Video detail",
+      "posts": "User posts",
+      "convert": "Convert",
+      "merge": "Merge",
+      "translate": "Translate",
+      "create": "Create draft",
+      "send": "Send",
+      "preview": "Preview",
+      "export": "Export"
+    }
   }
 }

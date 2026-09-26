@@ -106,6 +106,7 @@
               <el-option label="Google Gemini TTS" value="gemini" />
               <el-option label="Xiaomi MiMo TTS" value="mimo" />
               <el-option label="ElevenLabs TTS" value="elevenlabs" />
+              <el-option label="Fish-Speech S2" value="fishspeech" />
             </el-select>
           </div>
           <div class="form-grid">
@@ -138,6 +139,27 @@
             <div class="form-label">{{ $t('settings.tts.mimoKey') }}</div>
             <el-input v-model="mimoKey" type="password" show-password />
           </div>
+          <template v-if="ttsProvider === 'fishspeech'">
+            <div class="form-row">
+              <div class="form-label">{{ $t('settings.tts.fishspeechBaseUrl') }}</div>
+              <el-input v-model="fishspeechBaseUrl" placeholder="https://api.fish.audio" />
+            </div>
+            <div class="form-grid">
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.tts.fishspeechApiKey') }}</div>
+                <el-input v-model="fishspeechApiKey" type="password" show-password />
+              </div>
+              <div class="form-row">
+                <div class="form-label">{{ $t('settings.tts.fishspeechRefId') }}</div>
+                <el-input v-model="fishspeechReferenceId" />
+              </div>
+            </div>
+            <div class="form-row" style="display: flex; align-items: center; gap: 12px;">
+              <el-switch v-model="narrationEmotionTags" />
+              <span>{{ $t('settings.tts.emotionTags') }}</span>
+            </div>
+            <el-alert type="info" :closable="false" :title="$t('settings.tts.fishspeechHint')" />
+          </template>
         </div>
       </section>
 
@@ -382,6 +404,10 @@ const siliconflowKey = ref(configStore.config.tts.siliconflow_key || '')
 const elevenlabsKey = ref(configStore.config.tts.elevenlabs_key || '')
 const elevenlabsModel = ref(configStore.config.tts.elevenlabs_model || 'eleven_multilingual_v2')
 const mimoKey = ref(configStore.config.tts.mimo_key || '')
+const fishspeechBaseUrl = ref(configStore.config.tts.fishspeech_base_url || '')
+const fishspeechApiKey = ref(configStore.config.tts.fishspeech_api_key || '')
+const fishspeechReferenceId = ref(configStore.config.tts.fishspeech_reference_id || '')
+const narrationEmotionTags = ref(configStore.config.app.narration_emotion_tags || false)
 
 const pexelsApiKey = ref(configStore.config.stock.pexels_api_key)
 const pixabayApiKey = ref(configStore.config.stock.pixabay_api_key)
@@ -415,6 +441,10 @@ watch(() => configStore.config, (cfg) => {
   elevenlabsKey.value = cfg.tts.elevenlabs_key || ''
   elevenlabsModel.value = cfg.tts.elevenlabs_model || 'eleven_multilingual_v2'
   mimoKey.value = cfg.tts.mimo_key || ''
+  fishspeechBaseUrl.value = cfg.tts.fishspeech_base_url || ''
+  fishspeechApiKey.value = cfg.tts.fishspeech_api_key || ''
+  fishspeechReferenceId.value = cfg.tts.fishspeech_reference_id || ''
+  narrationEmotionTags.value = cfg.app.narration_emotion_tags || false
   pexelsApiKey.value = cfg.stock.pexels_api_key
   pixabayApiKey.value = cfg.stock.pixabay_api_key
   coverrApiKey.value = cfg.stock.coverr_api_key
@@ -464,6 +494,7 @@ const ttsOk = computed(() => {
   if (ttsProvider.value === 'siliconflow') return !!siliconflowKey.value.trim()
   if (ttsProvider.value === 'elevenlabs') return !!elevenlabsKey.value.trim()
   if (ttsProvider.value === 'mimo') return !!mimoKey.value.trim()
+  if (ttsProvider.value === 'fishspeech') return !!fishspeechBaseUrl.value.trim()
   return true
 })
 const stockOk = computed(() => !!pexelsApiKey.value.trim() || !!pixabayApiKey.value.trim() || !!coverrApiKey.value.trim())
@@ -494,6 +525,8 @@ function formSnapshot(): string {
       provider: ttsProvider.value, azure_speech_key: azureSpeechKey.value,
       azure_speech_region: azureSpeechRegion.value, siliconflow_key: siliconflowKey.value,
       elevenlabs_key: elevenlabsKey.value, elevenlabs_model: elevenlabsModel.value, mimo_key: mimoKey.value,
+      fishspeech_base_url: fishspeechBaseUrl.value, fishspeech_api_key: fishspeechApiKey.value,
+      fishspeech_reference_id: fishspeechReferenceId.value, narration_emotion_tags: narrationEmotionTags.value,
     },
     { pexels_api_key: pexelsApiKey.value, pixabay_api_key: pixabayApiKey.value, coverr_api_key: coverrApiKey.value },
     {
@@ -544,6 +577,9 @@ async function onSave() {
       elevenlabs_key: elevenlabsKey.value,
       elevenlabs_model: elevenlabsModel.value,
       mimo_key: mimoKey.value,
+      fishspeech_base_url: fishspeechBaseUrl.value,
+      fishspeech_api_key: fishspeechApiKey.value,
+      fishspeech_reference_id: fishspeechReferenceId.value,
     })
     configStore.updateStockConfig({
       pexels_api_key: pexelsApiKey.value,
@@ -567,6 +603,7 @@ async function onSave() {
     configStore.updateAppConfig({
       storage_path: storagePath.value,
       concurrent_tasks: concurrentTasks.value,
+      narration_emotion_tags: narrationEmotionTags.value,
     })
     const ok = await configStore.save()
     if (ok) {

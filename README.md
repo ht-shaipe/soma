@@ -8,7 +8,7 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 
 - **AI 脚本生成**：支持 DeepSeek、OpenAI、Qwen、Gemini、Moonshot、Grok、Ollama 等 25+ 种 LLM 提供商
 - **需求理解与分镜**：LLM 先解析风格/情绪/受众（意图理解），再产出带视觉提示词、镜头运动、转场建议的分镜脚本
-- **智能语音合成 (TTS)**：Edge TTS、Azure、SiliconFlow、ElevenLabs、Gemini、MiMo、火山引擎、科大讯飞等 10 种引擎，支持中/英/多语种
+- **智能语音合成 (TTS)**：Edge TTS、Azure、SiliconFlow、ElevenLabs、Gemini、MiMo、火山引擎、科大讯飞、Fish-Speech S2（含旁白情感标签）等 11 种引擎，支持中/英/多语种
 - **声音克隆**：对接 SSH 远程 GPU 推理服务，支持 GPT-SoVITS / CosyVoice / Fish-Speech 克隆自定义音色
 - **素材自动采集**：对接 Pexels、Pixabay、Coverr 素材库，按关键词自动搜索下载视频片段，支持多 Key 轮换突破速率限制
 - **AI 视频生成**：支持智谱 CogVideoX（免费 flash 模型）、快手可灵 Kling、MiniMax 海螺 Hailuo 等视频生成大模型，直接生成视频片段
@@ -40,7 +40,7 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 | 后端 | Rust + Actix-Web 4 |
 | 前端 | Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue I18n（中英双语） |
 | 视频处理 | FFmpeg（拼接/转场/字幕/混音/水印） |
-| 语音合成 | Edge TTS / Azure / SiliconFlow / ElevenLabs / Gemini / MiMo / 火山引擎 / 讯飞 / HeyGem / 声音克隆 |
+| 语音合成 | Edge TTS / Azure / SiliconFlow / ElevenLabs / Gemini / MiMo / 火山引擎 / 讯飞 / Fish-Speech S2 / HeyGem / 声音克隆 |
 | AI 模型 | DeepSeek / OpenAI / Qwen / Gemini 等 25+ 提供商 |
 | 视频生成 | 智谱 CogVideoX / 快手可灵 Kling / MiniMax 海螺 |
 | 数字人 | HeyGen / SadTalker / EchoMimicV3-Flash / HeyGem / Live2D |
@@ -298,8 +298,11 @@ cd web && npm install && npm run dev
 | ElevenLabs | `[elevenlabs]` 段 `api_key` | https://elevenlabs.io | 1万字符/月 |
 | 火山引擎 | `[volcengine]` 段 `app_id` + `access_token` | https://console.volcengine.com/speech | 有免费额度 |
 | 科大讯飞 | `[xfyun]` 段 `app_id` + `api_key` + `api_secret` | https://www.xfyun.cn | 注册送额度 |
+| Fish-Speech S2 | `[fishspeech]` 段 `base_url`（自部署）或 `api_key`（云端） | https://fish.audio | 自部署免费 / 云端按量 |
 
 > 支持在 `voice_name` 中用引擎前缀路由（如 `siliconflow:xxx`、`azure:xxx`、`volcengine:xxx`），无前缀默认 Edge TTS。声音克隆音色通过 `/api/v1/voices/clone` 上传参考音频训练。
+>
+> **Fish-Speech S2** 兼容自部署（`python tools/api_server.py`）与 Fish Audio 云端；在 `[app]` 段开启 `narration_emotion_tags = true` 后，LLM 会在旁白中插入 `[whisper]` `[excited]` 等情感标签，由 Fish-Speech 渲染为真实情绪（其他引擎自动剥离）。详见 CONFIG_GUIDE.md。
 
 ### 可选：生产部署
 

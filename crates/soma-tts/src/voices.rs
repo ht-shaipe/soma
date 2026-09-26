@@ -180,6 +180,24 @@ pub fn is_xfyun_voice(voice_name: &str) -> bool {
     voice_name.starts_with("xfyun:")
 }
 
+/// 判断是否为 Fish-Speech 语音（以 `fishspeech:` 开头）
+pub fn is_fishspeech_voice(voice_name: &str) -> bool {
+    voice_name.starts_with("fishspeech:")
+}
+
+/// 从 Fish-Speech 语音名称中提取参考音色 ID
+///
+/// 格式：`fishspeech:reference-id`（如 `fishspeech:my-speaker`）
+/// `fishspeech:` 后为空时返回空串（使用配置中的默认音色）。
+pub fn extract_fishspeech_voice(voice_name: &str) -> Option<String> {
+    let parts: Vec<&str> = voice_name.splitn(2, ':').collect();
+    if parts.len() == 2 && parts[0] == "fishspeech" {
+        Some(parts[1].trim().to_string())
+    } else {
+        None
+    }
+}
+
 /// 从火山引擎语音名称中提取 voice_id
 ///
 /// 格式：`volcengine:voice-id`（如 `volcengine:BV700_streaming`）

@@ -15,6 +15,9 @@ deepseek_model_name = "deepseek-v4-pro"
 gemini_api_key = ""
 mimo_api_key = ""
 subtitle_provider = "edge-tts"
+# 是否在旁白文案中注入 Fish-Speech 风格情感标签（[whisper] [excited] 等）
+# 开启后 LLM 生成旁白时插入标签；fishspeech 引擎渲染标签，其他引擎自动剥离
+narration_emotion_tags = false
 imagemagick_path = ""
 ffmpeg_path = "ffmpeg"
 video_codec = "libx264"
@@ -59,6 +62,27 @@ api_key = ""
 [elevenlabs]
 api_key = ""
 model_id = "eleven_multilingual_v2"
+
+# Fish-Speech S2 TTS 配置（语音名前缀 fishspeech: 路由，或 tts_provider = "fishspeech"）
+# 两种部署形态：
+#   1. 自部署（免费，需 GPU）：fish-speech 仓库执行
+#      python tools/api_server.py --llama-checkpoint-path checkpoints/s2-pro \
+#        --decoder-checkpoint-path checkpoints/s2-pro/codec.pth --listen 0.0.0.0:8080
+#      此处 base_url 填 "http://GPU主机IP:8080"；服务未启用 --api-key 时 api_key 可留空
+#   2. Fish Audio 云端（按量付费）：https://fish.audio 申请 API Key，
+#      base_url 填 "https://api.fish.audio"（默认值），api_key 必填
+# 注意：fish-speech 代码与权重为 FISH AUDIO RESEARCH LICENSE，商用需另行授权
+[fishspeech]
+base_url = "https://api.fish.audio"
+api_key = ""
+# 默认参考音色 ID（服务端 references 目录名或 fish.audio 音色 ID），留空用默认音色
+reference_id = ""
+# 音频格式：wav / pcm / mp3 / opus
+format = "mp3"
+# 中英文数字归一化（提升数字朗读稳定性）
+normalize = true
+# 请求超时（秒）
+timeout = 120
 
 [ui]
 hide_log = false

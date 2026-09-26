@@ -74,78 +74,157 @@
       </div>
 
       <div v-if="formFields.length" class="wb-form">
-        <div class="section-title">{{ $t('workbench.inputParams') }}</div>
-        <el-form label-position="top" size="large">
-          <el-form-item
-            v-for="field in formFields"
-            :key="field.name"
-            :required="field.required"
-          >
-            <template #label>
-              <span class="wb-field-label">
-                {{ field.description || field.name }}
-                <code v-if="field.description && field.description !== field.name" class="wb-field-key">{{ field.name }}</code>
-                <code class="wb-field-type">{{ field.typeLabel }}</code>
-              </span>
-            </template>
+        <!-- 必填字段：直接展示 -->
+        <template v-if="requiredFields.length">
+          <div v-for="field in requiredFields" :key="field.name" class="wb-form-item">
+            <el-form-item :required="field.required">
+              <template #label>
+                <span class="wb-field-label">
+                  {{ field.description || field.name }}
+                  <code v-if="field.description && field.description !== field.name" class="wb-field-key">{{ field.name }}</code>
+                </span>
+              </template>
+              <!-- 文件选择器：视频素材（多选） -->
+              <div v-if="isFileSelectorField(field.name, current?.id || '') === 'video'" class="wb-file-selector">
+                <div class="wb-file-list" v-if="formModel[field.name] && (formModel[field.name] as string[]).length">
+                  <div v-for="(path, idx) in (formModel[field.name] as string[])" :key="path" class="wb-file-item">
+                    <span class="wb-file-name">{{ getFileName(path) }}</span>
+                    <el-button type="danger" :icon="Delete" size="small" circle @click="removeFile(field.name, idx)" />
+                  </div>
+                </div>
+                <el-button type="primary" :icon="FolderOpened" @click="handleFilesPick(field.name)">
+                  选择视频文件
+                </el-button>
+              </div>
+              <!-- 文件选择器：音频文件（单选） -->
+              <div v-else-if="isFileSelectorField(field.name, current?.id || '') === 'audio'" class="wb-file-selector">
+                <div v-if="formModel[field.name]" class="wb-file-list">
+                  <div class="wb-file-item">
+                    <span class="wb-file-name">{{ getFileName(formModel[field.name] as string) }}</span>
+                    <el-button type="danger" :icon="Delete" size="small" circle @click="formModel[field.name] = ''" />
+                  </div>
+                </div>
+                <el-button type="primary" :icon="FolderOpened" @click="handleFilePick(field.name)">
+                  选择音频文件
+                </el-button>
+              </div>
+              <el-switch v-else-if="field.type === 'boolean'" v-model="formModel[field.name]" />
+              <el-select
+                v-else-if="field.options"
+                v-model="formModel[field.name]"
+                filterable
+                allow-create
+                default-first-option
+                :placeholder="$t('workbench.selectHint')"
+                class="!w-full"
+              >
+                <el-option v-for="o in field.options" :key="o" :label="getOptionLabel(o)" :value="o" />
+              </el-select>
+              <el-input
+                v-else-if="field.type === 'object'"
+                v-model="formModel[field.name]"
+                type="textarea"
+                :rows="6"
+                class="wb-json-editor"
+                :placeholder="$t('workbench.jsonHint')"
+              />
+              <el-input-number
+                v-else-if="field.type === 'number' || field.type === 'integer'"
+                v-model="formModel[field.name]"
+                :step="field.type === 'integer' ? 1 : 0.1"
+                class="!w-full"
+              />
+              <el-input
+                v-else-if="field.longText"
+                v-model="formModel[field.name]"
+                type="textarea"
+                :rows="4"
+              />
+              <el-input
+                v-else
+                v-model="formModel[field.name]"
+                :placeholder="field.description || field.name"
+              />
+            </el-form-item>
+          </div>
+        </template>
 
-            <el-switch v-if="field.type === 'boolean'" v-model="formModel[field.name]" />
-            <el-select
-              v-else-if="field.options"
-              v-model="formModel[field.name]"
-              filterable
-              allow-create
-              default-first-option
-              :placeholder="$t('workbench.selectHint')"
-              class="!w-full"
-            >
-              <el-option v-for="o in field.options" :key="o" :label="getOptionLabel(o)" :value="o" />
-            </el-select>
-            <el-input
-              v-else-if="field.type === 'object'"
-              v-model="formModel[field.name]"
-              type="textarea"
-              :rows="6"
-              class="wb-json-editor"
-              :placeholder="$t('workbench.jsonHint')"
-            />
-            <el-input-number
-              v-else-if="field.type === 'number' || field.type === 'integer'"
-              v-model="formModel[field.name]"
-              :step="field.type === 'integer' ? 1 : 0.1"
-              class="!w-full"
-            />
-            <el-input
-              v-else-if="field.type === 'array' && field.itemIsObject"
-              v-model="formModel[field.name]"
-              type="textarea"
-              :rows="6"
-              class="wb-json-editor"
-              :placeholder="$t('workbench.jsonArrayHint')"
-            />
-            <el-select
-              v-else-if="field.type === 'array'"
-              v-model="formModel[field.name]"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              :placeholder="$t('workbench.arrayHint')"
-              class="!w-full"
-            />
-            <el-input
-              v-else-if="field.longText"
-              v-model="formModel[field.name]"
-              type="textarea"
-              :rows="4"
-            />
-            <el-input
-              v-else
-              v-model="formModel[field.name]"
-              :placeholder="field.description || field.name"
-            />
-          </el-form-item>
-        </el-form>
+        <!-- 可选字段：折叠到「高级设置」 -->
+        <el-collapse v-if="optionalFields.length" class="wb-advanced-collapse">
+          <el-collapse-item :title="$t('workbench.advancedSettings')" name="advanced">
+            <div v-for="field in optionalFields" :key="field.name" class="wb-form-item">
+              <el-form-item>
+                <template #label>
+                  <span class="wb-field-label">
+                    {{ field.description || field.name }}
+                    <code v-if="field.description && field.description !== field.name" class="wb-field-key">{{ field.name }}</code>
+                  </span>
+                </template>
+                <!-- 文件选择器：视频素材（多选） -->
+                <div v-if="isFileSelectorField(field.name, current?.id || '') === 'video'" class="wb-file-selector">
+                  <div class="wb-file-list" v-if="formModel[field.name] && (formModel[field.name] as string[]).length">
+                    <div v-for="(path, idx) in (formModel[field.name] as string[])" :key="path" class="wb-file-item">
+                      <span class="wb-file-name">{{ getFileName(path) }}</span>
+                      <el-button type="danger" :icon="Delete" size="small" circle @click="removeFile(field.name, idx)" />
+                    </div>
+                  </div>
+                  <el-button type="primary" :icon="FolderOpened" @click="handleFilesPick(field.name)">
+                    选择视频文件
+                  </el-button>
+                </div>
+                <!-- 文件选择器：音频文件（单选） -->
+                <div v-else-if="isFileSelectorField(field.name, current?.id || '') === 'audio'" class="wb-file-selector">
+                  <div v-if="formModel[field.name]" class="wb-file-list">
+                    <div class="wb-file-item">
+                      <span class="wb-file-name">{{ getFileName(formModel[field.name] as string) }}</span>
+                      <el-button type="danger" :icon="Delete" size="small" circle @click="formModel[field.name] = ''" />
+                    </div>
+                  </div>
+                  <el-button type="primary" :icon="FolderOpened" @click="handleFilePick(field.name)">
+                    选择音频文件
+                  </el-button>
+                </div>
+                <el-switch v-else-if="field.type === 'boolean'" v-model="formModel[field.name]" />
+                <el-select
+                  v-else-if="field.options"
+                  v-model="formModel[field.name]"
+                  filterable
+                  allow-create
+                  default-first-option
+                  :placeholder="$t('workbench.selectHint')"
+                  class="!w-full"
+                >
+                  <el-option v-for="o in field.options" :key="o" :label="getOptionLabel(o)" :value="o" />
+                </el-select>
+                <el-input
+                  v-else-if="field.type === 'object'"
+                  v-model="formModel[field.name]"
+                  type="textarea"
+                  :rows="6"
+                  class="wb-json-editor"
+                  :placeholder="$t('workbench.jsonHint')"
+                />
+                <el-input-number
+                  v-else-if="field.type === 'number' || field.type === 'integer'"
+                  v-model="formModel[field.name]"
+                  :step="field.type === 'integer' ? 1 : 0.1"
+                  class="!w-full"
+                />
+                <el-input
+                  v-else-if="field.longText"
+                  v-model="formModel[field.name]"
+                  type="textarea"
+                  :rows="4"
+                />
+                <el-input
+                  v-else
+                  v-model="formModel[field.name]"
+                  :placeholder="field.description || field.name"
+                />
+              </el-form-item>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </div>
       <el-empty v-else :description="$t('workbench.noParams')" :image-size="72" />
 
@@ -247,8 +326,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, Document } from '@element-plus/icons-vue'
+import { Search, Refresh, Document, FolderOpened, Delete } from '@element-plus/icons-vue'
 import api, { extractData } from '@/api'
+import { open } from '@tauri-apps/plugin-dialog'
 
 /** 功能点描述（与后端 FeatureDescriptor 对应） */
 interface FeatureDescriptor {
@@ -289,7 +369,7 @@ const LANGUAGES = ['zh-CN', 'en-US', 'ja-JP'] as const
 const TRANSITIONS = ['FadeIn', 'FadeOut', 'None', 'Shuffle', 'SlideIn', 'SlideOut'] as const
 const PLATFORMS = ['douyin', 'xiaohongshu', 'tiktok', 'youtube_shorts', 'instagram_reels', 'x'] as const
 const VOICES = ['zh-CN-XiaoxiaoNeural', 'zh-CN-YunxiNeural', 'zh-CN-YunjianNeural', 'en-US-JennyNeural', 'en-US-GuyNeural', 'no-voice'] as const
-const TTS_PROVIDERS = ['edge', 'azure', 'siliconflow', 'elevenlabs', 'mimo', 'gemini', 'volcengine', 'xfyun'] as const
+const TTS_PROVIDERS = ['edge', 'azure', 'siliconflow', 'elevenlabs', 'mimo', 'gemini', 'volcengine', 'xfyun', 'fishspeech'] as const
 const ASPECT_RATIOS = ['9:16', '16:9', '1:1'] as const
 
 /** 可枚举字段：优先下拉选择，仍可手动输入其它值（allow-create） */
@@ -358,6 +438,8 @@ const OPTION_LABELS: Record<string, string> = {
   gemini: 'Gemini TTS',
   volcengine: '火山引擎',
   xfyun: '讯飞语音',
+  fishspeech: 'Fish-Speech S2',
+  'fishspeech:': 'Fish-Speech S2 (默认音色)',
   // BGM
   none: '无背景音乐',
   random: '随机背景音乐',
@@ -366,6 +448,64 @@ const OPTION_LABELS: Record<string, string> = {
 /** 根据选项值获取中文显示标签 */
 function getOptionLabel(value: string): string {
   return OPTION_LABELS[value] || value
+}
+
+/** 判断字段是否使用文件选择器 */
+function isFileSelectorField(fieldName: string, featureId: string): 'video' | 'audio' | null {
+  if (featureId === 'video.compose' || featureId === 'video.concat') {
+    if (fieldName === 'materials') return 'video'
+    if (fieldName === 'audio_file') return 'audio'
+  }
+  return null
+}
+
+/** 打开文件选择对话框 */
+async function pickFile(fieldType: 'video' | 'audio'): Promise<string | null> {
+  try {
+    const filters = fieldType === 'video'
+      ? [{ name: '视频文件', extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'] }]
+      : [{ name: '音频文件', extensions: ['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a', 'wma'] }]
+
+    const selected = await open({
+      multiple: false,
+      filters,
+      title: fieldType === 'video' ? '选择视频文件' : '选择音频文件',
+    })
+
+    if (selected && typeof selected === 'string') {
+      return selected
+    }
+    return null
+  } catch (e) {
+    console.error('[workbench] pickFile failed:', e)
+    return null
+  }
+}
+
+/** 打开文件选择对话框（多选） */
+async function pickFiles(fieldType: 'video' | 'audio'): Promise<string[]> {
+  try {
+    const filters = fieldType === 'video'
+      ? [{ name: '视频文件', extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'] }]
+      : [{ name: '音频文件', extensions: ['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a', 'wma'] }]
+
+    const selected = await open({
+      multiple: true,
+      filters,
+      title: fieldType === 'video' ? '选择视频文件' : '选择音频文件',
+    })
+
+    if (selected) {
+      if (Array.isArray(selected)) {
+        return selected
+      }
+      return [selected]
+    }
+    return []
+  } catch (e) {
+    console.error('[workbench] pickFiles failed:', e)
+    return []
+  }
 }
 
 /** 常用默认值：打开表单即预填，减少手动输入 */
@@ -519,6 +659,12 @@ const formFields = computed<FormField[]>(() => {
   })
 })
 
+/** 必填字段（直接展示） */
+const requiredFields = computed(() => formFields.value.filter(f => f.required))
+
+/** 可选字段（折叠到「高级设置」） */
+const optionalFields = computed(() => formFields.value.filter(f => !f.required))
+
 function openRun(f: FeatureDescriptor) {
   current.value = f
   formModel.value = {}
@@ -537,6 +683,43 @@ function openRun(f: FeatureDescriptor) {
     }
   }
   runVisible.value = true
+}
+
+/** 从完整路径中提取文件名 */
+function getFileName(path: string): string {
+  return path.split('/').pop() || path.split('\\').pop() || path
+}
+
+/** 处理文件选择（单选） */
+async function handleFilePick(fieldName: string) {
+  const fieldType = isFileSelectorField(fieldName, current.value?.id || '')
+  if (!fieldType) return
+
+  const filePath = await pickFile(fieldType)
+  if (filePath) {
+    formModel.value[fieldName] = filePath
+  }
+}
+
+/** 处理文件选择（多选，用于 materials） */
+async function handleFilesPick(fieldName: string) {
+  const fieldType = isFileSelectorField(fieldName, current.value?.id || '')
+  if (!fieldType) return
+
+  const filePaths = await pickFiles(fieldType)
+  if (filePaths.length > 0) {
+    // 合并到现有列表（去重）
+    const existing = Array.isArray(formModel.value[fieldName]) ? formModel.value[fieldName] as string[] : []
+    const merged = [...new Set([...existing, ...filePaths])]
+    formModel.value[fieldName] = merged
+  }
+}
+
+/** 移除已选文件 */
+function removeFile(fieldName: string, index: number) {
+  const existing = Array.isArray(formModel.value[fieldName]) ? formModel.value[fieldName] as string[] : []
+  existing.splice(index, 1)
+  formModel.value[fieldName] = [...existing]
 }
 
 function buildPayload(): Record<string, unknown> {
@@ -897,5 +1080,62 @@ async function copyText(text: string) {
   font-size: 11.5px;
   color: var(--soma-text-faint);
   font-family: 'JetBrains Mono', monospace;
+}
+
+.wb-advanced-collapse {
+  border: none;
+  margin-top: 8px;
+}
+
+.wb-advanced-collapse :deep(.el-collapse-item__header) {
+  font-size: 13px;
+  color: var(--soma-text-dim);
+  height: 36px;
+  line-height: 36px;
+  background: transparent;
+  border: none;
+}
+
+.wb-advanced-collapse :deep(.el-collapse-item__wrap) {
+  border: none;
+  background: transparent;
+}
+
+.wb-advanced-collapse :deep(.el-collapse-item__content) {
+  padding-bottom: 0;
+}
+
+.wb-form-item {
+  margin-bottom: 4px;
+}
+
+.wb-file-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--soma-line);
+  border-radius: var(--soma-radius-sm);
+  background: var(--soma-glass);
+}
+
+.wb-file-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

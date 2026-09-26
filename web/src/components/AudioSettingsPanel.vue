@@ -15,6 +15,7 @@
         <el-option :label="$t('audio.elevenlabsTts')" value="elevenlabs" />
         <el-option :label="$t('audio.volcengineTts')" value="volcengine" />
         <el-option :label="$t('audio.xfyunTts')" value="xfyun" />
+        <el-option :label="$t('audio.fishspeechTts')" value="fishspeech" />
       </el-select>
     </div>
     <VoiceSelector v-if="store.ttsServer !== 'none'" />
@@ -74,6 +75,18 @@
     <div v-if="store.ttsServer === 'xfyun'" class="form-row">
       <div class="form-label">{{ $t('audio.xfyunApiSecret') }}</div>
       <el-input v-model="xfyunApiSecret" type="password" show-password @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'fishspeech'" class="form-row">
+      <div class="form-label">{{ $t('audio.fishspeechBaseUrl') }}</div>
+      <el-input v-model="fishspeechBaseUrl" placeholder="https://api.fish.audio" @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'fishspeech'" class="form-row">
+      <div class="form-label">{{ $t('audio.fishspeechApiKey') }}</div>
+      <el-input v-model="fishspeechApiKey" type="password" show-password @change="onSaveTtsConfig" />
+    </div>
+    <div v-if="store.ttsServer === 'fishspeech'" class="form-row">
+      <div class="form-label">{{ $t('audio.fishspeechRefId') }}</div>
+      <el-input v-model="fishspeechReferenceId" @change="onSaveTtsConfig" />
     </div>
     <div v-if="store.ttsServer !== 'none'" class="form-row">
       <div class="form-label">{{ $t('audio.speechVolume') }}</div>
@@ -138,6 +151,9 @@ const volcAccessToken = ref('')
 const xfyunAppId = ref('')
 const xfyunApiKey = ref('')
 const xfyunApiSecret = ref('')
+const fishspeechBaseUrl = ref('')
+const fishspeechApiKey = ref('')
+const fishspeechReferenceId = ref('')
 
 function loadTtsKeys() {
   const tts = configStore.config.tts
@@ -153,6 +169,9 @@ function loadTtsKeys() {
   xfyunAppId.value = tts.xfyun_app_id || ''
   xfyunApiKey.value = tts.xfyun_api_key || ''
   xfyunApiSecret.value = tts.xfyun_api_secret || ''
+  fishspeechBaseUrl.value = tts.fishspeech_base_url || ''
+  fishspeechApiKey.value = tts.fishspeech_api_key || ''
+  fishspeechReferenceId.value = tts.fishspeech_reference_id || ''
 }
 
 function onSaveTtsConfig() {
@@ -169,6 +188,9 @@ function onSaveTtsConfig() {
     xfyun_app_id: xfyunAppId.value,
     xfyun_api_key: xfyunApiKey.value,
     xfyun_api_secret: xfyunApiSecret.value,
+    fishspeech_base_url: fishspeechBaseUrl.value,
+    fishspeech_api_key: fishspeechApiKey.value,
+    fishspeech_reference_id: fishspeechReferenceId.value,
   })
   configStore.save()
 }

@@ -191,6 +191,7 @@ fn main() {
     init_backend();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![greet, api, upload_file])
         .run(tauri::generate_context!())
         .expect("Soma 桌面应用启动失败");

@@ -212,6 +212,20 @@ pub async fn generate_narration(
         language
     };
 
+    // Fish-Speech 风格情感标签指令：开启后让 LLM 在旁白中插入 [tag]，
+    // 由支持标签的 TTS 引擎（fishspeech）渲染为语气/停顿/情绪；
+    // 其他引擎会在合成前自动剥离标签。
+    let emotion_tag_instruction = if conf.get_narration_emotion_tags() {
+        "\n11. 在合适的语句前插入方括号情感标签来控制语气和情绪，例如 [whisper]（耳语）、\
+         [excited]（兴奋）、[pause]（停顿）、[sad]（低落）、[laughing]（轻笑）、\
+         [emphasis]（重音）、[sigh]（叹息）、[surprised]（惊讶）\n\
+         - 标签必须紧贴它所作用的语句之前\n\
+         - 克制使用，全文标签总数不超过段落句子数的一半，每句最多一个\n\
+         - 标签之外不要再输出任何其他方括号内容\n"
+    } else {
+        ""
+    };
+
     let sys_msg = format!(
         "你是一个专业的短视频旁白撰稿人。你的任务是将视频脚本转换为适合语音朗读的旁白文案。\n\n\
          关键要求：\n\
@@ -224,8 +238,9 @@ pub async fn generate_narration(
          7. 添加适当的语气词和连接词（'然而''不仅如此''想象一下'等），让旁白更有感染力\n\
          8. 每段旁白要有信息增量，避免空洞重复\n\
          9. 风格：{}，情感基调：{}\n\
-         10. 语言：{}\n\n\
-         直接输出旁白文案纯文本，不要加标题、标号或任何解释。", style, mood, lang_instruction
+         10. 语言：{}{}\n\n\
+         直接输出旁白文案纯文本，不要加标题、标号或任何解释。",
+        style, mood, lang_instruction, emotion_tag_instruction
     );
 
     let user_msg = format!("视频脚本：\n{}{}", script, storyboard_hint);

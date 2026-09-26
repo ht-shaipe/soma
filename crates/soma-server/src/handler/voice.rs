@@ -138,6 +138,23 @@ async fn list_voices(_param: &RequestParameter) -> Result<Value> {
         vec![]
     };
 
+    // Fish-Speech S2 语音（自部署 API Server 或 Fish Audio 云端）
+    let fs_base = conf.app.fishspeech.get_base_url();
+    let mut fishspeech_voices: Vec<Value> = vec![];
+    if !fs_base.is_empty() {
+        fishspeech_voices.push(value!({
+            "name": "fishspeech:",
+            "label": "Fish-Speech S2 (默认音色)",
+        }));
+        let fs_ref_id = conf.app.fishspeech.get_reference_id();
+        if !fs_ref_id.is_empty() {
+            fishspeech_voices.push(value!({
+                "name": format!("fishspeech:{}", fs_ref_id),
+                "label": format!("{} (Fish-Speech 参考音色)", fs_ref_id),
+            }));
+        }
+    }
+
     let mut all_voices = edge_voices;
     all_voices.extend(sf_voices);
     all_voices.extend(el_voices);
@@ -146,6 +163,7 @@ async fn list_voices(_param: &RequestParameter) -> Result<Value> {
     all_voices.extend(azure_voices);
     all_voices.extend(volc_voices);
     all_voices.extend(xfyun_voices);
+    all_voices.extend(fishspeech_voices);
 
     // 添加已克隆的声音
     if let Ok(cloned) = soma_tts::voice_clone::list_cloned_voices() {
@@ -222,6 +240,9 @@ pub async fn preview_voice(req: HttpRequest) -> HttpResponse {
         let xfyun_secret = conf.app.xfyun.api_secret.as_deref().unwrap_or("");
         let tts = soma_tts::xfyun_tts::XfyunTts::new(xfyun_appid, xfyun_key, xfyun_secret);
         local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+    } else if soma_tts::voices::is_fishspeech_voice(&voice_name) {
+        let tts = soma_tts::fishspeech_tts::FishspeechTts::from_config(&conf.app.fishspeech);
+        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
     } else {
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
         local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
@@ -275,7 +296,9 @@ pub async fn preview_subtitle(req: HttpRequest) -> HttpResponse {
         return HttpResponse::BadRequest().body("text parameter required");
     }
 
-    let cues = soma_tts::edge_tts::generate_subtitle_cues_from_text(&text, estimated_duration);
+    // 字幕预览不显示 Fish-Speech 情感标签
+    let plain_text = soma_tts::fishspeech_tts::strip_emotion_tags(&text);
+    let cues = soma_tts::edge_tts::generate_subtitle_cues_from_text(&plain_text, estimated_duration);
     let json = serde_json::to_string(&cues).unwrap_or_else(|_| "[]".to_string());
     HttpResponse::Ok()
         .content_type("application/json")

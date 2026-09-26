@@ -53,6 +53,12 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
         "features" => crate::handler::features::distribute(&param).await,
         "system" => crate::handler::system::distribute(&param).await,
         "image_story" => crate::handler::image_story::distribute(&param).await,
+        "download" => crate::handler::download::distribute(&param).await,
+        "notify" => crate::handler::notify::distribute(&param).await,
+        "subtitle" => crate::handler::subtitle::distribute(&param).await,
+        "jianying" => crate::handler::jianying::distribute(&param).await,
+        "platform" => crate::handler::platform::distribute(&param).await,
+        "dataexport" => crate::handler::dataexport::distribute(&param).await,
         _ => Err(error!("请求方法{}.{}系统未提供。", param.module, param.method)),
     };
 

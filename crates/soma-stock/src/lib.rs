@@ -19,6 +19,8 @@ pub mod pixabay;
 pub mod coverr;
 pub mod aivideo;
 pub mod digital_human;
+pub mod ytdlp;
+pub mod douyin;
 
 /// 素材供应商特征（Trait）
 ///

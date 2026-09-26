@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "主窗口默认能力：允许调用自定义命令与核心 API",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-ask",
+    "dialog:allow-message"
+  ]
 }

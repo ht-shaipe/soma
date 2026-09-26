@@ -33,3 +33,15 @@ pub mod features;
 pub mod system;
 /// 图片故事处理器 - 图片故事视频生成
 pub mod image_story;
+/// 视频下载处理器 - 基于 yt-dlp 的通用视频下载
+pub mod download;
+/// 通知推送处理器 - Bark / 钉钉 / Telegram
+pub mod notify;
+/// 字幕处理处理器 - 翻译/校正/合并/格式转换
+pub mod subtitle;
+/// 剪映草稿处理器 - 生成剪映草稿文件
+pub mod jianying;
+/// 平台直连处理器 - 抖音 Web API（a_bogus 签名直连）
+pub mod platform;
+/// 数据导出处理器 - CSV / JSON / JSONL 通用导出
+pub mod dataexport;

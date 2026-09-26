@@ -10,6 +10,7 @@ const TTS_DEFAULT_VOICES: Record<string, string> = {
   'gemini': 'gemini:Zephyr',
   'mimo': 'mimo:almara',
   'elevenlabs': 'elevenlabs:21m00Tcm4TlvDq8ikWAM:Rachel',
+  'fishspeech': 'fishspeech:',
   'none': 'no-voice',
 }
 

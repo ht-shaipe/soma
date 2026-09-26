@@ -1,8 +1,8 @@
 //! TTS 语音合成功能点（文本 → 音频文件）
 //!
 //! 覆盖原流水线第 5 步的音频部分，同时可作为独立完整合成入口：
-//! 按 provider 选择 TTS 引擎（voice_clone / heygem / siliconflow /
-//! elevenlabs / mimo / gemini / azure / volcengine / xfyun / edge）。
+//! 按 provider 选择 TTS 引擎（voice_clone / heygem / fishspeech /
+//! siliconflow / elevenlabs / mimo / gemini / azure / volcengine / xfyun / edge）。
 
 use crate::context::FeatureContext;
 use crate::descriptor::{FeatureKind, FeatureMeta};
@@ -35,6 +35,17 @@ pub fn synthesize_to(
     if let Some(parent) = std::path::Path::new(output_path).parent() {
         std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
     }
+
+    // Fish-Speech 引擎支持文本内嵌情感标签（如 [whisper] [excited]），保留原文；
+    // 其他引擎会把标签当普通文本朗读，合成前统一剥离。
+    let use_fishspeech = tts_provider == "fishspeech"
+        || soma_tts::voices::is_fishspeech_voice(voice_name);
+    let effective_text = if use_fishspeech {
+        text.to_string()
+    } else {
+        soma_tts::fishspeech_tts::strip_emotion_tags(text)
+    };
+    let text = effective_text.as_str();
 
     let result = if tts_provider == "voice_clone" {
         let vc_conf = &conf.digital_human.voice_clone;
@@ -91,6 +102,20 @@ pub fn synthesize_to(
         );
         let max_retries = hg_conf.get_max_retries() as usize;
         retry(max_retries, || {
+            let fut = soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+            );
+            block_on_async(fut)?
+        })
+    } else if use_fishspeech {
+        let fs_conf = &conf.fishspeech;
+        if fs_conf.get_base_url().is_empty() {
+            return Err(SomaError::Config(
+                "Fish-Speech 未配置，请在 config.toml 中添加 [fishspeech] 段".into(),
+            ));
+        }
+        let tts = soma_tts::fishspeech_tts::FishspeechTts::from_config(fs_conf);
+        retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
                 &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
             );
@@ -221,7 +246,7 @@ pub struct TtsSynthesizeInput {
     /// 语速倍率
     #[serde(default)]
     pub voice_rate: Option<f32>,
-    /// TTS 提供者（voice_clone/heygem/siliconflow/elevenlabs/mimo/gemini/azure/volcengine/xfyun/edge），
+    /// TTS 提供者（voice_clone/heygem/fishspeech/siliconflow/elevenlabs/mimo/gemini/azure/volcengine/xfyun/edge），
     /// 也可由语音名称前缀自动识别
     #[serde(default)]
     pub tts_provider: Option<String>,

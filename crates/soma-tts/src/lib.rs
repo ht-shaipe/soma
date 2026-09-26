@@ -15,6 +15,7 @@ pub mod voice_clone_tts;
 pub mod heygem_tts;
 pub mod volcengine_tts;
 pub mod xfyun_tts;
+pub mod fishspeech_tts;
 pub mod voices;
 pub mod subtitle;
 pub mod voice_clone;

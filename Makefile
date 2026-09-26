@@ -10,6 +10,7 @@ CONFIG_FILE   := conf/config.toml
 WEB_DIR       := web
 STORAGE_DIR   := storage
 CONF_DIR      := conf
+TAURI_DIR     := crates/soma-app
 
 # Colors for output
 COLOR_RESET   := \033[0m
@@ -47,7 +48,31 @@ install-frontend: ## Install frontend dependencies
 	@echo "$(COLOR_GREEN)>>> Installing frontend dependencies...$(COLOR_RESET)"
 	cd $(WEB_DIR) && npm install
 
-## dev: Start both backend and frontend (development mode)
+## install-tauri: Install Tauri CLI
+install-tauri: ## Install Tauri CLI
+	@echo "$(COLOR_GREEN)>>> Installing Tauri CLI...$(COLOR_RESET)"
+	cargo install tauri-cli
+
+# ==================== Desktop App (Tauri) ====================
+
+## dev-tauri: Start Tauri desktop app in development mode
+dev-tauri: check-storage ## Start Tauri desktop app (dev mode)
+	@echo "$(COLOR_GREEN)>>> Starting Soma desktop app...$(COLOR_RESET)"
+	cargo tauri dev
+
+## build-tauri: Build Tauri desktop app for production
+build-tauri: ## Build desktop app for distribution
+	@echo "$(COLOR_GREEN)>>> Building desktop app...$(COLOR_RESET)"
+	cargo tauri build
+
+## dev-tauri-debug: Start Tauri desktop app in debug mode (faster build)
+dev-tauri-debug: check-storage ## Start Tauri desktop app (debug mode)
+	@echo "$(COLOR_GREEN)>>> Starting Soma desktop app (debug)...$(COLOR_RESET)"
+	cargo tauri dev --debug
+
+# ==================== Web Server Mode ====================
+
+## dev: Start both backend and frontend (web development mode)
 dev: ## Start development servers (backend + frontend)
 	@echo "$(COLOR_GREEN)>>> Starting Soma development environment...$(COLOR_RESET)"
 	@echo "$(COLOR_CYAN)    Backend:  http://localhost:$(BACKEND_PORT)$(COLOR_RESET)"
@@ -58,7 +83,7 @@ dev: ## Start development servers (backend + frontend)
 ## dev-backend: Start Rust backend only (development mode)
 dev-backend: check-storage ## Start backend development server
 	@echo "$(COLOR_GREEN)>>> Starting backend on port $(BACKEND_PORT)...$(COLOR_RESET)"
-	cargo run
+	cargo run -p soma-server
 
 ## dev-frontend: Start Vue frontend only (Vite dev server)
 dev-frontend: ## Start frontend Vite dev server
@@ -71,7 +96,7 @@ build: build-backend build-frontend ## Build all for production
 ## build-backend: Build Rust backend in release mode
 build-backend: ## Build backend (release)
 	@echo "$(COLOR_GREEN)>>> Building backend (release)...$(COLOR_RESET)"
-	cargo build --release
+	cargo build --release -p soma-server
 
 ## build-frontend: Build Vue frontend for production
 build-frontend: ## Build frontend for production
@@ -81,11 +106,11 @@ build-frontend: ## Build frontend for production
 ## prod: Build frontend then run backend in release mode (serves SPA)
 prod: build-frontend ## Build frontend, then run backend (production)
 	@echo "$(COLOR_GREEN)>>> Starting production server on port $(BACKEND_PORT)...$(COLOR_RESET)"
-	cargo run --release
+	cargo run --release -p soma-server
 
 ## run: Quick alias for cargo run (backend only, debug mode)
 run: ## Quick start backend in debug mode
-	cargo run
+	cargo run -p soma-server
 
 ## clean: Clean all build artifacts
 clean: ## Clean all build artifacts
@@ -115,7 +140,8 @@ lint: ## Run clippy linter
 check-storage:
 	@mkdir -p $(STORAGE_DIR)/songs $(STORAGE_DIR)/fonts $(STORAGE_DIR)/cache_videos
 
-.PHONY: help install install-backend install-frontend \
+.PHONY: help install install-backend install-frontend install-tauri \
+		dev-tauri build-tauri dev-tauri-debug \
 		dev dev-backend dev-frontend \
 		build build-backend build-frontend prod run \
 		clean check test fmt lint check-storage

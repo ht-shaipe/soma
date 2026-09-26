@@ -13,6 +13,7 @@ tauri-build = { version = "2", features = [] }
 soma-core = { workspace = true }
 soma-server = { workspace = true }
 tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-dialog = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
