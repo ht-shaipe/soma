@@ -5,7 +5,6 @@
 /// - terms: 关键词提取（从脚本中提取素材搜索关键词）
 /// - social: 社交元数据生成（生成社交媒体标题、描述、标签）
 /// - intent: 需求理解（解析用户意图为结构化参数）
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use crate::Config;

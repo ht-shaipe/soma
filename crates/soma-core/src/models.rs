@@ -97,6 +97,7 @@ pub enum VideoAspect {
 
 impl VideoAspect {
     /// 从字符串（如 "16:9"）解析为 VideoAspect，无法识别则返回 None
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "16:9" => Some(VideoAspect::Landscape),
@@ -375,7 +376,7 @@ impl VideoParams {
 
     /// 获取脚本分段数，限制在 1~10 之间，默认 1
     pub fn get_paragraph_number(&self) -> u32 {
-        self.paragraph_number.unwrap_or(1).min(10).max(1)
+        self.paragraph_number.unwrap_or(1).clamp(1, 10)
     }
 
     /// 判断是否为无语音模式（voice_name 为 "no-voice" 或 "none" 时不生成语音）

@@ -185,7 +185,7 @@ impl HeyGemHealthChecker {
                 description: format!("{} 服务过载: HTTP {}", label, r.status()),
             }),
             Err(e) => {
-                let s = format!("{}", e);
+                let s = e.to_string();
                 if s.contains("connect") || s.contains("dns") || s.contains("resolve") {
                     Some(HeyGemMissingItem {
                         kind: HeyGemMissingKind::Environment,

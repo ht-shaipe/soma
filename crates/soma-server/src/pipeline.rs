@@ -8,13 +8,18 @@
 /// 4. 生成字幕（generate_subtitle）
 /// 5. 获取视频素材（get_video_materials）
 /// 6. 生成最终视频（generate_final_videos）
-
 use soma_core::models::VideoParams;
 use tube::Result;
 use crate::service::pipeline as svc_pipeline;
 
 /// 流水线结构体，委托到 service::pipeline::run_task
 pub struct Pipeline;
+
+impl Default for Pipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Pipeline {
     pub fn new() -> Self {

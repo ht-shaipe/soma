@@ -76,7 +76,7 @@ impl SomaTtsProvider for AzureTts {
                 std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
             }
             let result = tokio::process::Command::new("ffmpeg")
-                .args(&[
+                .args([
                     "-y", "-f", "lavfi",
                     "-i", "anullsrc=r=44100:cl=mono",
                     "-t", &format!("{:.3}", duration),

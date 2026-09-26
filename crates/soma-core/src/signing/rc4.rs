@@ -7,8 +7,8 @@
 /// RC4 是对称流密码，加密和解密使用相同操作。
 pub fn rc4(key: &[u8], data: &[u8]) -> Vec<u8> {
     let mut s: [u8; 256] = [0; 256];
-    for i in 0..256 {
-        s[i] = i as u8;
+    for (i, v) in s.iter_mut().enumerate() {
+        *v = i as u8;
     }
 
     // KSA (Key-Scheduling Algorithm)

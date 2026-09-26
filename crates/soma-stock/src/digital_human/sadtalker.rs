@@ -36,7 +36,7 @@ struct SadTalkerTaskState {
 
 /// 环境检查缺失项类型
 #[derive(Debug, Clone)]
-enum MissingKind {
+pub enum MissingKind {
     Environment,
     Dependency,
     ModelWeight,
@@ -45,9 +45,9 @@ enum MissingKind {
 
 /// 环境检查缺失项
 #[derive(Debug, Clone)]
-struct MissingItem {
-    kind: MissingKind,
-    description: String,
+pub struct MissingItem {
+    pub kind: MissingKind,
+    pub description: String,
 }
 
 /// 环境健康检查报告
@@ -165,6 +165,7 @@ impl SadTalkerEnvChecker {
 pub struct SadTalkerProvider {
     config: SadTalkerConfig,
     tasks: Arc<Mutex<HashMap<String, SadTalkerTaskState>>>,
+    #[allow(dead_code)] // 预留：并发限流
     semaphore: Arc<Semaphore>,
     env_checker: SadTalkerEnvChecker,
 }

@@ -3,7 +3,6 @@
 /// 0.1.2 起实现已迁至 `soma_feature::llm`（配置参数为 AppConfig），
 /// 本模块保留原函数签名（`conf: &Config`）委托转发，
 /// handler 层与既有调用方无需改动。
-
 use soma_core::error::SomaError;
 use soma_core::models::StoryboardScene;
 use crate::Config;
@@ -12,6 +11,7 @@ use crate::Config;
 ///
 /// 对应设计文档②文案/剧情生成。一次 LLM 调用同时完成脚本撰写和关键词提取，
 /// 避免两次串行调用导致超时。关键词以 JSON 数组形式附在脚本之后。
+#[allow(clippy::too_many_arguments)]
 pub async fn generate_script(
     provider: &str,
     subject: &str,

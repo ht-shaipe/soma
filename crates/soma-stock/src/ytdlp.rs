@@ -142,8 +142,8 @@ pub async fn get_info(url: &str, proxy: Option<&str>) -> Result<VideoInfo, SomaE
                     ext: f.get("ext").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                     resolution: f.get("resolution").and_then(|v| v.as_str()).map(String::from),
                     filesize: f.get("filesize").and_then(|v| v.as_u64()),
-                    has_video: f.get("vcodec").and_then(|v| v.as_str()).map_or(false, |s| s != "none"),
-                    has_audio: f.get("acodec").and_then(|v| v.as_str()).map_or(false, |s| s != "none"),
+                    has_video: f.get("vcodec").and_then(|v| v.as_str()).is_some_and(|s| s != "none"),
+                    has_audio: f.get("acodec").and_then(|v| v.as_str()).is_some_and(|s| s != "none"),
                 })
             }).collect()
         })

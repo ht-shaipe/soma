@@ -28,14 +28,14 @@ async fn send(param: &RequestParameter) -> Result<Value> {
     let ch = NotifyChannel {
         channel: channel.to_string(),
         webhook: webhook.to_string(),
-        secret: param.value.get("secret").and_then(|v| v.as_str()).map(String::from),
+        secret: param.value.get("secret").and_then(|v| v.as_str()),
     };
 
     let msg = NotifyMessage {
         title: title.to_string(),
         body: body.to_string(),
-        url: param.value.get("url").and_then(|v| v.as_str()).map(String::from),
-        group: param.value.get("group").and_then(|v| v.as_str()).map(String::from),
+        url: param.value.get("url").and_then(|v| v.as_str()),
+        group: param.value.get("group").and_then(|v| v.as_str()),
     };
 
     let result = notify::send(&ch, &msg).await;
@@ -60,7 +60,7 @@ async fn send_batch(param: &RequestParameter) -> Result<Value> {
             Some(NotifyChannel {
                 channel: channel.to_string(),
                 webhook: webhook.to_string(),
-                secret: v.get("secret").and_then(|v| v.as_str()).map(String::from),
+                secret: v.get("secret").and_then(|v| v.as_str()),
             })
         }).collect()
     } else {
@@ -70,8 +70,8 @@ async fn send_batch(param: &RequestParameter) -> Result<Value> {
     let msg = NotifyMessage {
         title: title.to_string(),
         body: body.to_string(),
-        url: param.value.get("url").and_then(|v| v.as_str()).map(String::from),
-        group: param.value.get("group").and_then(|v| v.as_str()).map(String::from),
+        url: param.value.get("url").and_then(|v| v.as_str()),
+        group: param.value.get("group").and_then(|v| v.as_str()),
     };
 
     let results = notify::send_batch(&channels, &msg).await;

@@ -92,8 +92,7 @@ fn greet(name: &str) -> String {
 fn upload_file(file_name: String, data_base64: String) -> Result<serde_json::Value, String> {
     use base64::Engine as _;
     let safe_name: String = file_name
-        .replace('\\', "_")
-        .replace('/', "_")
+        .replace(['\\', '/'], "_")
         .replace("..", "_")
         .chars()
         .filter(|c| !c.is_control())
@@ -216,7 +215,7 @@ mod tests {
         let mut param = RequestParameter::default();
         param.module = "features".to_string();
         param.method = "list".to_string();
-        param.value = tube_value::Value::from_serialize(&serde_json::json!({})).unwrap_or(tube_value::Value::Null);
+        param.value = tube_value::Value::from_serialize(serde_json::json!({})).unwrap_or(tube_value::Value::Null);
         param.text = Some("{}".to_string());
 
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -310,7 +309,7 @@ mod tests {
         param.module = "dataexport".to_string();
         param.method = "preview".to_string();
         param.value = tube_value::Value::from_serialize(
-            &serde_json::json!({ "data": [{ "k": "v", "x": "y" }] }),
+            serde_json::json!({ "data": [{ "k": "v", "x": "y" }] }),
         )
         .unwrap_or(tube_value::Value::Null);
         param.text = Some(r#"{"data":[{"k":"v","x":"y"}]}"#.to_string());

@@ -6,7 +6,6 @@
 ///
 /// 产物根目录默认 `storage/features/`，每次运行会写入
 /// `input.json` 与 `run_record.json` 运行记录（按功能点/运行 ID 归档）。
-
 use lazy_static::lazy_static;
 use soma_feature::FeatureRegistry;
 

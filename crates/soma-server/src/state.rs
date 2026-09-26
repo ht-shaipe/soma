@@ -2,7 +2,6 @@
 ///
 /// 通过 TaskStore trait 抽象任务存储，支持内存和 Redis 后端。
 /// 提供任务的创建、查询、更新、删除等 CRUD 操作。
-
 use soma_core::models::{TaskInfo, TaskStatus, StoryboardScene, VideoParams, AiVideoSegmentLog, DigitalHumanTaskInfo, DigitalHumanParams, ImageStoryTaskInfo, ImageStoryParams};
 use crate::store::{TaskStore, InMemoryTaskStore, SqliteTaskStore};
 use std::sync::Mutex;
@@ -72,7 +71,7 @@ pub fn get_task(task_id: &str) -> Option<TaskInfo> {
 
 pub fn get_all_tasks(page: usize, page_size: usize) -> (Vec<TaskInfo>, usize) {
     let mut tasks = lock_store().get_all();
-    tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    tasks.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
     let total = tasks.len();
     let start = (page.saturating_sub(1)) * page_size;
     let end = (start + page_size).min(total);
@@ -360,7 +359,7 @@ pub fn get_dh_task(task_id: &str) -> Option<DigitalHumanTaskInfo> {
 /// 获取全部数字人任务（分页）
 pub fn get_all_dh_tasks(page: usize, page_size: usize) -> (Vec<DigitalHumanTaskInfo>, usize) {
     let mut tasks = lock_store().get_all_dh();
-    tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    tasks.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
     let total = tasks.len();
     let start = (page.saturating_sub(1)) * page_size;
     let end = (start + page_size).min(total);
@@ -434,7 +433,7 @@ pub fn get_image_story_task(task_id: &str) -> Option<ImageStoryTaskInfo> {
 /// 获取全部图片故事任务（分页）
 pub fn get_all_image_story_tasks(page: usize, page_size: usize) -> (Vec<ImageStoryTaskInfo>, usize) {
     let mut tasks = lock_store().get_all_image_story();
-    tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    tasks.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
     let total = tasks.len();
     let start = (page.saturating_sub(1)) * page_size;
     let end = (start + page_size).min(total);

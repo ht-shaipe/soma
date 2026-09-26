@@ -72,7 +72,7 @@ async fn merge(param: &RequestParameter) -> Result<Value> {
 
     let paths_val = param.value.get("paths").and_then(|v| v.as_array());
     let paths: Vec<String> = if let Some(arr) = paths_val {
-        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+        arr.iter().filter_map(|v| v.as_str()).collect()
     } else {
         return Err(error!("缺少 paths 参数"));
     };

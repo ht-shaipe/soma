@@ -167,6 +167,7 @@ pub async fn save_video(video_url: &str, save_dir: &str) -> Result<String, SomaE
 ///
 /// # 返回
 /// 下载成功的视频文件路径列表，按下载顺序排列
+#[allow(clippy::too_many_arguments)]
 pub async fn download_videos(
     save_dir: &str,
     search_terms: &[String],
@@ -213,7 +214,7 @@ pub async fn download_videos(
             }
             has_candidate = true;
             let item = &group[candidate_index];
-            match save_video(&item.url, &save_dir).await {
+            match save_video(&item.url, save_dir).await {
                 Ok(path) => {
                     if validate_video_file(&path) {
                         let seconds = max_clip_duration.min(item.duration as u32);
@@ -466,7 +467,7 @@ pub async fn generate_ai_videos(
         return Err(SomaError::VideoGen(first_err));
     }
 
-    if !failed_indices.is_empty() || !download_failures.is_empty() || pending.len() > 0 {
+    if !failed_indices.is_empty() || !download_failures.is_empty() || !pending.is_empty() {
         log!("AI视频生成: 部分失败，成功 {}/{} 个视频", indexed_paths.len(), total);
     }
 
@@ -480,7 +481,7 @@ pub async fn generate_ai_videos(
 /// 无效文件（时长为0或无法读取）返回 false。
 fn validate_video_file(path: &str) -> bool {
     let output = std::process::Command::new("ffprobe")
-        .args(&["-v", "error", "-show_entries", "format=duration:stream=r_frame_rate", "-of", "default=noprint_wrappers=1", path])
+        .args(["-v", "error", "-show_entries", "format=duration:stream=r_frame_rate", "-of", "default=noprint_wrappers=1", path])
         .output();
     match output {
         Ok(out) => {

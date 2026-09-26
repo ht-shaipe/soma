@@ -37,7 +37,7 @@ struct EchoMimicV3TaskState {
 
 /// 环境检查缺失项类型
 #[derive(Debug, Clone)]
-enum MissingKind {
+pub enum MissingKind {
     Environment,
     Dependency,
     ModelWeight,
@@ -50,9 +50,9 @@ enum MissingKind {
 
 /// 环境检查缺失项
 #[derive(Debug, Clone)]
-struct MissingItem {
-    kind: MissingKind,
-    description: String,
+pub struct MissingItem {
+    pub kind: MissingKind,
+    pub description: String,
 }
 
 /// 环境健康检查报告
@@ -289,6 +289,7 @@ impl EchoMimicV3EnvChecker {
 pub struct EchoMimicV3Provider {
     config: EchoMimicV3Config,
     tasks: Arc<Mutex<HashMap<String, EchoMimicV3TaskState>>>,
+    #[allow(dead_code)] // 预留：并发限流
     semaphore: Arc<Semaphore>,
     env_checker: EchoMimicV3EnvChecker,
 }

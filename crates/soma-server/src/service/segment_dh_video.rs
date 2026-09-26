@@ -100,7 +100,7 @@ pub fn run_segment_flow(
     let task_dir = soma_core::utils::task_dir(task_id);
     let seg_conf = &conf.app.digital_human.segment;
     let max_chars = seg_conf.get_segment_max_chars();
-    let max_dur = seg_conf.get_segment_max_duration();
+    let _max_dur = seg_conf.get_segment_max_duration();
 
     let segments = split_into_segments(text, max_chars);
     let n = segments.len() as u32;
@@ -286,6 +286,7 @@ fn generate_segment_audio(
     Ok(dur)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_segment_video(
     task_id: &str,
     params: &DigitalHumanParams,
@@ -304,7 +305,7 @@ fn generate_segment_video(
     );
 
     if !Path::new(seg_mp4).exists() {
-        let preview: String = std::fs::read_to_string(seg_mp3).unwrap_or_default().chars().take(50).collect();
+        let _preview: String = std::fs::read_to_string(seg_mp3).unwrap_or_default().chars().take(50).collect();
         log::info!("口播分段 {} 开始: task_id={}", index, task_id);
 
         crate::service::digital_human::generate_portrait_video_stage(
@@ -318,11 +319,11 @@ fn generate_segment_video(
         let pad = dur - video_dur;
         log::info!("分段 {} 补冻结帧: video={:.2}s audio={:.2}s pad={:.2}s", index, video_dur, dur, pad);
         let padded_mp4 = task_dir.join(format!("portrait_{}_padded.mp4", index)).to_string_lossy().to_string();
-        let result = std::process::Command::new(&conf.app.get_ffmpeg_binary())
-            .args(&[
+        let result = std::process::Command::new(conf.app.get_ffmpeg_binary())
+            .args([
                 "-y", "-i", seg_mp4,
                 "-vf", &format!("tpad=stop_mode=clone:stop_duration={:.3}", pad),
-                "-c:v", &conf.app.get_video_codec(),
+                "-c:v", conf.app.get_video_codec(),
                 "-pix_fmt", "yuv420p",
                 "-an",
                 &padded_mp4,

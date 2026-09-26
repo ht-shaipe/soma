@@ -177,6 +177,6 @@ mod tests {
     #[test]
     fn test_check_ready_nonexistent() {
         let store = MerchantAssetStore::new("/tmp/heygem_test_nonexistent");
-        assert_eq!(store.check_ready("no_such_merchant").unwrap(), false);
+        assert!(!store.check_ready("no_such_merchant").unwrap());
     }
 }

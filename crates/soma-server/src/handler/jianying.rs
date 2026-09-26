@@ -24,7 +24,7 @@ async fn create(param: &RequestParameter) -> Result<Value> {
 
     let videos_val = param.value.get("videos").and_then(|v| v.as_array());
     let videos: Vec<String> = if let Some(arr) = videos_val {
-        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+        arr.iter().filter_map(|v| v.as_str()).collect()
     } else {
         return Err(error!("缺少 videos 参数"));
     };

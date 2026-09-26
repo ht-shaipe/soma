@@ -1382,8 +1382,10 @@ preflight_check = false
 
     #[test]
     fn test_voice_clone_config_remote_script_path_default() {
-        let mut config = VoiceCloneConfig::default();
-        config.remote_env_path = Some("/root/voice_clone".into());
+        let config = VoiceCloneConfig {
+            remote_env_path: Some("/root/voice_clone".into()),
+            ..Default::default()
+        };
         assert_eq!(
             config.get_remote_script_path(),
             "/root/voice_clone/voice_clone_runner.py"
@@ -1392,8 +1394,10 @@ preflight_check = false
 
     #[test]
     fn test_voice_clone_config_remote_script_path_explicit() {
-        let mut config = VoiceCloneConfig::default();
-        config.remote_script_path = Some("/custom/runner.py".into());
+        let config = VoiceCloneConfig {
+            remote_script_path: Some("/custom/runner.py".into()),
+            ..Default::default()
+        };
         assert_eq!(config.get_remote_script_path(), "/custom/runner.py");
     }
 

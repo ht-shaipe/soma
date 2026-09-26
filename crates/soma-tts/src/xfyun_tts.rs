@@ -107,7 +107,7 @@ impl SomaTtsProvider for XfyunTts {
 
         let client = reqwest::Client::new();
         let resp = client
-            .post(&format!("https://{}{}", host, path))
+            .post(format!("https://{}{}", host, path))
             .header("Authorization", authorization)
             .header("Date", date)
             .header("Host", host)

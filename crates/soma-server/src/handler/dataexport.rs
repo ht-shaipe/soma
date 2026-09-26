@@ -93,7 +93,7 @@ async fn export_data(param: &RequestParameter) -> Result<Value> {
 
     // 可选列头（按给定顺序输出 CSV 列）
     if let Some(headers) = param.value.get("headers").and_then(|v| v.as_array()) {
-        let hs: Vec<String> = headers.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+        let hs: Vec<String> = headers.iter().filter_map(|v| v.as_str()).collect();
         if !hs.is_empty() {
             exporter.set_headers(hs);
         }

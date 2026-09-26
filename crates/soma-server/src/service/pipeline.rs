@@ -17,7 +17,6 @@
 ///
 /// 兼容说明：generate_audio / generate_audio_to / get_video_materials
 /// 保留原签名供数字人服务与 handler 层调用，内部委托功能点层实现。
-
 use soma_core::error::SomaError;
 use soma_core::models::{StoryboardScene, TaskStatus, VideoParams, AiVideoSegmentLog};
 use soma_feature::features::compose::VideoComposeOutput;
@@ -318,7 +317,7 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     // 功能点内部进度（0~99）映射到任务的 70~99 区间
     let task_id_for_progress = task_id.to_string();
     let compose_reporter = FnReporter(move |p: FeatureProgress| {
-        let mapped = 70 + (p.percent.min(100) as u32) * 29 / 100;
+        let mapped = 70 + p.percent.min(100) * 29 / 100;
         state::update_task(&task_id_for_progress, None, Some(mapped));
     });
     let out: VideoComposeOutput = serde_json::from_value(super::registry::run_feature(
@@ -574,9 +573,8 @@ pub fn generate_audio_to(task_id: &str, params: &VideoParams, script: &str, outp
         params.get_merchant_id(),
         output_path,
     );
-    result.map_err(|e| {
+    result.inspect_err(|_e| {
         state::update_task(task_id, Some(TaskStatus::Failed.as_i32()), None);
-        e
     })
 }
 

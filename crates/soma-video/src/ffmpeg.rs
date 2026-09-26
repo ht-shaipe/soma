@@ -167,7 +167,7 @@ impl Ffmpeg {
             // -v error: 只输出错误信息
             // -show_entries format=duration: 只显示 format 中的 duration 字段
             // -of default=noprint_wrappers=1:nokey=1: 不打印包裹行和键名，仅输出数值
-            .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
+            .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
         String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
@@ -202,7 +202,7 @@ impl Ffmpeg {
         std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
 
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y",
                 "-f", "concat",
                 "-safe", "0",
@@ -233,7 +233,7 @@ impl Ffmpeg {
     /// 当指定编码器拼接失败时，回退到 libx264 软编码重新尝试。
     fn concat_clips_fallback(&self, _clip_files: &[String], output_file: &str, concat_list: &Path) -> Result<(), SomaError> {
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y", "-f", "concat", "-safe", "0",
                 "-i", concat_list.to_string_lossy().as_ref(),
                 "-c:v", DEFAULT_CODEC,
@@ -281,7 +281,7 @@ impl Ffmpeg {
             w = width, h = height
         );
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y",
                 "-ss", &start.to_string(),
                 "-i", input_path,
@@ -327,7 +327,7 @@ impl Ffmpeg {
             _ => return Ok(()),
         };
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", &self.codec, "-an", "-pix_fmt", "yuv420p", output_path]))?;
+            .args(["-y", "-i", input_path, "-vf", &vf, "-c:v", &self.codec, "-an", "-pix_fmt", "yuv420p", output_path]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             return Err(SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", stderr)));
@@ -522,7 +522,7 @@ impl Ffmpeg {
     /// 成功返回时长（f64 秒），失败返回 SomaError
     pub fn get_video_duration(&self, video_path: &str) -> Result<f64, SomaError> {
         let output = std::process::Command::new("ffprobe")
-            .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
+            .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
         String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
@@ -543,7 +543,7 @@ impl Ffmpeg {
             // -select_streams v:0: 选择第一个视频流
             // -show_entries stream=width,height: 显示宽高
             // -of csv=s=x:p=0: 用 x 分隔输出，不含前缀
-            .args(&["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
+            .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe resolution failed: {}", e)))?;
         let res_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -618,7 +618,7 @@ impl Ffmpeg {
         let total_frames = (duration * FPS as f64).ceil() as u32;
         let zoom_expr = format!("min(zoom+0.0005,{:.3})", 1.0 + duration * 0.03);
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y",
                 "-loop", "1",
                 "-i", image_path,
@@ -645,7 +645,7 @@ impl Ffmpeg {
     /// - `output_path`: 输出视频路径
     pub fn add_watermark(&self, input_path: &str, watermark_path: &str, output_path: &str) -> Result<(), SomaError> {
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y",
                 "-i", input_path,
                 "-i", watermark_path,
@@ -687,7 +687,7 @@ impl Ffmpeg {
             .map_err(|e| SomaError::Ffmpeg(format!("写入 concat 列表失败: {}", e)))?;
 
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y",
                 "-f", "concat", "-safe", "0",
                 "-i", list_path.to_str().unwrap_or(""),
@@ -727,7 +727,7 @@ impl Ffmpeg {
         std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
 
         let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(&[
+            .args([
                 "-y",
                 "-f", "concat",
                 "-safe", "0",

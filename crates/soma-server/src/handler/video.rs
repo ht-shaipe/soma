@@ -3,7 +3,6 @@
 /// 处理视频创建（/videos）和任务管理（/tasks）两类 API 请求：
 /// - videos 模块：创建视频生成任务
 /// - tasks 模块：任务列表查询、单个任务查询、任务删除
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use soma_core::models::VideoParams;

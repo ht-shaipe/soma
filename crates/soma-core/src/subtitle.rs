@@ -436,12 +436,11 @@ pub fn parse_vtt(content: &str) -> Vec<SubtitleEntry> {
     let mut in_header = true;
 
     for block in content.split("\n\n") {
-        if in_header {
-            if block.starts_with("WEBVTT") {
+        if in_header
+            && block.starts_with("WEBVTT") {
                 in_header = false;
                 continue;
             }
-        }
         let lines: Vec<&str> = block.lines().collect();
         if lines.is_empty() {
             continue;
@@ -494,16 +493,16 @@ pub fn parse_ass(content: &str) -> Vec<SubtitleEntry> {
             continue;
         }
 
-        if line.starts_with("Format:") {
-            format_fields = line[7..]
+        if let Some(rest) = line.strip_prefix("Format:") {
+            format_fields = rest
                 .split(',')
                 .map(|s| s.trim().to_string())
                 .collect();
             continue;
         }
 
-        if line.starts_with("Dialogue:") {
-            let fields: Vec<&str> = line[9..].splitn(format_fields.len(), ',').collect();
+        if let Some(rest) = line.strip_prefix("Dialogue:") {
+            let fields: Vec<&str> = rest.splitn(format_fields.len(), ',').collect();
             let start_idx = format_fields.iter().position(|f| f == "Start");
             let end_idx = format_fields.iter().position(|f| f == "End");
             let text_idx = format_fields.iter().position(|f| f == "Text");

@@ -299,9 +299,19 @@ fn list_runs_returns_records_sorted_desc() {
     }
 
     let runs = registry.list_runs("test.echo").unwrap();
-    assert_eq!(runs.len(), 2);
-    assert_eq!(runs[0].input["text"], "第二次");
-    assert_eq!(runs[1].input["text"], "第一次");
+    assert_eq!(
+        runs.len(),
+        2,
+        "应恰有 2 条运行记录，实际 {}：{:?}",
+        runs.len(),
+        runs.iter().map(|r| (&r.run_id, &r.input)).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        (&runs[0].input["text"], &runs[1].input["text"]),
+        (&serde_json::json!("第二次"), &serde_json::json!("第一次")),
+        "倒序排序不应颠倒两次运行的先后（run_id: {:#?}）",
+        runs.iter().map(|r| &r.run_id).collect::<Vec<_>>()
+    );
 
     // 未运行过的功能点返回空列表而非错误
     assert!(registry.list_runs("test.empty").unwrap().is_empty());

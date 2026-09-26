@@ -3,7 +3,6 @@
 /// 实现带并发限制和排队机制的任务调度器。当当前执行任务数未达到最大并发数时，
 /// 新任务立即在新线程中启动执行；超出并发限制时任务进入等待队列；
 /// 队列也满时返回错误。任务完成后自动从队列中取下一个任务执行。
-
 use soma_core::error::SomaError;
 use soma_core::models::{TaskStatus, VideoParams, DigitalHumanParams, ImageStoryParams};
 use crate::state;
@@ -37,6 +36,7 @@ pub struct TaskQueue {
 }
 
 /// 排队中的任务信息（视频任务、数字人任务或图片故事任务）
+#[allow(clippy::large_enum_variant)] // Video 变体携带完整 VideoParams，装箱会拖累所有构造点
 enum QueuedTask {
     Video {
         task_id: String,

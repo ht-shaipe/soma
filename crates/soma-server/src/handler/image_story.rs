@@ -6,7 +6,6 @@
 /// - "get" → 查询单个任务
 /// - "delete" → 删除任务
 /// - "upload_images" → 批量上传图片
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use soma_core::models::ImageStoryParams;

@@ -4,7 +4,6 @@
 /// 1. 验证图片文件存在
 /// 2. 为每个场景调用AI视频生成
 /// 3. 合并所有视频片段
-
 use soma_core::error::SomaError;
 use soma_core::models::{TaskStatus, ImageStoryParams};
 use crate::state;

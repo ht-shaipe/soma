@@ -30,7 +30,7 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
         let (w, h) = get_video_resolution(input_path, ffmpeg_path)?;
         let total_dur = get_video_duration(input_path, ffmpeg_path)?;
         let result = std::process::Command::new(ffmpeg_path)
-            .args(&[
+            .args([
                 "-y",
                 "-f", "lavfi", "-i", &format!("color=c=black:s={}x{}:duration={:.3}", w, h, total_dur),
                 "-i", input_path,
@@ -47,7 +47,7 @@ pub fn apply_transition(input_path: &str, output_path: &str, transition: &str, d
         }
     } else {
         let result = std::process::Command::new(ffmpeg_path)
-            .args(&["-y", "-i", input_path, "-vf", &vf, "-c:v", codec, "-an", "-pix_fmt", "yuv420p", output_path])
+            .args(["-y", "-i", input_path, "-vf", &vf, "-c:v", codec, "-an", "-pix_fmt", "yuv420p", output_path])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", e)))?;
         if !result.status.success() {
@@ -118,7 +118,7 @@ fn build_slide_y_expr_slideout(duration: f64, side: &str, h: u32, start_t: f64) 
 
 fn get_video_duration(video_path: &str, _ffmpeg_path: &str) -> Result<f64, SomaError> {
     let output = std::process::Command::new("ffprobe")
-        .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
+        .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
         .output()
         .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
     String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
@@ -127,7 +127,7 @@ fn get_video_duration(video_path: &str, _ffmpeg_path: &str) -> Result<f64, SomaE
 
 fn get_video_resolution(video_path: &str, _ffmpeg_path: &str) -> Result<(u32, u32), SomaError> {
     let output = std::process::Command::new("ffprobe")
-        .args(&["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
+        .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
         .output()
         .map_err(|e| SomaError::Ffmpeg(format!("ffprobe resolution failed: {}", e)))?;
     let res_str = String::from_utf8_lossy(&output.stdout).trim().to_string();

@@ -3,7 +3,6 @@
 /// 处理前端设置页的配置读写请求：
 /// - "get" → 获取当前配置
 /// - "save" → 保存配置到文件
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use crate::Config;
@@ -364,7 +363,7 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
             ui.upload_post_username = Some(un.to_string());
         }
         if let Some(platforms) = v.get("upload_post_platforms").and_then(|p| p.as_array()) {
-            ui.upload_post_platforms = Some(platforms.iter().filter_map(|v| v.as_str().map(String::from)).collect());
+            ui.upload_post_platforms = Some(platforms.iter().filter_map(|v| v.as_str()).collect());
         }
         if let Some(au) = v.get("upload_post_auto_upload").and_then(|b| b.as_bool()) {
             ui.upload_post_auto_upload = Some(au);

@@ -43,7 +43,7 @@ impl HeyGemTrainer {
             .ffmpeg
             .get_video_duration(video_path)
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
-        if dur < 60.0 || dur > 300.0 {
+        if !(60.0..=300.0).contains(&dur) {
             return Err(SomaError::VideoGen(format!(
                 "录制视频时长需在 1-5 分钟之间，当前 {:.1} 分钟",
                 dur / 60.0

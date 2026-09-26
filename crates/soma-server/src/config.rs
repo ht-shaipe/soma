@@ -2,7 +2,6 @@
 ///
 /// 提供配置的加载（从 TOML 文件）、缓存（通过全局 Mutex HashMap）和读取功能。
 /// 使用 lazy_static 实现全局配置缓存，避免反复读取文件。
-
 use soma_core::config::AppConfig;
 use std::collections::HashMap;
 use std::sync::Mutex;

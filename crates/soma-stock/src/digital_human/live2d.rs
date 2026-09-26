@@ -106,7 +106,7 @@ impl Live2DEnvChecker {
         match output {
             Ok(o) if o.status.success() => {
                 let version = String::from_utf8_lossy(&o.stdout).to_string();
-                let parts: Vec<&str> = version.trim().split_whitespace().collect();
+                let parts: Vec<&str> = version.split_whitespace().collect();
                 if parts.len() >= 2 {
                     let ver = parts[1];
                     let nums: Vec<&str> = ver.split('.').collect();
@@ -450,15 +450,14 @@ impl DigitalHumanProvider for Live2DProvider {
         if let Some(parent) = dest.parent() {
             tokio::fs::create_dir_all(parent)
                 .await
-                .map_err(|e| SomaError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                .map_err(|e| SomaError::Io(std::io::Error::other(
                     format!("创建目录失败: {}", e),
                 )))?;
         }
 
         tokio::fs::copy(&src, &dest)
             .await
-            .map_err(|e| SomaError::Io(e))?;
+            .map_err(SomaError::Io)?;
 
         log::info!("Live2D 视频已拷贝: {} -> {}", src.display(), save_path);
         Ok(save_path.to_string())

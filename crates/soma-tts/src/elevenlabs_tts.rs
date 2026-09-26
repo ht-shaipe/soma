@@ -52,7 +52,7 @@ impl SomaTtsProvider for ElevenlabsTts {
         let url = format!("https://api.elevenlabs.io/v1/text-to-speech/{}", voice_id);
         // rate 偏移量映射到 stability: rate>1 → stability低(更快), rate<1 → stability高(更慢)
         // stability 范围 0.0~1.0，默认 0.5
-        let stability = (0.5 + (1.0 - rate as f64) * 0.3).max(0.0).min(1.0);
+        let stability = (0.5 + (1.0 - rate as f64) * 0.3).clamp(0.0, 1.0);
         let similarity_boost = 0.75;
         let payload = serde_json::json!({
             "text": text,

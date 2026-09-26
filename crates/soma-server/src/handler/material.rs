@@ -3,7 +3,6 @@
 /// 处理视频素材相关的 API 请求：
 /// - "list" → 列出素材目录下的视频/图片文件
 /// - "upload" → 上传素材文件
-
 use actix_multipart::Multipart;
 use actix_web::HttpResponse;
 use futures::StreamExt;
@@ -120,7 +119,7 @@ async fn list_portraits() -> Result<Value> {
         ));
     }
 
-    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.sort_by_key(|b| std::cmp::Reverse(b.0));
     let list: Vec<Value> = items.into_iter().map(|(_, v)| v).collect();
     let total = list.len();
     Ok(value!({

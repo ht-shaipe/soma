@@ -83,12 +83,12 @@ async fn download(param: &RequestParameter) -> Result<Value> {
     let params = ytdlp::YtdlpParams {
         url: url.clone(),
         save_dir,
-        output_template: param.value.get("outputTemplate").and_then(|v| v.as_str()).map(String::from),
-        format: param.value.get("format").and_then(|v| v.as_str()).map(String::from),
+        output_template: param.value.get("outputTemplate").and_then(|v| v.as_str()),
+        format: param.value.get("format").and_then(|v| v.as_str()),
         audio_only: param.value.get("audioOnly").and_then(|v| v.as_bool()).unwrap_or(false),
-        audio_quality: param.value.get("audioQuality").and_then(|v| v.as_str()).map(String::from),
-        proxy: param.value.get("proxy").and_then(|v| v.as_str()).map(String::from),
-        rate_limit: param.value.get("rateLimit").and_then(|v| v.as_str()).map(String::from),
+        audio_quality: param.value.get("audioQuality").and_then(|v| v.as_str()),
+        proxy: param.value.get("proxy").and_then(|v| v.as_str()),
+        rate_limit: param.value.get("rateLimit").and_then(|v| v.as_str()),
         skip_existing: param.value.get("skipExisting").and_then(|v| v.as_bool()).unwrap_or(true),
     };
 
@@ -106,7 +106,7 @@ async fn download(param: &RequestParameter) -> Result<Value> {
 async fn batch(param: &RequestParameter) -> Result<Value> {
     let urls_val = param.value.get("urls").and_then(|v| v.as_array());
     let urls: Vec<String> = if let Some(arr) = urls_val {
-        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+        arr.iter().filter_map(|v| v.as_str()).collect()
     } else {
         return Err(error!("缺少 urls 参数"));
     };

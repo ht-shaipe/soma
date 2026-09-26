@@ -6,7 +6,6 @@
 ///
 /// run 为同步长任务（LLM/TTS/合成可能耗时数分钟），通过 web::block 交给阻塞线程池执行，
 /// 避免阻塞 actix worker。功能点执行失败（status=failed）按既有约定返回错误响应。
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use soma_feature::{FeatureRequest, FeatureStatus, NoopProgress};

@@ -41,7 +41,7 @@ impl SomaTtsProvider for SiliconflowTts {
         }
 
         // 将语速倍率转换为增益值，范围限制在 [-10, 10]
-        let gain = (rate - 1.0).max(-10.0).min(10.0);
+        let gain = (rate - 1.0).clamp(-10.0, 10.0);
         let url = "https://api.siliconflow.cn/v1/audio/speech";
 
         let (model, voice_id) = crate::voices::extract_siliconflow_voice(voice)
@@ -99,7 +99,7 @@ impl SomaTtsProvider for SiliconflowTts {
 /// 使用 ffprobe 获取音频文件时长（秒）
 fn get_audio_duration(audio_path: &str) -> Result<f64, SomaError> {
     let output = std::process::Command::new("ffprobe")
-        .args(&["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
+        .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
         .output()
         .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
     String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()

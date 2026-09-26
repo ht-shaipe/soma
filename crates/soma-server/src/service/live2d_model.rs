@@ -4,7 +4,7 @@
 //! 模型以 `{models_dir}/{model_id}/` 目录形式持久化，
 //! 支持上传、列表、删除、就绪校验等操作。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use soma_core::error::SomaError;
 use soma_core::models::{Live2DModel, Live2DModelStatus, TaskStatus};
 use soma_core::utils::validate_live2d_model_id;
@@ -240,12 +240,11 @@ impl Live2DModelStore {
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                if dangerous_exts.iter().any(|ext| name.ends_with(ext)) {
-                    if std::fs::remove_file(entry.path()).is_ok() {
+                if dangerous_exts.iter().any(|ext| name.ends_with(ext))
+                    && std::fs::remove_file(entry.path()).is_ok() {
                         log::warn!("已剥离可执行文件 {}，仅保留模型资产", name);
                         stripped.push(name);
                     }
-                }
             }
         }
         stripped
@@ -283,7 +282,7 @@ fn dir_size_mb(dir: &PathBuf) -> Result<f64, SomaError> {
     Ok(total as f64 / 1024.0 / 1024.0)
 }
 
-fn copy_dir_all(src: &str, dest: &PathBuf) -> Result<(), SomaError> {
+fn copy_dir_all(src: &str, dest: &Path) -> Result<(), SomaError> {
     for entry in std::fs::read_dir(src).map_err(SomaError::Io)? {
         let entry = entry.map_err(SomaError::Io)?;
         let dest_path = dest.join(entry.file_name());
@@ -311,6 +310,6 @@ mod tests {
     #[test]
     fn test_check_model_ready_nonexistent() {
         let store = Live2DModelStore::new("/tmp/live2d_test_nonexistent");
-        assert_eq!(store.check_model_ready("no_such_model").unwrap(), false);
+        assert!(!store.check_model_ready("no_such_model").unwrap());
     }
 }

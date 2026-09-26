@@ -92,11 +92,10 @@ impl SomaStockProvider for Pexels {
                     let near_match = w >= (target_w as f64 * 0.8) as u32;
                     let quality = if exact { 3 } else if wide_enough { 2 } else if near_match { 1 } else { 0 };
                     let current_best = best_match.as_ref().map(|(q, _)| *q).unwrap_or(0);
-                    if quality > current_best || (quality == current_best && quality > 0) {
-                        if quality > 0 {
+                    if (quality > current_best || (quality == current_best && quality > 0))
+                        && quality > 0 {
                             best_match = Some((quality, vf));
                         }
-                    }
                 }
                 if let Some((_, vf)) = best_match {
                     if let Some(link) = vf.get("link").and_then(|l| l.as_str()) {

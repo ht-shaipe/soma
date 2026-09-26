@@ -3,7 +3,6 @@
 /// - preflight: 依赖与配置体检（FFmpeg/ffprobe/edge-tts 可用性、存储可写、各服务密钥状态）
 ///
 /// 供设置页「环境状态」卡片与桌面端启动提示使用（0.1.2 M2.5）。
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use std::process::Command;
@@ -74,15 +73,13 @@ async fn preflight() -> Result<Value> {
         || conf.app.app.kling_access_key.is_some()
         || conf.app.app.minimax_video_api_key.is_some();
 
-    let checks = vec![
-        check!("FFmpeg", ffmpeg_ok, ffmpeg_detail, "brew install ffmpeg 或 apt install ffmpeg"),
+    let checks = [check!("FFmpeg", ffmpeg_ok, ffmpeg_detail, "brew install ffmpeg 或 apt install ffmpeg"),
         check!("ffprobe", ffprobe_ok, ffprobe_detail, "随 FFmpeg 一同安装"),
         check!("edge-tts", edge_ok, edge_detail, "pip install edge-tts（免费配音引擎）"),
         check!("存储目录", storage_ok, storage_detail, "检查磁盘权限或更换存储路径"),
         check!("LLM 密钥", llm_ok, format!("提供商 {}，{}", llm_provider, if llm_ok { "已配置" } else { "未配置" }), "系统设置 → LLM 配置 中填入 API Key"),
         check!("素材站密钥", pexels_ok, if pexels_ok { "Pexels 已配置".to_string() } else { "Pexels/Pixabay/Coverr 均未配置".to_string() }, "系统设置 → 素材源 API Key"),
-        check!("AI 视频密钥", aivideo_ok, if aivideo_ok { "至少一家已配置".to_string() } else { "智谱/可灵/MiniMax 均未配置".to_string() }, "系统设置 → AI 视频生成"),
-    ];
+        check!("AI 视频密钥", aivideo_ok, if aivideo_ok { "至少一家已配置".to_string() } else { "智谱/可灵/MiniMax 均未配置".to_string() }, "系统设置 → AI 视频生成")];
 
     let all_ok = checks.iter().all(|c| c.1);
     Ok(value!({

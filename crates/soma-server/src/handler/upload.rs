@@ -1,5 +1,4 @@
 /// 跨平台发布 API 处理器
-
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 use crate::Config;
@@ -19,7 +18,7 @@ async fn upload(param: &RequestParameter) -> Result<Value> {
         .unwrap_or(0) as usize;
     let platforms_val = param.value.get("platforms");
     let platforms: Vec<String> = if let Some(arr) = platforms_val.and_then(|v| v.as_array()) {
-        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+        arr.iter().filter_map(|v| v.as_str()).collect()
     } else {
         vec!["tiktok".into(), "youtube".into()]
     };

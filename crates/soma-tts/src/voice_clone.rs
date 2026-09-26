@@ -279,7 +279,7 @@ async fn clone_volcengine(
         .part("audio_file", part);
 
     let resp = client
-        .post(&format!("{}/audio/upload", base_url))
+        .post(format!("{}/audio/upload", base_url))
         .header("Authorization", format!("Bearer;{}", access_token))
         .multipart(form)
         .timeout(std::time::Duration::from_secs(120))
@@ -307,7 +307,7 @@ async fn clone_volcengine(
     });
 
     let _ = client
-        .post(&format!("{}/audio/train", base_url))
+        .post(format!("{}/audio/train", base_url))
         .header("Authorization", format!("Bearer;{}", access_token))
         .header("Content-Type", "application/json")
         .json(&train_payload)
@@ -326,7 +326,7 @@ async fn clone_volcengine(
     for _ in 0..30 {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         let resp = client
-            .post(&format!("{}/audio/query", base_url))
+            .post(format!("{}/audio/query", base_url))
             .header("Authorization", format!("Bearer;{}", access_token))
             .header("Content-Type", "application/json")
             .json(&query_payload)
@@ -381,7 +381,7 @@ async fn clone_xfyun(
         .part("file", part);
 
     let resp = client
-        .post(&format!("{}/upload", base_url))
+        .post(format!("{}/upload", base_url))
         .header("Authorization", format!("Bearer {}", api_key))
         .multipart(form)
         .timeout(std::time::Duration::from_secs(120))
@@ -411,7 +411,7 @@ async fn clone_xfyun(
     });
 
     let train_resp = client
-        .post(&format!("{}/train", base_url))
+        .post(format!("{}/train", base_url))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&train_payload)
@@ -443,7 +443,7 @@ async fn clone_xfyun(
     for _ in 0..30 {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         let resp = client
-            .post(&format!("{}/query", base_url))
+            .post(format!("{}/query", base_url))
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&query_payload)

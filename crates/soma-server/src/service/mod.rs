@@ -2,7 +2,6 @@
 ///
 /// 导出流水线执行（pipeline）和 LLM 服务（llm）两个子模块，
 /// 为 handler 层提供核心业务逻辑调用。
-
 /// 视频生成流水线 - 基于 Feature 编排的完整任务执行逻辑
 pub mod pipeline;
 /// 功能点注册表 - 服务端宿主的全局 FeatureRegistry 与统一运行入口

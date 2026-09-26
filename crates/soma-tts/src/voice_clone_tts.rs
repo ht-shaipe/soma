@@ -9,7 +9,6 @@
 use async_trait::async_trait;
 use soma_core::config::VoiceCloneConfig;
 use soma_core::error::SomaError;
-use soma_core::models::SubtitleCue;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -34,8 +33,10 @@ struct VoiceCloneTaskState {
     status: VoiceCloneRunStatus,
     audio_path: Option<String>,
     error: Option<String>,
+    #[allow(dead_code)] // 状态时间线，供调试与后续超时清理使用
     started_at: Instant,
     completed_at: Option<Instant>,
+    #[allow(dead_code)]
     retry_count: u32,
 }
 
@@ -72,6 +73,7 @@ pub enum CloneModel {
 }
 
 impl CloneModel {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self, SomaError> {
         match s {
             "gpt_sovits" => Ok(Self::GptSovits),
@@ -894,8 +896,10 @@ mod tests {
 
     #[test]
     fn test_voice_clone_config_remote_script_path_default() {
-        let mut config = VoiceCloneConfig::default();
-        config.remote_env_path = Some("/root/voice_clone".into());
+        let config = VoiceCloneConfig {
+            remote_env_path: Some("/root/voice_clone".into()),
+            ..Default::default()
+        };
         assert_eq!(
             config.get_remote_script_path(),
             "/root/voice_clone/voice_clone_runner.py"
@@ -904,8 +908,10 @@ mod tests {
 
     #[test]
     fn test_voice_clone_config_remote_script_path_explicit() {
-        let mut config = VoiceCloneConfig::default();
-        config.remote_script_path = Some("/custom/path/runner.py".into());
+        let config = VoiceCloneConfig {
+            remote_script_path: Some("/custom/path/runner.py".into()),
+            ..Default::default()
+        };
         assert_eq!(config.get_remote_script_path(), "/custom/path/runner.py");
     }
 }

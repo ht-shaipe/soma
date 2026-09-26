@@ -193,7 +193,13 @@ impl FeatureRegistry {
                 Err(e) => log::warn!("解析运行记录失败 {}: {}", record_path.display(), e),
             }
         }
-        runs.sort_by_key(|r| std::cmp::Reverse(r.finished_at));
+        runs.sort_by(|a, b| {
+            b.finished_at
+                .cmp(&a.finished_at)
+                // 同一毫秒内多次运行时 finished_at 可能并列，
+                // 以 run_id 作决胜键保证历史顺序稳定可复现
+                .then_with(|| b.run_id.cmp(&a.run_id))
+        });
         Ok(runs)
     }
 
@@ -217,8 +223,15 @@ fn persist_record(work_dir: &std::path::Path, input: &serde_json::Value, output:
     let write = |filename: &str, value: &serde_json::Value| -> Result<(), SomaError> {
         let path = work_dir.join(filename);
         let content = serde_json::to_string_pretty(value)?;
-        std::fs::write(&path, content)?;
-        Ok(())
+        // 高负载下偶发瞬时写失败会静默丢失历史记录（list_runs 依赖此文件），
+        // 与任务队列的落盘健壮性保持一致：失败重试一次
+        match std::fs::write(&path, &content) {
+            Ok(()) => Ok(()),
+            Err(first) => {
+                log::warn!("写入 {} 首次失败（{first}），重试", path.display());
+                std::fs::write(&path, content).map_err(SomaError::Io)
+            }
+        }
     };
     if let Err(e) = write("input.json", input) {
         log::warn!("写入 input.json 失败: {}", e);

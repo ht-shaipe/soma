@@ -3,7 +3,6 @@
 /// 提供 TaskStore trait，支持内存、Redis 和 SQLite 三种后端实现。
 /// SQLite 后端为默认实现，任务数据持久化到本地数据库文件。
 /// Redis 后端需启用 `redis` feature。
-
 use soma_core::models::{TaskInfo, DigitalHumanTaskInfo, ImageStoryTaskInfo};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -49,6 +48,12 @@ pub struct InMemoryTaskStore {
     dh_store: Mutex<HashMap<String, DigitalHumanTaskInfo>>,
     /// 图片故事任务存储
     image_story_store: Mutex<HashMap<String, ImageStoryTaskInfo>>,
+}
+
+impl Default for InMemoryTaskStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InMemoryTaskStore {
@@ -353,11 +358,9 @@ impl TaskStore for SqliteTaskStore {
         let mut tasks = Vec::new();
         match rows {
             Ok(iter) => {
-                for row in iter {
-                    if let Ok(data) = row {
-                        if let Some(task) = Self::row_to_task(&data) {
-                            tasks.push(task);
-                        }
+                for data in iter.flatten() {
+                    if let Some(task) = Self::row_to_task(&data) {
+                        tasks.push(task);
                     }
                 }
             }
@@ -444,11 +447,9 @@ impl TaskStore for SqliteTaskStore {
         let mut tasks = Vec::new();
         match rows {
             Ok(iter) => {
-                for row in iter {
-                    if let Ok(data) = row {
-                        if let Some(task) = Self::row_to_dh_task(&data) {
-                            tasks.push(task);
-                        }
+                for data in iter.flatten() {
+                    if let Some(task) = Self::row_to_dh_task(&data) {
+                        tasks.push(task);
                     }
                 }
             }
@@ -535,11 +536,9 @@ impl TaskStore for SqliteTaskStore {
         let mut tasks = Vec::new();
         match rows {
             Ok(iter) => {
-                for row in iter {
-                    if let Ok(data) = row {
-                        if let Some(task) = Self::row_to_image_story_task(&data) {
-                            tasks.push(task);
-                        }
+                for data in iter.flatten() {
+                    if let Some(task) = Self::row_to_image_story_task(&data) {
+                        tasks.push(task);
                     }
                 }
             }

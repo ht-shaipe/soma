@@ -30,6 +30,12 @@ pub struct ExportRow {
     pub fields: Vec<(String, String)>,
 }
 
+impl Default for ExportRow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExportRow {
     pub fn new() -> Self {
         Self { fields: Vec::new() }
@@ -45,6 +51,12 @@ impl ExportRow {
 pub struct DataExporter {
     rows: Vec<ExportRow>,
     headers: Vec<String>,
+}
+
+impl Default for DataExporter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DataExporter {

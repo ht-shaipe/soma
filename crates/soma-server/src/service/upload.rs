@@ -2,7 +2,6 @@
 ///
 /// 通过 Upload-Post API 将生成的视频发布到 TikTok、Instagram、YouTube Shorts 等平台。
 /// API 文档：https://docs.upload-post.com
-
 use soma_core::error::SomaError;
 use soma_core::config::UiSection;
 use std::path::Path;
@@ -22,8 +21,8 @@ pub struct UploadResult {
 /// 检查 Upload-Post 是否已配置
 pub fn is_configured(ui: &UiSection) -> bool {
     let enabled = ui.upload_post_enabled.unwrap_or(false);
-    let has_key = ui.upload_post_api_key.as_deref().unwrap_or("") != "";
-    let has_user = ui.upload_post_username.as_deref().unwrap_or("") != "";
+    let has_key = !ui.upload_post_api_key.as_deref().unwrap_or("").is_empty();
+    let has_user = !ui.upload_post_username.as_deref().unwrap_or("").is_empty();
     enabled && has_key && has_user
 }
 
@@ -95,7 +94,7 @@ pub async fn upload_video(
 
     let client = reqwest::Client::new();
     let resp = client
-        .post(&format!("{}/api/upload", API_BASE))
+        .post(format!("{}/api/upload", API_BASE))
         .header("Authorization", format!("Apikey {}", api_key))
         .multipart(form)
         .timeout(std::time::Duration::from_secs(300))
@@ -125,7 +124,7 @@ pub async fn upload_video(
 pub async fn check_status(request_id: &str, api_key: &str) -> Result<serde_json::Value, SomaError> {
     let client = reqwest::Client::new();
     let resp = client
-        .get(&format!("{}/api/uploadposts/status", API_BASE))
+        .get(format!("{}/api/uploadposts/status", API_BASE))
         .query(&[("request_id", request_id)])
         .header("Authorization", format!("Apikey {}", api_key))
         .timeout(std::time::Duration::from_secs(30))

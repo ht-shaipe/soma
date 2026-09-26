@@ -60,7 +60,7 @@ impl SomaTtsProvider for EdgeTts {
         // 调用 edge-tts 命令行工具进行语音合成
         let output_str = output_path.to_string_lossy().to_string();
         let result = tokio::process::Command::new("edge-tts")
-            .args(&[
+            .args([
                 "--voice", &voice_name,
                 "--rate", &rate_str,
                 "--text", text,
@@ -105,9 +105,9 @@ impl EdgeTts {
         // 使用 ffmpeg 的 anullsrc 滤镜生成静音音频
         let ffmpeg = "ffmpeg";
         let result = tokio::process::Command::new(ffmpeg)
-            .args(&[
+            .args([
                 "-y", "-f", "lavfi",
-                "-i", &format!("anullsrc=r=44100:cl=mono"),
+                "-i", "anullsrc=r=44100:cl=mono",
                 "-t", &format!("{:.3}", duration),
                 "-codec:a", "libmp3lame",
                 "-q:a", "4",
@@ -140,7 +140,7 @@ impl EdgeTts {
 /// 返回音频时长（秒）。
 pub fn get_audio_duration(audio_path: &str) -> Result<f64, SomaError> {
     let output = std::process::Command::new("ffprobe")
-        .args(&[
+        .args([
             "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",

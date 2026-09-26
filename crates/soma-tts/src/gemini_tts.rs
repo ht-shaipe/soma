@@ -128,7 +128,7 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
 
 fn convert_pcm_to_mp3(pcm_path: &str, mp3_path: &str, sample_rate: u32) -> Result<(), SomaError> {
     let result = std::process::Command::new("ffmpeg")
-        .args(&[
+        .args([
             "-y",
             "-f", "s16le",
             "-ar", &sample_rate.to_string(),

@@ -4,7 +4,6 @@
 /// - list_cloned: 返回已克隆的语音列表
 /// - delete_cloned: 删除已克隆的语音
 /// - preview: 生成语音预览音频并返回
-
 use actix_web::{HttpRequest, HttpResponse};
 use actix_multipart::Multipart;
 use futures::StreamExt;
@@ -268,16 +267,16 @@ fn extract_query_param(query: &str, key: &str) -> Option<String> {
     url_decode(
         query.split('&')
             .find_map(|pair| {
-                let mut kv = pair.splitn(2, '=');
-                let k = kv.next()?;
-                let v = kv.next()?;
+                let (k, v) = pair.split_once('=')?;
+                
+                
                 if k == key { Some(v) } else { None }
             })?
     )
 }
 
 fn url_decode(s: &str) -> Option<String> {
-    let bytes: Vec<u8> = s.as_bytes().iter().copied().collect();
+    let bytes: Vec<u8> = s.as_bytes().to_vec();
     let decoded = percent_encoding::percent_decode(&bytes).decode_utf8().ok()?;
     Some(decoded.to_string())
 }

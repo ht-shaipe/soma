@@ -191,7 +191,7 @@ pub fn generate_whisper_subtitle(audio_file: &str, subtitle_file: &str, model_si
     let dev = if device.is_empty() { "cpu" } else { device };
     let ct = if compute_type.is_empty() { "int8" } else { compute_type };
     let status = std::process::Command::new("whisper")
-        .args(&[
+        .args([
             audio_file,
             "--model", model,
             "--device", dev,

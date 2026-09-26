@@ -220,9 +220,9 @@ pub fn strip_emotion_tags(text: &str) -> String {
                 inner.next();
             }
             if let Some(j) = end {
-                if len >= 1 && len <= 40 && !has_punct {
+                if (1..=40).contains(&len) && !has_punct {
                     // 命中情感标签，跳到 ']' 之后，并吞掉标签后的空白
-                    while let Some((k, _)) = chars.next() {
+                    for (k, _) in chars.by_ref() {
                         if k == j {
                             break;
                         }

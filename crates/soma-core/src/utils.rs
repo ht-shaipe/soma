@@ -244,7 +244,7 @@ pub fn text_to_srt(idx: u32, msg: &str, start_time: f64, end_time: f64) -> Strin
 /// 仅保留文件名的最后一段（去除目录前缀），
 /// 拒绝空文件名、`.` 和 `..` 等特殊路径。
 pub fn sanitize_upload_filename(filename: &str) -> Result<String, SomaError> {
-    let normalized = filename.replace('\\', "/").split('/').last().unwrap_or("").trim().to_string();
+    let normalized = filename.replace('\\', "/").split('/').next_back().unwrap_or("").trim().to_string();
     if normalized.is_empty() || normalized == "." || normalized == ".." {
         return Err(SomaError::Config("invalid filename".into()));
     }
