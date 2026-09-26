@@ -37,7 +37,9 @@
           <el-input-number
             v-else-if="f.type === 'number'"
             v-model="formModel[f.name]"
-            :min="1"
+            :min="f.min ?? 1"
+            :max="f.max"
+            :step="f.step ?? 1"
             class="!w-full"
           />
           <el-select v-else-if="f.options" v-model="formModel[f.name]" class="!w-full">
@@ -66,6 +68,20 @@
         </el-button>
       </div>
 
+      <div v-if="wmPreview" class="tb-result-box">
+        <div class="tb-result-title">{{ $t('toolbox.wmPreview') }}</div>
+        <div class="tb-wm-frame">
+          <img :src="wmPreview.frame" class="tb-wm-img" alt="frame" />
+          <img v-if="wmPreview.showMask" :src="wmPreview.mask" class="tb-wm-mask" alt="mask" />
+        </div>
+        <div class="tb-wm-meta">
+          <el-checkbox v-model="wmPreview.showMask">{{ $t('toolbox.wmMaskToggle') }}</el-checkbox>
+          <span class="tb-wm-coverage">
+            {{ $t('toolbox.wmCoverage') }}: {{ (wmPreview.coverage * 100).toFixed(1) }}%
+          </span>
+        </div>
+      </div>
+
       <el-alert
         v-if="runError"
         type="error"
@@ -85,10 +101,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Bell, DataAnalysis, Document, Download, Film, Link } from '@element-plus/icons-vue'
+import { Bell, DataAnalysis, Document, Download, Film, Link, MagicStick } from '@element-plus/icons-vue'
 import {
   convertSubtitle,
   createJianyingDraft,
+  detectWatermark,
   douyinDetail,
   douyinPosts,
   downloadVideo,
@@ -96,6 +113,7 @@ import {
   getYtdlpInfo,
   mergeSubtitles,
   previewData,
+  removeWatermark,
   sendNotify,
   translateSubtitle,
 } from '@/api/tools'
@@ -109,6 +127,9 @@ interface ToolField {
   placeholder?: string
   options?: string[]
   defaultValue?: string | number | boolean
+  min?: number
+  max?: number
+  step?: number
 }
 
 interface ToolAction {
@@ -340,6 +361,53 @@ const tools: Tool[] = [
       },
     ],
   },
+  {
+    id: 'watermark',
+    module: 'watermark',
+    icon: MagicStick,
+    color: '#f472b6',
+    chipBg: 'rgba(244, 114, 182, 0.16)',
+    titleKey: 'toolbox.tools.watermark.title',
+    descKey: 'toolbox.tools.watermark.desc',
+    fields: [
+      { name: 'videoPath', labelKey: 'toolbox.f.videoPath', type: 'input', placeholder: 'storage/tasks/.../final.mp4' },
+      { name: 'keyframes', labelKey: 'toolbox.f.keyframes', type: 'number', defaultValue: 30, min: 2, max: 120 },
+      { name: 'gradThreshold', labelKey: 'toolbox.f.gradThreshold', type: 'number', defaultValue: 8, min: 0.5, max: 120, step: 0.5 },
+      { name: 'maskThreshold', labelKey: 'toolbox.f.maskThreshold', type: 'number', defaultValue: 0.2, min: 0.01, max: 0.99, step: 0.05 },
+      { name: 'blurSigma', labelKey: 'toolbox.f.blurSigma', type: 'number', defaultValue: 2, min: 0.5, max: 10, step: 0.5 },
+      { name: 'maskPath', labelKey: 'toolbox.f.maskPath', type: 'input' },
+      { name: 'outputDir', labelKey: 'toolbox.f.outputDir', type: 'input', placeholder: 'storage/watermark/' },
+      { name: 'codec', labelKey: 'toolbox.f.codec', type: 'select', options: ['libx264', 'libx265'], defaultValue: 'libx264' },
+      { name: 'crf', labelKey: 'toolbox.f.crf', type: 'number', defaultValue: 18, min: 0, max: 51 },
+    ],
+    actions: [
+      {
+        key: 'detect',
+        labelKey: 'toolbox.a.detect',
+        handler: (f) =>
+          detectWatermark({
+            videoPath: str(f, 'videoPath'),
+            keyframes: num(f, 'keyframes', 30),
+            gradThreshold: num(f, 'gradThreshold', 8),
+            maskThreshold: num(f, 'maskThreshold', 0.2),
+            blurSigma: num(f, 'blurSigma', 2),
+          }),
+      },
+      {
+        key: 'remove',
+        labelKey: 'toolbox.a.remove',
+        primary: true,
+        handler: (f) =>
+          removeWatermark({
+            videoPath: str(f, 'videoPath'),
+            maskPath: str(f, 'maskPath') || undefined,
+            outputDir: str(f, 'outputDir') || undefined,
+            codec: str(f, 'codec') || 'libx264',
+            crf: num(f, 'crf', 18),
+          }),
+      },
+    ],
+  },
 ]
 
 function parseJsonArray(text: string): unknown[] {
@@ -356,6 +424,10 @@ const formModel = ref<Record<string, string | number | boolean>>({})
 const running = ref('')
 const runError = ref('')
 const resultJson = ref('')
+// 去水印检测预览（采样帧 + 可叠加蒙版）
+const wmPreview = ref<{ frame: string; mask: string; coverage: number; showMask: boolean } | null>(
+  null,
+)
 
 function openTool(tool: Tool) {
   currentTool.value = tool
@@ -366,6 +438,7 @@ function openTool(tool: Tool) {
   runError.value = ''
   resultJson.value = ''
   running.value = ''
+  wmPreview.value = null
   dialogVisible.value = true
 }
 
@@ -373,9 +446,23 @@ async function runAction(action: ToolAction) {
   running.value = action.key
   runError.value = ''
   resultJson.value = ''
+  wmPreview.value = null
   try {
     const result = await action.handler(formModel.value)
     resultJson.value = JSON.stringify(result, null, 2)
+    // 去水印 detect 结果：展示蒙版预览并自动回填蒙版路径
+    const r = result as Record<string, unknown> | null
+    if (r && typeof r === 'object' && typeof r.framePreview === 'string' && typeof r.maskPreview === 'string') {
+      wmPreview.value = {
+        frame: r.framePreview,
+        mask: r.maskPreview,
+        coverage: Number(r.coverage ?? 0),
+        showMask: true,
+      }
+      if (typeof r.maskPath === 'string' && r.maskPath && currentTool.value?.id === 'watermark') {
+        formModel.value.maskPath = r.maskPath
+      }
+    }
   } catch (e) {
     runError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -494,5 +581,40 @@ async function runAction(action: ToolAction) {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.tb-wm-frame {
+  position: relative;
+  border: 1px solid var(--soma-line);
+  border-radius: var(--soma-radius-sm);
+  overflow: hidden;
+}
+
+.tb-wm-img {
+  display: block;
+  width: 100%;
+}
+
+.tb-wm-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.tb-wm-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.tb-wm-coverage {
+  font-size: 12px;
+  color: var(--soma-text-dim);
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
 }
 </style>

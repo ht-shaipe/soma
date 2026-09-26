@@ -133,6 +133,42 @@ export function previewData(data: unknown[]) {
     .then(extractData<{ total: number; rows: Record<string, string>[]; csvPreview: string }>)
 }
 
+// ---- 视频去水印 ----
+
+export interface WatermarkDetectResult {
+  maskPath: string
+  framePreview: string
+  maskPreview: string
+  width: number
+  height: number
+  coverage: number
+  keyframesUsed: number
+}
+
+export function detectWatermark(params: {
+  videoPath: string
+  keyframes?: number
+  gradThreshold?: number
+  maskThreshold?: number
+  blurSigma?: number
+}) {
+  return api.post('/watermark/detect', params).then(extractData<WatermarkDetectResult>)
+}
+
+export function removeWatermark(params: {
+  videoPath: string
+  maskPath?: string
+  outputDir?: string
+  codec?: string
+  crf?: number
+  keyframes?: number
+  gradThreshold?: number
+  maskThreshold?: number
+  blurSigma?: number
+}) {
+  return api.post('/watermark/remove', params).then(extractData<{ success: boolean; outputPath: string; elapsedMs: number }>)
+}
+
 // ---- 平台直连（抖音） ----
 
 export interface DouyinDetail {

@@ -6,6 +6,7 @@ pub mod effects;
 /// 核心结构体包括 [`Ffmpeg`]（FFmpeg 命令行封装）和 [`VideoComposer`]（视频合成编排器）。
 pub mod ffmpeg;
 pub mod jianying;
+pub mod watermark;
 
 pub use compose::VideoComposer;
 pub use ffmpeg::Ffmpeg;

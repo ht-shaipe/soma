@@ -18,7 +18,7 @@
 | [数字人开源自部署方案评估_2026-09-02](数字人开源自部署方案评估_2026-09-02.md) | 2026-09-02 | 「照片 + 文案 → 口播视频」开源方案选型，结论：主力选 EchoMimicV3-Flash（Apache 2.0，单张 4090 可跑） | `soma-stock/src/digital_human/` |
 | [EchoMimicV3-Flash成本评估_2026-09-03](EchoMimicV3-Flash成本评估_2026-09-03.md) | 2026-09-03 | GPU 服务器与推理成本测算 | — |
 | [china-ai-video-api-research](china-ai-video-api-research.md) | 2026-07 | 中国大陆 AI 视频生成 API 调研（智谱/可灵/通义万相/混元/百度 Vidu/MiniMax） | `soma-stock/src/aivideo/` |
-| [开源项目集成-非Rust功能清单_2026-09-22](开源项目集成-非Rust功能清单_2026-09-22.md) | 2026-09-22 | NarratoAI / creatorhub / MediaCrawler / reclip / yt-dlp 功能集成盘点：已用 Rust 实现（yt-dlp 下载/通知推送/签名算法/抖音直连/字幕处理/剪映草稿/数据导出）vs 需 Python 微服务桥接（Playwright/Gemini SDK/Whisper 等） | `soma-core/src/{signing,notify,subtitle,export}.rs`、`soma-stock/src/{ytdlp,douyin}.rs`、`soma-video/src/jianying.rs` |
+| [开源项目集成-非Rust功能清单_2026-09-22](开源项目集成-非Rust功能清单_2026-09-22.md) | 2026-09-22 | NarratoAI / creatorhub / MediaCrawler / reclip / yt-dlp / remove_watermark 功能集成盘点：已用 Rust 实现（yt-dlp 下载/通知推送/签名算法/抖音直连/字幕处理/剪映草稿/数据导出/视频去水印）vs 需 Python 微服务桥接（Playwright/Gemini SDK/Whisper 等） | `soma-core/src/{signing,notify,subtitle,export}.rs`、`soma-stock/src/{ytdlp,douyin}.rs`、`soma-video/src/{jianying,watermark}.rs` |
 
 ### 实践系列文章（articles/）
 

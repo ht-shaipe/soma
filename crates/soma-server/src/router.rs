@@ -59,6 +59,7 @@ pub async fn api_handler(
         "jianying" => crate::handler::jianying::distribute(&param).await,
         "platform" => crate::handler::platform::distribute(&param).await,
         "dataexport" => crate::handler::dataexport::distribute(&param).await,
+        "watermark" => crate::handler::watermark::distribute(&param).await,
         _ => Err(error!(
             "请求方法{}.{}系统未提供。",
             param.module, param.method

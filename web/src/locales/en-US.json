@@ -610,6 +610,10 @@
       "dataexport": {
         "title": "Data Export",
         "desc": "Export JSON data as CSV / JSON / JSONL files"
+      },
+      "watermark": {
+        "title": "Watermark Remover",
+        "desc": "Auto-detect static watermarks via multi-frame gradient analysis, preview the mask, then remove (works for AI-generated videos)"
       }
     },
     "f": {
@@ -637,7 +641,15 @@
       "title": "Title",
       "body": "Body",
       "data": "JSON data (array)",
-      "format": "Format"
+      "format": "Format",
+      "videoPath": "Video path",
+      "keyframes": "Sampled frames",
+      "gradThreshold": "Gradient threshold",
+      "maskThreshold": "Mask threshold",
+      "blurSigma": "Blur sigma",
+      "maskPath": "Mask path (auto-filled after detect)",
+      "codec": "Video codec",
+      "crf": "CRF quality"
     },
     "a": {
       "info": "Info",
@@ -650,8 +662,13 @@
       "create": "Create draft",
       "send": "Send",
       "preview": "Preview",
-      "export": "Export"
-    }
+      "export": "Export",
+      "detect": "Detect",
+      "remove": "Remove"
+    },
+    "wmPreview": "Detection preview",
+    "wmMaskToggle": "Overlay mask",
+    "wmCoverage": "Mask coverage"
   },
   "envBanner": {
     "title": "Environment check: {names} not ready — core features may fail",

@@ -610,6 +610,10 @@
       "dataexport": {
         "title": "数据导出",
         "desc": "JSON 数据导出为 CSV / JSON / JSONL 文件"
+      },
+      "watermark": {
+        "title": "视频去水印",
+        "desc": "多帧梯度分析自动检测静态水印，预览确认蒙版后一键去除（即梦等 AI 生成视频适用）"
       }
     },
     "f": {
@@ -637,7 +641,15 @@
       "title": "标题",
       "body": "内容",
       "data": "JSON 数据（数组）",
-      "format": "导出格式"
+      "format": "导出格式",
+      "videoPath": "视频路径",
+      "keyframes": "采样帧数",
+      "gradThreshold": "梯度阈值",
+      "maskThreshold": "蒙版阈值",
+      "blurSigma": "平滑 Sigma",
+      "maskPath": "蒙版路径（检测后自动填入）",
+      "codec": "编码器",
+      "crf": "CRF 质量"
     },
     "a": {
       "info": "查询信息",
@@ -650,8 +662,13 @@
       "create": "生成草稿",
       "send": "发送",
       "preview": "预览",
-      "export": "导出"
-    }
+      "export": "导出",
+      "detect": "检测水印",
+      "remove": "去除水印"
+    },
+    "wmPreview": "检测预览",
+    "wmMaskToggle": "叠加蒙版",
+    "wmCoverage": "蒙版覆盖率"
   },
   "envBanner": {
     "title": "环境检测：{names} 未就绪，核心功能可能无法运行",

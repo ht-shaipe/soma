@@ -45,3 +45,5 @@ pub mod upload;
 pub mod video;
 /// 语音处理器 - TTS 语音列表
 pub mod voice;
+/// 视频去水印处理器 - 静态水印检测与去除
+pub mod watermark;

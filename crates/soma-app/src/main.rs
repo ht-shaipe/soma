@@ -274,6 +274,7 @@ async fn dispatch(module: &str, param: &RequestParameter) -> tube::Result<tube::
         "jianying" => soma_server::handler::jianying::distribute(param).await,
         "platform" => soma_server::handler::platform::distribute(param).await,
         "dataexport" => soma_server::handler::dataexport::distribute(param).await,
+        "watermark" => soma_server::handler::watermark::distribute(param).await,
         // stream 仅返回播放/下载 URL 字符串；桌面模式下实际媒体播放
         // 需要本机 soma-server 提供静态服务，或等 M3 接入 asset 协议
         "stream" => soma_server::handler::stream::distribute(param).await,
@@ -391,6 +392,7 @@ mod tests {
             "jianying",
             "platform",
             "dataexport",
+            "watermark",
         ] {
             let mut param = RequestParameter::default();
             param.module = module.to_string();

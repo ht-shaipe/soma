@@ -28,6 +28,7 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
   - **剪映草稿导出**：视频/音频文件 → 剪映（JianYing）草稿，可直接在剪映中打开继续编辑
   - **通知推送**：Bark（iOS）/ 钉钉 / Telegram 消息推送
   - **数据导出**：JSON 数据 → CSV / JSON / JSONL 文件（含带引号转义的 CSV 解析）
+  - **视频去水印**：多帧梯度分析自动检测静态水印（即梦等 AI 生成视频适用），蒙版预览确认后 FFmpeg removelogo 一键去除
   - **抖音直连**：a_bogus/msToken 签名直连抖音 Web API，查询视频详情与用户作品列表（需浏览器 Cookie）
 - **图片故事**：多张图片 + 文字描述 → 图片故事视频
 
@@ -55,7 +56,7 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 | 桌面应用 | Tauri v2（内嵌 web/dist，invoke 分发与 HTTP 同构信封，0.1.2 新增） |
 | 前端 | Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue I18n（中英双语，HTTP/Tauri 双轨 Transport） |
 | 功能点框架 | soma-feature：Feature trait + 注册表 + schemars JSON Schema（24 个内置功能点） |
-| 视频处理 | FFmpeg（拼接/转场/字幕/混音/水印）+ 剪映草稿导出 + yt-dlp 下载 |
+| 视频处理 | FFmpeg（拼接/转场/字幕/混音/水印/静态水印去除）+ 剪映草稿导出 + yt-dlp 下载 |
 | 语音合成 | Edge TTS / Azure / SiliconFlow / ElevenLabs / Gemini / MiMo / 火山引擎 / 讯飞 / Fish-Speech S2 / HeyGem / 声音克隆 |
 | AI 模型 | DeepSeek / OpenAI / Qwen / Gemini 等 25+ 提供商 |
 | 视频生成 | 智谱 CogVideoX / 快手可灵 Kling / MiniMax 海螺 |
@@ -76,7 +77,7 @@ soma/
 │   ├── soma-feature/       # 功能点框架（Feature trait + 注册表 + JSON Schema，24 个内置功能点）
 │   ├── soma-tts/           # 语音合成（11 种引擎 + 声音克隆）
 │   ├── soma-stock/         # 素材采集 + AI 视频生成 + 数字人 Provider（5 种）+ yt-dlp 下载 + 抖音直连
-│   ├── soma-video/         # 视频处理（FFmpeg 拼接/转场/字幕/混音/水印 + 剪映草稿导出）
+│   ├── soma-video/         # 视频处理（FFmpeg 拼接/转场/字幕/混音/水印 + 剪映草稿导出 + 静态水印检测去除）
 │   ├── soma-server/        # Web 服务（API 路由/任务队列/流水线/SQLite 持久化）
 │   └── soma-app/           # Tauri v2 桌面应用（内嵌前端，invoke 分发与 HTTP 同构）
 ├── docs/                   # 技术文档（版本计划、方案调研、成本评估、实践文章）
@@ -266,7 +267,7 @@ make dev-tauri        # 启动桌面应用（debug 模式可用 make dev-tauri-d
 2. 按引导向导确认 API Key 已生效（也可在 **设置** 页面修改配置，页面顶部「环境状态」卡片可一键预检 FFmpeg/密钥/存储）
 3. 生成短视频：进入创作向导，填写视频主题（如"介绍人工智能的发展历程"），选择语言、段落数、画幅比例等，点击生成
 4. 生成数字人口播：上传一张人像照片（Live2D 模式选择卡通模型），输入口播文案（≤1000 字），选择语音，点击生成
-5. 单步功能：**功能点工作台** 中 24 个功能点可独立运行（如只做 TTS 合成、只生成字幕）；**工具箱** 提供视频下载/字幕处理/剪映草稿/通知推送/数据导出/抖音直连 6 个小工具
+5. 单步功能：**功能点工作台** 中 24 个功能点可独立运行（如只做 TTS 合成、只生成字幕）；**工具箱** 提供视频下载/字幕处理/剪映草稿/通知推送/数据导出/视频去水印/抖音直连 7 个小工具
 6. 任务页面实时查看进度，完成后可预览/下载成品视频
 
 ### 生成视频的完整流水线
@@ -416,6 +417,7 @@ CMD ["soma"]
 | `notify` | send / send_batch | 通知推送（Bark / 钉钉 / Telegram） |
 | `platform` | douyin_detail / douyin_posts | 抖音 Web API 直连（a_bogus 签名，需浏览器 Cookie） |
 | `dataexport` | export / import / preview | 数据导出（CSV / JSON / JSONL） |
+| `watermark` | detect / remove | 静态水印检测与去除（多帧梯度分析，蒙版预览，remove 支持自动检测） |
 | `system` | preflight | 环境预检（FFmpeg / yt-dlp / edge-tts / 存储 / 密钥共 7 项） |
 
 > 请求示例（裸调用 TTS 功能点，真实可用）：
