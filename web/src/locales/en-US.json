@@ -8,7 +8,6 @@
     "tasks": "Task List",
     "settings": "Settings",
     "guide": "Guide",
-    "workbench": "Feature Workbench",
     "toolbox": "Toolbox",
     "imageStory": "Image Story",
     "groupCreate": "Create",
@@ -541,7 +540,6 @@
     "theme": "Toggle theme"
   },
   "workbench": {
-    "subtitle": "Run each feature standalone; artifacts are archived automatically",
     "search": "Search features by name or ID",
     "refresh": "Refresh features",
     "use": "Use",
@@ -583,7 +581,7 @@
     "desc": "Upload multiple images, add text descriptions, AI will generate video based on images and descriptions"
   },
   "toolbox": {
-    "subtitle": "Standalone utilities",
+    "subtitle": "7 featured utilities and 20+ feature points, ready to run with auto-archived artifacts",
     "use": "Use",
     "result": "Result",
     "tools": {
@@ -668,7 +666,12 @@
     },
     "wmPreview": "Detection preview",
     "wmMaskToggle": "Overlay mask",
-    "wmCoverage": "Mask coverage"
+    "wmCoverage": "Mask coverage",
+    "section": {
+      "tools": "Featured Tools",
+      "features": "Feature Points"
+    },
+    "noMatch": "No matches"
   },
   "envBanner": {
     "title": "Environment check: {names} not ready — core features may fail",

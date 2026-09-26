@@ -16,10 +16,6 @@
         <el-icon><Picture /></el-icon>
         <span>{{ $t('nav.imageStory') }}</span>
       </router-link>
-      <router-link to="/workbench" class="nav-item" :class="{ 'is-active': isActive('/workbench') }">
-        <el-icon><Grid /></el-icon>
-        <span>{{ $t('nav.workbench') }}</span>
-      </router-link>
       <router-link to="/toolbox" class="nav-item" :class="{ 'is-active': isActive('/toolbox') }">
         <el-icon><Suitcase /></el-icon>
         <span>{{ $t('nav.toolbox') }}</span>
@@ -50,7 +46,7 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { VideoCamera, List, Setting, QuestionFilled, Grid, Picture, Suitcase } from '@element-plus/icons-vue'
+import { VideoCamera, List, Setting, QuestionFilled, Picture, Suitcase } from '@element-plus/icons-vue'
 
 const route = useRoute()
 

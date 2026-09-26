@@ -8,7 +8,6 @@
     "tasks": "任务列表",
     "settings": "系统设置",
     "guide": "使用指南",
-    "workbench": "功能点工作台",
     "toolbox": "工具箱",
     "imageStory": "图片故事",
     "groupCreate": "创作",
@@ -541,7 +540,6 @@
     "theme": "切换主题"
   },
   "workbench": {
-    "subtitle": "每个功能点可独立运行，产物自动归档",
     "search": "搜索功能点名称或 ID",
     "refresh": "刷新功能点列表",
     "use": "立即使用",
@@ -583,7 +581,7 @@
     "desc": "上传多张图片，添加文字描述，AI将根据图片和描述生成视频"
   },
   "toolbox": {
-    "subtitle": "独立小工具集合",
+    "subtitle": "7 个精选工具与 20+ 功能点，即开即用，产物自动归档",
     "use": "立即使用",
     "result": "执行结果",
     "tools": {
@@ -668,7 +666,12 @@
     },
     "wmPreview": "检测预览",
     "wmMaskToggle": "叠加蒙版",
-    "wmCoverage": "蒙版覆盖率"
+    "wmCoverage": "蒙版覆盖率",
+    "section": {
+      "tools": "精选工具",
+      "features": "功能点"
+    },
+    "noMatch": "无匹配结果"
   },
   "envBanner": {
     "title": "环境检测：{names} 未就绪，核心功能可能无法运行",

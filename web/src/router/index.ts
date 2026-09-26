@@ -10,12 +10,6 @@ const router = createRouter({
       meta: { titleKey: 'nav.home', subtitleKey: 'app.subtitle' },
     },
     {
-      path: '/workbench',
-      name: 'workbench',
-      component: () => import('@/views/WorkbenchView.vue'),
-      meta: { titleKey: 'nav.workbench', subtitleKey: 'workbench.subtitle' },
-    },
-    {
       path: '/toolbox',
       name: 'toolbox',
       component: () => import('@/views/ToolboxView.vue'),
