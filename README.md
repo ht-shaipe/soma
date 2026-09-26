@@ -256,7 +256,7 @@ make build            # 构建前端（桌面端内嵌 web/dist）与后端
 make dev-tauri        # 启动桌面应用（debug 模式可用 make dev-tauri-debug）
 ```
 
-桌面模式为独立窗口应用，无需启动后端服务与前端开发服务器：全部 API 经 Tauri invoke 在应用内分发，与 HTTP 同构（`{code, result, message}` 信封）。发布构建用 `make build-tauri`。
+桌面模式为独立窗口应用，无需启动后端服务与前端开发服务器：全部 API 经 Tauri invoke 在应用内分发，与 HTTP 同构（`{code, result, message}` 信封）。发布构建用 `make build-tauri`。首启自动初始化配置与存储至系统目录（macOS: `~/Library/Application Support/com.soma.desktop/`），开发机升级时自动迁移项目内既有 `conf/config.toml`（保留密钥），无需手动复制。
 
 **常用 make 命令**：`make dev`（开发）、`make build`（前后端 release 构建）、`make prod`（构建前端后启动后端，单进程托管）、`make dev-tauri` / `make build-tauri`（桌面应用）、`make test`、`make fmt`、`make lint`、`make clean`。
 
