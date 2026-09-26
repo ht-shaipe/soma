@@ -180,6 +180,13 @@ async fn dispatch(module: &str, param: &RequestParameter) -> tube::Result<tube::
         "portraits" => soma_server::handler::material::distribute_portraits(param).await,
         "features" => soma_server::handler::features::distribute(param).await,
         "system" => soma_server::handler::system::distribute(param).await,
+        "image_story" => soma_server::handler::image_story::distribute(param).await,
+        "download" => soma_server::handler::download::distribute(param).await,
+        "notify" => soma_server::handler::notify::distribute(param).await,
+        "subtitle" => soma_server::handler::subtitle::distribute(param).await,
+        "jianying" => soma_server::handler::jianying::distribute(param).await,
+        "platform" => soma_server::handler::platform::distribute(param).await,
+        "dataexport" => soma_server::handler::dataexport::distribute(param).await,
         // stream 仅返回播放/下载 URL 字符串；桌面模式下实际媒体播放
         // 需要本机 soma-server 提供静态服务，或等 M3 接入 asset 协议
         "stream" => soma_server::handler::stream::distribute(param).await,
@@ -235,14 +242,86 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let envelope = rt.block_on(api(
-            "features".to_string(),
-            "list".to_string(),
-            serde_json::json!({}),
-        ))
-        .expect("api 命令失败");
+        let envelope = rt
+            .block_on(api(
+                "features".to_string(),
+                "list".to_string(),
+                serde_json::json!({}),
+            ))
+            .expect("api 命令失败");
         assert_eq!(envelope["code"], 200, "信封 code 应为 200: {}", envelope["message"]);
         let list = envelope["result"].as_array().expect("result 应为数组");
         assert!(list.len() >= 24, "功能点数量应 ≥ 24，实际 {}", list.len());
+    }
+
+    /// 回归测试：router.rs 新增模块必须同步进桌面 dispatch，
+    /// 否则桌面模式调用会命中"桌面模式未提供"错误。
+    /// 以空参数调用，只要错误不是"模块未提供"即视为接线正确
+    /// （各 handler 会返回自己的参数校验错误）。
+    #[test]
+    fn test_dispatch_covers_new_modules() {
+        init_backend();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let local = tokio::task::LocalSet::new();
+
+        for module in [
+            "image_story",
+            "download",
+            "notify",
+            "subtitle",
+            "jianying",
+            "platform",
+            "dataexport",
+        ] {
+            let mut param = RequestParameter::default();
+            param.module = module.to_string();
+            param.method = "list".to_string();
+            param.value = tube_value::Value::Null;
+            param.text = Some("{}".to_string());
+
+            let res = local.block_on(&rt, dispatch(module, &param));
+            match res {
+                Ok(_) => { /* 接线正确且成功返回 */ }
+                Err(e) => {
+                    let msg = e.to_string();
+                    assert!(
+                        !msg.contains("桌面模式未提供"),
+                        "模块 {module} 未接入桌面 dispatch: {msg}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// 桌面模式 dataexport/preview 端到端（纯本地，无外部依赖）
+    #[test]
+    fn test_dispatch_dataexport_preview() {
+        init_backend();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let local = tokio::task::LocalSet::new();
+
+        let mut param = RequestParameter::default();
+        param.module = "dataexport".to_string();
+        param.method = "preview".to_string();
+        param.value = tube_value::Value::from_serialize(
+            &serde_json::json!({ "data": [{ "k": "v", "x": "y" }] }),
+        )
+        .unwrap_or(tube_value::Value::Null);
+        param.text = Some(r#"{"data":[{"k":"v","x":"y"}]}"#.to_string());
+
+        let res = local
+            .block_on(&rt, dispatch("dataexport", &param))
+            .expect("dataexport/preview dispatch 失败");
+        let json = serde_json::to_value(&res).expect("序列化失败");
+        assert_eq!(json["total"], 1, "preview 应返回 total=1: {json}");
+        let csv = json["csvPreview"].as_str().unwrap_or("");
+        assert!(csv.contains("k,x"), "CSV 表头应含 k,x: {csv}");
+        assert!(csv.contains("v,y"), "CSV 数据行应含 v,y: {csv}");
     }
 }
