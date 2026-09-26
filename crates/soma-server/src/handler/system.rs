@@ -35,7 +35,7 @@ fn check_binary(name: &str, program: &str, args: &[&str]) -> (bool, String) {
     }
 }
 
-/// 构造单项检测结果的便捷宏
+/// 构造单项检测结果的便捷宏（关键项：缺失计入 allOk）
 macro_rules! check {
     ($name:expr, $ok:expr, $detail:expr, $hint:expr) => {
         (
@@ -43,6 +43,20 @@ macro_rules! check {
             $ok,
             $detail.to_string(),
             $hint.to_string(),
+            false,
+        )
+    };
+}
+
+/// 可选项检测宏：缺失不影响核心流水线（如 Python/GPU 仅数字人/克隆需要）
+macro_rules! check_opt {
+    ($name:expr, $ok:expr, $detail:expr, $hint:expr) => {
+        (
+            $name.to_string(),
+            $ok,
+            $detail.to_string(),
+            $hint.to_string(),
+            true,
         )
     };
 }
@@ -57,6 +71,19 @@ async fn preflight() -> Result<Value> {
     let (ffmpeg_ok, ffmpeg_detail) = check_binary("FFmpeg", &ffmpeg_bin, &["-version"]);
     let (ffprobe_ok, ffprobe_detail) = check_binary("ffprobe", "ffprobe", &["-version"]);
     let (edge_ok, edge_detail) = check_binary("edge-tts", "edge-tts", &["--version"]);
+
+    // 可选项：Python（数字人引擎/声音克隆的推理脚本载体）与 NVIDIA GPU（GPU 数字人引擎）
+    let (python_ok, python_detail) = check_binary("Python 3", "python3", &["--version"]);
+    let (gpu_ok, gpu_detail) = check_binary(
+        "NVIDIA GPU",
+        "nvidia-smi",
+        &["--query-gpu=name", "--format=csv,noheader"],
+    );
+    let gpu_detail = if gpu_ok {
+        gpu_detail
+    } else {
+        "未检测到 NVIDIA GPU（Live2D 纯 CPU 数字人不受影响）".to_string()
+    };
 
     // 存储可写
     let storage_path = conf.app.get_storage_path().to_string();
@@ -134,13 +161,25 @@ async fn preflight() -> Result<Value> {
             },
             "系统设置 → AI 视频生成"
         ),
+        check_opt!(
+            "Python 3",
+            python_ok,
+            python_detail,
+            "brew install python3 或 apt install python3（数字人引擎/声音克隆依赖）"
+        ),
+        check_opt!(
+            "NVIDIA GPU",
+            gpu_ok,
+            gpu_detail,
+            "GPU 数字人引擎（EchoMimicV3/HeyGem）需 NVIDIA GPU；卡通数字人 Live2D 无需"
+        ),
     ];
 
-    let all_ok = checks.iter().all(|c| c.1);
+    let all_ok = checks.iter().all(|c| c.1 || c.4);
     Ok(value!({
         "allOk": all_ok,
-        "checks": checks.iter().map(|(name, ok, detail, hint)| value!({
-            "name": name, "ok": ok, "detail": detail, "hint": hint,
+        "checks": checks.iter().map(|(name, ok, detail, hint, optional)| value!({
+            "name": name, "ok": ok, "detail": detail, "hint": hint, "optional": optional,
         })).collect::<Vec<_>>(),
     }))
 }
@@ -173,4 +212,55 @@ fn get_llm_key(conf: &Config, provider: &str) -> String {
         _ => "",
     }
     .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// M2.5：preflight 应返回 9 项检查（含可选的 Python/GPU），
+    /// allOk 只由关键项决定，可选缺失不拉低结论
+    #[tokio::test]
+    async fn test_preflight_checks_shape() {
+        crate::Config::set(crate::Config::default());
+        let v = preflight().await.expect("preflight 失败");
+        let json = serde_json::to_value(&v).expect("序列化失败");
+        let checks = json["checks"].as_array().expect("checks 应为数组");
+        assert_eq!(checks.len(), 9, "应含 7 个关键项 + Python/GPU 两个可选项");
+        let names: Vec<&str> = checks.iter().filter_map(|c| c["name"].as_str()).collect();
+        for expected in [
+            "FFmpeg",
+            "ffprobe",
+            "edge-tts",
+            "存储目录",
+            "Python 3",
+            "NVIDIA GPU",
+        ] {
+            assert!(
+                names.contains(&expected),
+                "缺少检查项 {expected}: {names:?}"
+            );
+        }
+        for c in checks {
+            let optional = c["optional"].as_bool().unwrap_or(false);
+            if c["name"] == "Python 3" || c["name"] == "NVIDIA GPU" {
+                assert!(optional, "{} 应为可选项", c["name"]);
+            } else {
+                assert!(!optional, "{} 不应为可选项", c["name"]);
+            }
+            assert!(
+                c["hint"].as_str().is_some_and(|h| !h.is_empty()),
+                "每项需带指引"
+            );
+        }
+        // allOk 语义：可选项缺失不影响
+        let all_critical_ok = checks.iter().all(|c| {
+            c["ok"].as_bool().unwrap_or(false) || c["optional"].as_bool().unwrap_or(false)
+        });
+        assert_eq!(
+            json["allOk"].as_bool().unwrap_or(false),
+            all_critical_ok,
+            "allOk 应只由关键项决定"
+        );
+    }
 }

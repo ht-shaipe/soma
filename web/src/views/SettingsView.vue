@@ -28,10 +28,13 @@
         </div>
         <div v-if="envChecks.length" class="sec-fields env-list">
           <div v-for="c in envChecks" :key="c.name" class="env-row">
-            <span class="env-dot" :class="c.ok ? 'ok' : 'bad'" />
+            <span class="env-dot" :class="c.ok ? 'ok' : (c.optional ? 'opt' : 'bad')" />
             <span class="env-name">{{ c.name }}</span>
+            <el-tag v-if="c.optional" size="small" type="info" effect="plain" round>
+              {{ $t('settings.env.optional') }}
+            </el-tag>
             <span class="env-detail">{{ c.detail }}</span>
-            <span v-if="!c.ok" class="env-hint">{{ c.hint }}</span>
+            <span v-if="!c.ok && !c.optional" class="env-hint">{{ c.hint }}</span>
           </div>
         </div>
       </section>
@@ -542,7 +545,7 @@ function formSnapshot(): string {
 const isDirty = computed(() => formSnapshot() !== savedBaseline.value)
 
 // ── 环境检测（M2.5）──
-const envChecks = ref<Array<{ name: string; ok: boolean; detail: string; hint: string }>>([])
+const envChecks = ref<Array<{ name: string; ok: boolean; detail: string; hint: string; optional?: boolean }>>([])
 const envLoading = ref(false)
 
 async function runPreflight() {
@@ -836,6 +839,11 @@ html:not(.dark) .save-bar {
 .env-dot.bad {
   background: var(--soma-danger);
   box-shadow: 0 0 8px rgba(248, 113, 113, 0.6);
+}
+
+.env-dot.opt {
+  background: var(--soma-text-muted, #94a3b8);
+  opacity: 0.7;
 }
 
 .env-name {

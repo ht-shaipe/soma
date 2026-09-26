@@ -3,6 +3,26 @@
     <AppSidebar @open-guide="onOpenGuide" />
     <div class="app-main-area">
       <AppHeader @open-guide="onOpenGuide" />
+      <!-- M2.5 启动环境体检：关键依赖缺失时全局横幅引导（可关闭） -->
+      <el-alert
+        v-if="!envDismissed && envIssues.length"
+        class="env-banner"
+        type="warning"
+        show-icon
+        :title="$t('envBanner.title', { names: envIssueNames })"
+        :closable="true"
+        @close="envDismissed = true"
+      >
+        <div class="env-banner-body">
+          <div v-for="issue in envIssues" :key="issue.name" class="env-banner-item">
+            <span class="env-banner-name">{{ issue.name }}</span>
+            <span class="env-banner-hint">{{ issue.hint }}</span>
+          </div>
+          <el-button size="small" type="warning" plain @click="router.push('/settings')">
+            {{ $t('envBanner.goto') }}
+          </el-button>
+        </div>
+      </el-alert>
       <div class="app-content" ref="contentRef">
         <router-view />
       </div>
@@ -12,18 +32,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSidebar from '@/layout/AppSidebar.vue'
 import AppHeader from '@/layout/AppHeader.vue'
 import GuideDialog from '@/components/GuideDialog.vue'
 import { useConfigStore } from '@/stores/config'
+import api, { extractData } from '@/api'
+
+interface PreflightCheck {
+  name: string
+  ok: boolean
+  detail: string
+  hint: string
+  optional?: boolean
+}
 
 const guideRef = ref<InstanceType<typeof GuideDialog> | null>(null)
 const configStore = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const contentRef = ref<HTMLElement | null>(null)
+
+// ── M2.5 启动环境体检 ──
+const envIssues = ref<PreflightCheck[]>([])
+const envDismissed = ref(false)
+const envIssueNames = computed(() => envIssues.value.map((c) => c.name).join('、'))
+
+async function runStartupPreflight() {
+  try {
+    const res = await api.post('/system/preflight', {}).then(extractData<{ checks: PreflightCheck[] }>)
+    // 只横幅关键项（optional 缺失不拦截，设置页可见详情）
+    envIssues.value = (res?.checks || []).filter((c) => !c.ok && !c.optional)
+  } catch {
+    // 检测失败静默：不打扰启动流程，设置页可手动重测
+  }
+}
 
 function onOpenGuide() {
   guideRef.value?.open()
@@ -37,6 +81,7 @@ watch(() => route.path, async () => {
 
 onMounted(async () => {
   await configStore.loadConfig()
+  runStartupPreflight()
   if (guideRef.value?.shouldShowOnFirstUse()) {
     setTimeout(() => {
       guideRef.value?.open()
@@ -58,3 +103,33 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.env-banner {
+  margin: 0 20px;
+  border-radius: 12px;
+}
+
+.env-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.env-banner-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.env-banner-name {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.env-banner-hint {
+  opacity: 0.85;
+}
+</style>

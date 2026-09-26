@@ -306,7 +306,8 @@
     "env": {
       "title": "Environment Status",
       "desc": "FFmpeg, TTS engine, storage and API key health",
-      "rerun": "Re-check"
+      "rerun": "Re-check",
+      "optional": "Optional"
     },
     "desc": {
       "llm": "Large language model for script generation (25+ providers)",
@@ -651,5 +652,9 @@
       "preview": "Preview",
       "export": "Export"
     }
+  },
+  "envBanner": {
+    "title": "Environment check: {names} not ready — core features may fail",
+    "goto": "Open Settings"
   }
 }
