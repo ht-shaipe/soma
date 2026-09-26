@@ -34,7 +34,7 @@ $header-height: 60px;
   --soma-radius-sm: 10px;
   --soma-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
 
-  // Element Plus 对齐：主色与深色画布统一为 Soma 色板
+  // Element Plus 对齐：主色统一为 Soma 色板（浅色默认值，深色见 html.dark）
   --el-color-primary: #5b8cff;
   --el-color-primary-light-3: #7ba3ff;
   --el-color-primary-light-5: #9db9ff;
@@ -42,6 +42,14 @@ $header-height: 60px;
   --el-color-primary-light-8: #d0ddff;
   --el-color-primary-light-9: rgba(91, 140, 255, 0.14);
   --el-color-primary-dark-2: #4770d9;
+  --el-border-radius-base: 9px;
+  --el-font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI',
+    'Microsoft YaHei', Roboto, sans-serif;
+}
+
+// EP 深色定制：必须在 html.dark 作用域声明才能压过 EP dark/css-vars.css
+// （同特异性 0,1,1，本文件引入在后 → 胜出；写在 ：root 会被 EP 暗色值覆盖）
+html.dark {
   --el-bg-color: #131a2e;
   --el-bg-color-overlay: #161e36;
   --el-bg-color-page: #0a0e1a;
@@ -57,9 +65,6 @@ $header-height: 60px;
   --el-text-color-regular: #c3cde4;
   --el-text-color-secondary: #93a0bf;
   --el-text-color-placeholder: #5d6a8a;
-  --el-border-radius-base: 9px;
-  --el-font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI',
-    'Microsoft YaHei', Roboto, sans-serif;
 }
 
 * {
