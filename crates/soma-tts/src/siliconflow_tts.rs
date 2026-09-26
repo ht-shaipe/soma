@@ -3,10 +3,10 @@
 //! 基于 SiliconFlow 云端 TTS API（CosyVoice2 模型）进行语音合成。
 //! API 文档：https://api.siliconflow.cn/v1/audio/speech
 
-use async_trait::async_trait;
-use soma_core::error::SomaError;
 use crate::edge_tts::generate_subtitle_cues_from_text;
 use crate::provider::{SomaTtsProvider, TtsResult};
+use async_trait::async_trait;
+use soma_core::error::SomaError;
 use std::path::Path;
 
 /// SiliconFlow TTS 语音合成器
@@ -22,7 +22,9 @@ impl SiliconflowTts {
     ///
     /// - `api_key` - SiliconFlow 平台的 API 密钥
     pub fn new(api_key: &str) -> Self {
-        Self { api_key: api_key.to_string() }
+        Self {
+            api_key: api_key.to_string(),
+        }
     }
 }
 
@@ -73,11 +75,17 @@ impl SomaTtsProvider for SiliconflowTts {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(SomaError::Tts(format!("SiliconFlow TTS failed: {} - {}", status, body)));
+            return Err(SomaError::Tts(format!(
+                "SiliconFlow TTS failed: {} - {}",
+                status, body
+            )));
         }
 
         // 将返回的音频数据写入文件
-        let bytes = resp.bytes().await.map_err(|e| SomaError::Http(e.to_string()))?;
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| SomaError::Http(e.to_string()))?;
         let output_str = output_path.to_string_lossy().to_string();
         if let Some(parent) = output_path.parent() {
             std::fs::create_dir_all(parent).map_err(SomaError::Io)?;
@@ -99,9 +107,19 @@ impl SomaTtsProvider for SiliconflowTts {
 /// 使用 ffprobe 获取音频文件时长（秒）
 fn get_audio_duration(audio_path: &str) -> Result<f64, SomaError> {
     let output = std::process::Command::new("ffprobe")
-        .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            audio_path,
+        ])
         .output()
         .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
-    String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<f64>()
         .map_err(|e| SomaError::Tts(format!("parse duration failed: {}", e)))
 }

@@ -3,12 +3,12 @@
 //! 基于 Microsoft Edge 在线 TTS 服务（通过 `edge-tts` 命令行工具）进行语音合成。
 //! 同时提供静音音频生成、音频时长探测和基于文本的字幕时间轴生成功能。
 
+use crate::provider::{SomaTtsProvider, TtsResult};
+use crate::voices;
 use async_trait::async_trait;
 use soma_core::error::SomaError;
 use soma_core::models::SubtitleCue;
 use soma_core::utils;
-use crate::provider::{SomaTtsProvider, TtsResult};
-use crate::voices;
 use std::path::Path;
 
 /// EdgeTTS 语音合成器
@@ -53,7 +53,8 @@ impl SomaTtsProvider for EdgeTts {
         }
 
         // 构造超时参数（如果设置了超时）
-        let timeout_args: Vec<String> = self.timeout
+        let timeout_args: Vec<String> = self
+            .timeout
             .map(|t| vec![format!("--timeout={}", t as u64)])
             .unwrap_or_default();
 
@@ -61,10 +62,14 @@ impl SomaTtsProvider for EdgeTts {
         let output_str = output_path.to_string_lossy().to_string();
         let result = tokio::process::Command::new("edge-tts")
             .args([
-                "--voice", &voice_name,
-                "--rate", &rate_str,
-                "--text", text,
-                "--write-media", &output_str,
+                "--voice",
+                &voice_name,
+                "--rate",
+                &rate_str,
+                "--text",
+                text,
+                "--write-media",
+                &output_str,
             ])
             .args(&timeout_args)
             .output()
@@ -93,7 +98,11 @@ impl EdgeTts {
     ///
     /// 当语音设置为 "no-voice" 时调用，使用 ffmpeg 生成指定时长的静音 MP3 文件。
     /// 时长根据文本长度估算（参见 [`voices::estimate_no_voice_duration`]）。
-    async fn synthesize_silent(&self, text: &str, output_path: &Path) -> Result<TtsResult, SomaError> {
+    async fn synthesize_silent(
+        &self,
+        text: &str,
+        output_path: &Path,
+    ) -> Result<TtsResult, SomaError> {
         // 根据文本长度估算无语音时的音频时长
         let duration = voices::estimate_no_voice_duration(text);
         let output_str = output_path.to_string_lossy().to_string();
@@ -106,11 +115,17 @@ impl EdgeTts {
         let ffmpeg = "ffmpeg";
         let result = tokio::process::Command::new(ffmpeg)
             .args([
-                "-y", "-f", "lavfi",
-                "-i", "anullsrc=r=44100:cl=mono",
-                "-t", &format!("{:.3}", duration),
-                "-codec:a", "libmp3lame",
-                "-q:a", "4",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "anullsrc=r=44100:cl=mono",
+                "-t",
+                &format!("{:.3}", duration),
+                "-codec:a",
+                "libmp3lame",
+                "-q:a",
+                "4",
                 &output_str,
             ])
             .output()
@@ -141,16 +156,20 @@ impl EdgeTts {
 pub fn get_audio_duration(audio_path: &str) -> Result<f64, SomaError> {
     let output = std::process::Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
             audio_path,
         ])
         .output()
         .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
 
     let duration_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    duration_str.parse::<f64>()
+    duration_str
+        .parse::<f64>()
         .map_err(|e| SomaError::Tts(format!("failed to parse audio duration: {}", e)))
 }
 
@@ -183,7 +202,10 @@ pub fn generate_subtitle_cues_from_text(text: &str, audio_duration: f64) -> Vec<
         if sentence.trim().is_empty() {
             continue;
         }
-        let width: usize = sentence.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum();
+        let width: usize = sentence
+            .chars()
+            .map(|c| if c.is_ascii() { 1 } else { 2 })
+            .sum();
         if width <= max_line_width * 2 {
             split_sentences.push(sentence.clone());
         } else {
@@ -226,7 +248,8 @@ pub fn generate_subtitle_cues_from_text(text: &str, audio_duration: f64) -> Vec<
         let sentence_duration = if i == split_sentences.len() - 1 {
             audio_duration_100ns.saturating_sub(current_offset)
         } else {
-            ((audio_duration_100ns as f64) * (sentence_chars as f64 / total_chars as f64)).max(1.0) as u64
+            ((audio_duration_100ns as f64) * (sentence_chars as f64 / total_chars as f64)).max(1.0)
+                as u64
         };
         let sentence_end = (current_offset + sentence_duration).min(audio_duration_100ns);
 

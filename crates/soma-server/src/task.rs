@@ -1,14 +1,14 @@
+use crate::service;
+use crate::state;
 /// 任务队列调度模块
 ///
 /// 实现带并发限制和排队机制的任务调度器。当当前执行任务数未达到最大并发数时，
 /// 新任务立即在新线程中启动执行；超出并发限制时任务进入等待队列；
 /// 队列也满时返回错误。任务完成后自动从队列中取下一个任务执行。
 use soma_core::error::SomaError;
-use soma_core::models::{TaskStatus, VideoParams, DigitalHumanParams, ImageStoryParams};
-use crate::state;
-use crate::service;
-use std::sync::Mutex;
+use soma_core::models::{DigitalHumanParams, ImageStoryParams, TaskStatus, VideoParams};
 use std::collections::VecDeque;
+use std::sync::Mutex;
 
 lazy_static! {
     /// 全局任务队列实例，默认并发数5、排队数100，可通过 init_queue 重新初始化
@@ -53,11 +53,14 @@ enum QueuedTask {
     },
 }
 
-
 /// 在独立线程中执行任务，完成后释放并发槽位
 fn spawn_task(task: QueuedTask) {
     match task {
-        QueuedTask::Video { task_id, params, stop_at } => {
+        QueuedTask::Video {
+            task_id,
+            params,
+            stop_at,
+        } => {
             std::thread::spawn(move || {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     service::pipeline::run_task(&task_id, &params, &stop_at)
@@ -88,55 +91,61 @@ fn spawn_task(task: QueuedTask) {
 }
 
 /// 处理视频任务执行结果
-fn handle_task_result(
-    task_id: &str,
-    result: std::thread::Result<Result<(), SomaError>>,
-) {
+fn handle_task_result(task_id: &str, result: std::thread::Result<Result<(), SomaError>>) {
     match result {
         Ok(Ok(())) => {}
         Ok(Err(e)) => {
             log::error!("task {} failed: {:?}", task_id, e);
-            state::update_task_data(task_id, &state::TaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(format!("{:?}", e)),
-                ..Default::default()
-            });
+            state::update_task_data(
+                task_id,
+                &state::TaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(format!("{:?}", e)),
+                    ..Default::default()
+                },
+            );
         }
         Err(panic_val) => {
             let msg = panic_msg(panic_val);
             log::error!("task {} panicked: {}", task_id, msg);
-            state::update_task_data(task_id, &state::TaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(format!("pipeline panicked: {}", msg)),
-                ..Default::default()
-            });
+            state::update_task_data(
+                task_id,
+                &state::TaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(format!("pipeline panicked: {}", msg)),
+                    ..Default::default()
+                },
+            );
         }
     }
 }
 
 /// 处理数字人任务执行结果
-fn handle_dh_task_result(
-    task_id: &str,
-    result: std::thread::Result<Result<(), SomaError>>,
-) {
+fn handle_dh_task_result(task_id: &str, result: std::thread::Result<Result<(), SomaError>>) {
     match result {
         Ok(Ok(())) => {}
         Ok(Err(e)) => {
             log::error!("dh task {} failed: {:?}", task_id, e);
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(format!("{:?}", e)),
-                ..Default::default()
-            });
+            state::update_dh_task_data(
+                task_id,
+                &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(format!("{:?}", e)),
+                    ..Default::default()
+                },
+            );
         }
         Err(panic_val) => {
             let msg = panic_msg(panic_val);
             log::error!("dh task {} panicked: {}", task_id, msg);
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(format!("pipeline panicked: {}", msg)),
-                ..Default::default()
-            });
+            state::update_dh_task_data(
+                task_id,
+                &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(format!("pipeline panicked: {}", msg)),
+                    ..Default::default()
+                },
+            );
         }
     }
 }
@@ -150,12 +159,24 @@ fn handle_image_story_task_result(
         Ok(Ok(())) => {}
         Ok(Err(e)) => {
             log::error!("image story task {} failed: {:?}", task_id, e);
-            state::update_image_story_task_data(task_id, Some(TaskStatus::Failed.as_i32()), None, None, Some(format!("{:?}", e)));
+            state::update_image_story_task_data(
+                task_id,
+                Some(TaskStatus::Failed.as_i32()),
+                None,
+                None,
+                Some(format!("{:?}", e)),
+            );
         }
         Err(panic_val) => {
             let msg = panic_msg(panic_val);
             log::error!("image story task {} panicked: {}", task_id, msg);
-            state::update_image_story_task_data(task_id, Some(TaskStatus::Failed.as_i32()), None, None, Some(format!("pipeline panicked: {}", msg)));
+            state::update_image_story_task_data(
+                task_id,
+                Some(TaskStatus::Failed.as_i32()),
+                None,
+                None,
+                Some(format!("pipeline panicked: {}", msg)),
+            );
         }
     }
 }
@@ -173,21 +194,43 @@ fn panic_msg(panic_val: Box<dyn std::any::Any + Send>) -> String {
 
 impl TaskQueue {
     pub fn new(max_concurrent: usize, max_queued: usize) -> Self {
-        Self { max_concurrent, max_queued, current: 0, queue: VecDeque::new() }
+        Self {
+            max_concurrent,
+            max_queued,
+            current: 0,
+            queue: VecDeque::new(),
+        }
     }
 
     /// 添加视频任务到队列
-    pub fn add_task(&mut self, task_id: String, params: VideoParams, stop_at: String) -> Result<(), SomaError> {
-        self.enqueue(QueuedTask::Video { task_id, params, stop_at })
+    pub fn add_task(
+        &mut self,
+        task_id: String,
+        params: VideoParams,
+        stop_at: String,
+    ) -> Result<(), SomaError> {
+        self.enqueue(QueuedTask::Video {
+            task_id,
+            params,
+            stop_at,
+        })
     }
 
     /// 添加数字人任务到队列
-    pub fn add_dh_task(&mut self, task_id: String, params: DigitalHumanParams) -> Result<(), SomaError> {
+    pub fn add_dh_task(
+        &mut self,
+        task_id: String,
+        params: DigitalHumanParams,
+    ) -> Result<(), SomaError> {
         self.enqueue(QueuedTask::DigitalHuman { task_id, params })
     }
 
     /// 添加图片故事任务到队列
-    pub fn add_image_story_task(&mut self, task_id: String, params: ImageStoryParams) -> Result<(), SomaError> {
+    pub fn add_image_story_task(
+        &mut self,
+        task_id: String,
+        params: ImageStoryParams,
+    ) -> Result<(), SomaError> {
         self.enqueue(QueuedTask::ImageStory { task_id, params })
     }
 

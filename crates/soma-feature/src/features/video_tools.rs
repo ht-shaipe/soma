@@ -29,7 +29,10 @@ fn resolve_output(
 ) -> String {
     match output_path {
         Some(ref p) if !p.is_empty() => p.clone(),
-        _ => ctx.artifact_path(default_name).to_string_lossy().to_string(),
+        _ => ctx
+            .artifact_path(default_name)
+            .to_string_lossy()
+            .to_string(),
     }
 }
 
@@ -111,11 +114,7 @@ impl TypedFeature for VideoConcatFeature {
                 .with_step("concat")
                 .with_message(format!("拼接 {} 段素材", input.materials.len())),
         );
-        let composer = soma_video::VideoComposer::new(build_ffmpeg(
-            conf,
-            2,
-            None,
-        ));
+        let composer = soma_video::VideoComposer::new(build_ffmpeg(conf, 2, None));
         composer.combine_videos(
             &input.materials,
             &input.audio_file,
@@ -256,7 +255,10 @@ impl TypedFeature for VideoWatermarkFeature {
         _progress: &dyn ProgressReporter,
     ) -> Result<VideoWatermarkOutput, SomaError> {
         if !std::path::Path::new(&input.watermark).exists() {
-            return Err(SomaError::Config(format!("水印图片不存在: {}", input.watermark)));
+            return Err(SomaError::Config(format!(
+                "水印图片不存在: {}",
+                input.watermark
+            )));
         }
         let conf = ctx.config();
         let output_path = resolve_output(ctx, &input.output_path, "watermarked.mp4");
@@ -459,7 +461,9 @@ impl TypedFeature for VideoClipResizeFeature {
         let ffmpeg = build_ffmpeg(conf, 2, None);
         let duration = match input.duration {
             Some(d) => d,
-            None => (ffmpeg.get_video_duration(&input.video)? - input.start.unwrap_or(0.0)).max(0.1),
+            None => {
+                (ffmpeg.get_video_duration(&input.video)? - input.start.unwrap_or(0.0)).max(0.1)
+            }
         };
         ffmpeg.clip_and_resize(
             &input.video,
@@ -526,13 +530,21 @@ impl TypedFeature for VideoInfoFeature {
         _progress: &dyn ProgressReporter,
     ) -> Result<VideoInfoOutput, SomaError> {
         if !std::path::Path::new(&input.video).exists() {
-            return Err(SomaError::Config(format!("视频文件不存在: {}", input.video)));
+            return Err(SomaError::Config(format!(
+                "视频文件不存在: {}",
+                input.video
+            )));
         }
         let ffmpeg = build_ffmpeg(ctx.config(), 1, None);
         let duration = ffmpeg.get_video_duration(&input.video)?;
         let (width, height) = ffmpeg.get_video_resolution(&input.video)?;
         let aspect = detect_aspect(width, height);
-        Ok(VideoInfoOutput { duration, width, height, aspect })
+        Ok(VideoInfoOutput {
+            duration,
+            width,
+            height,
+            aspect,
+        })
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::Config;
 /// LLM（大语言模型）服务模块（宿主兼容层）
 ///
 /// 0.1.2 起实现已迁至 `soma_feature::llm`（配置参数为 AppConfig），
@@ -5,7 +6,6 @@
 /// handler 层与既有调用方无需改动。
 use soma_core::error::SomaError;
 use soma_core::models::StoryboardScene;
-use crate::Config;
 
 /// 根据主题生成短视频脚本，同时提取素材搜索关键词
 ///
@@ -23,7 +23,14 @@ pub async fn generate_script(
     conf: &Config,
 ) -> Result<String, SomaError> {
     soma_feature::llm::generate_script(
-        provider, subject, intent, language, paragraph_number, prompt, system_prompt, &conf.app,
+        provider,
+        subject,
+        intent,
+        language,
+        paragraph_number,
+        prompt,
+        system_prompt,
+        &conf.app,
     )
     .await
 }
@@ -76,7 +83,12 @@ pub async fn generate_storyboard(
     conf: &Config,
 ) -> Result<Vec<StoryboardScene>, SomaError> {
     soma_feature::llm::generate_storyboard(
-        provider, subject, script, clip_duration, intent, &conf.app,
+        provider,
+        subject,
+        script,
+        clip_duration,
+        intent,
+        &conf.app,
     )
     .await
 }

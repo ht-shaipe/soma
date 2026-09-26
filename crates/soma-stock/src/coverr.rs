@@ -1,3 +1,4 @@
+use crate::{get_api_key, SomaStockProvider};
 /// Coverr 视频素材供应商实现
 ///
 /// 封装 Coverr API（https://api.coverr.co）的视频搜索功能。
@@ -6,7 +7,6 @@
 use async_trait::async_trait;
 use soma_core::error::SomaError;
 use soma_core::models::{MaterialInfo, VideoAspect};
-use crate::{SomaStockProvider, get_api_key};
 
 /// Coverr 视频素材供应商
 ///
@@ -23,7 +23,9 @@ impl Coverr {
     /// # 参数
     /// - `api_keys`: Coverr API 密钥列表
     pub fn new(api_keys: &[String]) -> Self {
-        Self { api_keys: api_keys.to_vec() }
+        Self {
+            api_keys: api_keys.to_vec(),
+        }
     }
 }
 
@@ -42,7 +44,12 @@ impl SomaStockProvider for Coverr {
     ///
     /// # 返回
     /// 符合条件的素材信息列表，每个视频包含 MP4 下载链接
-    async fn search(&self, keyword: &str, video_aspect: &VideoAspect, min_duration: u32) -> Result<Vec<MaterialInfo>, SomaError> {
+    async fn search(
+        &self,
+        keyword: &str,
+        video_aspect: &VideoAspect,
+        min_duration: u32,
+    ) -> Result<Vec<MaterialInfo>, SomaError> {
         let api_key = get_api_key(&self.api_keys)?;
         let client = reqwest::Client::new();
         let url = format!(
@@ -58,8 +65,12 @@ impl SomaStockProvider for Coverr {
             .await
             .map_err(|e| SomaError::Http(e.to_string()))?;
 
-        let body: serde_json::Value = resp.json().await.map_err(|e| SomaError::Http(e.to_string()))?;
-        let hits = body.get("hits")
+        let body: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| SomaError::Http(e.to_string()))?;
+        let hits = body
+            .get("hits")
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
@@ -67,9 +78,14 @@ impl SomaStockProvider for Coverr {
         let (target_w, target_h) = video_aspect.to_resolution();
         let mut items = Vec::new();
         for v in hits {
-            let duration = v.get("duration")
+            let duration = v
+                .get("duration")
                 .and_then(|d| d.as_f64())
-                .or_else(|| v.get("duration").and_then(|d| d.as_str()).and_then(|s| s.parse::<f64>().ok()))
+                .or_else(|| {
+                    v.get("duration")
+                        .and_then(|d| d.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                })
                 .unwrap_or(0.0);
             if (duration as u32) < min_duration {
                 continue;
@@ -87,7 +103,8 @@ impl SomaStockProvider for Coverr {
                 }
             }
 
-            let mp4_url = v.get("urls")
+            let mp4_url = v
+                .get("urls")
                 .and_then(|u| u.get("mp4_download"))
                 .and_then(|u| u.as_str());
             if let Some(url) = mp4_url {

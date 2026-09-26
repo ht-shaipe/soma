@@ -98,11 +98,14 @@ pub fn to_ass(entries: &[SubtitleEntry], style: Option<&str>) -> String {
 
     output.push_str("[V4+ Styles]\n");
     output.push_str("Format: Name, Fontname, Fontsize, PrimaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Alignment, MarginL, MarginR, MarginV\n");
-    let style_line = style.unwrap_or("Default,Microsoft YaHei,60,&H00FFFFFF,&H80000000,0,0,1,2,2,80,80,40");
+    let style_line =
+        style.unwrap_or("Default,Microsoft YaHei,60,&H00FFFFFF,&H80000000,0,0,1,2,2,80,80,40");
     output.push_str(&format!("Style: {}\n\n", style_line));
 
     output.push_str("[Events]\n");
-    output.push_str("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
+    output.push_str(
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n",
+    );
 
     for entry in entries {
         let start = format_ass_time(entry.start_ms);
@@ -190,8 +193,8 @@ pub fn merge_subtitles(lists: &[Vec<SubtitleEntry>]) -> Vec<SubtitleEntry> {
 pub fn merge_srt_files(paths: &[String]) -> Result<Vec<SubtitleEntry>, String> {
     let mut lists = Vec::new();
     for path in paths {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("读取文件失败 {}: {}", path, e))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("读取文件失败 {}: {}", path, e))?;
         lists.push(parse_srt(&content));
     }
     Ok(merge_subtitles(&lists))
@@ -223,7 +226,11 @@ pub async fn translate_subtitles(
     entries: &[SubtitleEntry],
     params: &TranslateParams,
 ) -> Result<Vec<SubtitleEntry>, String> {
-    let batch_size = if params.batch_size == 0 { 20 } else { params.batch_size };
+    let batch_size = if params.batch_size == 0 {
+        20
+    } else {
+        params.batch_size
+    };
     let mut result = Vec::new();
 
     for chunk in entries.chunks(batch_size) {
@@ -231,7 +238,10 @@ pub async fn translate_subtitles(
         let translated = translate_batch(&texts, params).await?;
 
         for (i, entry) in chunk.iter().enumerate() {
-            let text = translated.get(i).cloned().unwrap_or_else(|| entry.text.clone());
+            let text = translated
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| entry.text.clone());
             result.push(SubtitleEntry {
                 index: entry.index,
                 start_ms: entry.start_ms,
@@ -245,10 +255,7 @@ pub async fn translate_subtitles(
 }
 
 /// 调用 LLM API 翻译一批文本
-async fn translate_batch(
-    texts: &[&str],
-    params: &TranslateParams,
-) -> Result<Vec<String>, String> {
+async fn translate_batch(texts: &[&str], params: &TranslateParams) -> Result<Vec<String>, String> {
     let prompt = format!(
         "将以下字幕文本翻译为{}。保持原意，语气自然。每行一个翻译结果，不要添加序号或额外说明。\n\n{}",
         params.target_lang,
@@ -373,7 +380,10 @@ pub async fn correct_subtitles(
             index: entry.index,
             start_ms: entry.start_ms,
             end_ms: entry.end_ms,
-            text: corrected.get(i).cloned().unwrap_or_else(|| entry.text.clone()),
+            text: corrected
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| entry.text.clone()),
         })
         .collect())
 }
@@ -390,7 +400,10 @@ fn parse_timestamp(ts: &str, sep: char) -> u64 {
     if parts.len() != 2 {
         return 0;
     }
-    let hms: Vec<u64> = parts[0].split(':').filter_map(|s| s.trim().parse().ok()).collect();
+    let hms: Vec<u64> = parts[0]
+        .split(':')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
     let ms: u64 = parts[1].trim().parse().unwrap_or(0);
     if hms.len() == 3 {
         hms[0] * 3600000 + hms[1] * 60000 + hms[2] * 1000 + ms
@@ -414,8 +427,7 @@ fn format_timestamp(ms: u64, sep: char) -> String {
 
 /// 从文件加载字幕（自动检测格式）
 pub fn load_subtitle(path: &str) -> Result<Vec<SubtitleEntry>, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("读取文件失败: {}", e))?;
+    let content = std::fs::read_to_string(path).map_err(|e| format!("读取文件失败: {}", e))?;
 
     let ext = std::path::Path::new(path)
         .extension()
@@ -436,11 +448,10 @@ pub fn parse_vtt(content: &str) -> Vec<SubtitleEntry> {
     let mut in_header = true;
 
     for block in content.split("\n\n") {
-        if in_header
-            && block.starts_with("WEBVTT") {
-                in_header = false;
-                continue;
-            }
+        if in_header && block.starts_with("WEBVTT") {
+            in_header = false;
+            continue;
+        }
         let lines: Vec<&str> = block.lines().collect();
         if lines.is_empty() {
             continue;
@@ -494,10 +505,7 @@ pub fn parse_ass(content: &str) -> Vec<SubtitleEntry> {
         }
 
         if let Some(rest) = line.strip_prefix("Format:") {
-            format_fields = rest
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
+            format_fields = rest.split(',').map(|s| s.trim().to_string()).collect();
             continue;
         }
 
@@ -528,7 +536,11 @@ pub fn parse_ass(content: &str) -> Vec<SubtitleEntry> {
 fn parse_ass_time(ts: &str) -> u64 {
     let parts: Vec<&str> = ts.split('.').collect();
     let hms: Vec<u64> = parts[0].split(':').filter_map(|s| s.parse().ok()).collect();
-    let cs: u64 = if parts.len() > 1 { parts[1].parse().unwrap_or(0) } else { 0 };
+    let cs: u64 = if parts.len() > 1 {
+        parts[1].parse().unwrap_or(0)
+    } else {
+        0
+    };
     if hms.len() == 3 {
         hms[0] * 3600000 + hms[1] * 60000 + hms[2] * 1000 + cs * 10
     } else if hms.len() == 2 {

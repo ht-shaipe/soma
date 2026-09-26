@@ -29,9 +29,7 @@ pub fn compose_videos(
     output_dir: &str,
     on_progress: &dyn Fn(u32),
 ) -> Result<(Vec<String>, Vec<String>), SomaError> {
-    let codec = params
-        .get_video_encoder()
-        .unwrap_or(conf.get_video_codec());
+    let codec = params.get_video_encoder().unwrap_or(conf.get_video_codec());
     let ffmpeg = soma_video::Ffmpeg::new(&conf.get_ffmpeg_binary(), params.get_n_threads(), codec);
     let composer = soma_video::VideoComposer::new(ffmpeg);
     let aspect = params.get_video_aspect();
@@ -51,13 +49,26 @@ pub fn compose_videos(
     let step_progress = (100 / total_steps).max(1);
 
     for i in 1..=video_count {
-        let combined_path = out_dir.join(format!("combined-{}.mp4", i)).to_string_lossy().to_string();
-        let final_path = out_dir.join(format!("final-{}.mp4", i)).to_string_lossy().to_string();
+        let combined_path = out_dir
+            .join(format!("combined-{}.mp4", i))
+            .to_string_lossy()
+            .to_string();
+        let final_path = out_dir
+            .join(format!("final-{}.mp4", i))
+            .to_string_lossy()
+            .to_string();
 
         progress = (progress + step_progress).min(99);
         on_progress(progress);
 
-        composer.combine_videos(materials, audio_file, &combined_path, &aspect, clip_dur, transition_mode)?;
+        composer.combine_videos(
+            materials,
+            audio_file,
+            &combined_path,
+            &aspect,
+            clip_dur,
+            transition_mode,
+        )?;
 
         progress = (progress + step_progress).min(99);
         on_progress(progress);
@@ -72,12 +83,21 @@ pub fn compose_videos(
             final_params.bgm_file = Some(bgm_file);
         }
 
-        composer.generate_video(&combined_path, audio_file, subtitle_path, &final_path, &final_params)?;
+        composer.generate_video(
+            &combined_path,
+            audio_file,
+            subtitle_path,
+            &final_path,
+            &final_params,
+        )?;
 
         // 水印（右下角，半透明）
         let current_path = if let Some(ref wm) = params.video_watermark {
             if !wm.is_empty() && std::path::Path::new(wm).exists() {
-                let wm_path = out_dir.join(format!("watermarked-{}.mp4", i)).to_string_lossy().to_string();
+                let wm_path = out_dir
+                    .join(format!("watermarked-{}.mp4", i))
+                    .to_string_lossy()
+                    .to_string();
                 composer.ffmpeg().add_watermark(&final_path, wm, &wm_path)?;
                 wm_path
             } else {
@@ -88,29 +108,33 @@ pub fn compose_videos(
         };
 
         // 片头/片尾拼接
-        let final_path_with_intro_outro = if params.video_intro.is_some() || params.video_outro.is_some() {
-            let intro = params.video_intro.as_deref().unwrap_or("");
-            let outro = params.video_outro.as_deref().unwrap_or("");
-            let has_intro = !intro.is_empty() && std::path::Path::new(intro).exists();
-            let has_outro = !outro.is_empty() && std::path::Path::new(outro).exists();
-            if has_intro || has_outro {
-                let io_path = out_dir.join(format!("final-io-{}.mp4", i)).to_string_lossy().to_string();
-                let mut segments: Vec<&str> = Vec::new();
-                if has_intro {
-                    segments.push(intro);
+        let final_path_with_intro_outro =
+            if params.video_intro.is_some() || params.video_outro.is_some() {
+                let intro = params.video_intro.as_deref().unwrap_or("");
+                let outro = params.video_outro.as_deref().unwrap_or("");
+                let has_intro = !intro.is_empty() && std::path::Path::new(intro).exists();
+                let has_outro = !outro.is_empty() && std::path::Path::new(outro).exists();
+                if has_intro || has_outro {
+                    let io_path = out_dir
+                        .join(format!("final-io-{}.mp4", i))
+                        .to_string_lossy()
+                        .to_string();
+                    let mut segments: Vec<&str> = Vec::new();
+                    if has_intro {
+                        segments.push(intro);
+                    }
+                    segments.push(&current_path);
+                    if has_outro {
+                        segments.push(outro);
+                    }
+                    composer.ffmpeg().concat_videos(&segments, &io_path)?;
+                    io_path
+                } else {
+                    current_path.clone()
                 }
-                segments.push(&current_path);
-                if has_outro {
-                    segments.push(outro);
-                }
-                composer.ffmpeg().concat_videos(&segments, &io_path)?;
-                io_path
             } else {
                 current_path.clone()
-            }
-        } else {
-            current_path.clone()
-        };
+            };
 
         final_videos.push(final_path_with_intro_outro);
         combined_videos.push(combined_path);
@@ -174,9 +198,8 @@ impl TypedFeature for VideoComposeFeature {
         let feature_id = ctx.feature_id().to_string();
         let run_id = ctx.run_id().to_string();
         let on_progress = |percent: u32| {
-            progress.report(
-                FeatureProgress::new(&feature_id, &run_id, percent).with_step("compose"),
-            );
+            progress
+                .report(FeatureProgress::new(&feature_id, &run_id, percent).with_step("compose"));
         };
 
         let (final_videos, combined_videos) = compose_videos(

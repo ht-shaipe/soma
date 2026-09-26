@@ -99,7 +99,10 @@ fn extract_voice_suffix(voice_name: &str, prefix: &str) -> Option<String> {
     if parts.len() >= 2 && parts[0] == prefix {
         let voice_with_gender = parts[1];
         // 取 '-' 前的部分作为纯语音标识
-        let voice = voice_with_gender.split('-').next().unwrap_or(voice_with_gender);
+        let voice = voice_with_gender
+            .split('-')
+            .next()
+            .unwrap_or(voice_with_gender);
         Some(voice.to_string())
     } else {
         None
@@ -241,11 +244,16 @@ pub fn estimate_no_voice_duration(text: &str) -> f64 {
         return 3.0;
     }
     // 统计中文字符数（Unicode 范围 U+4E00 ~ U+9FFF）
-    let cjk_count = text.chars().filter(|c| ('\u{4e00}'..='\u{9fff}').contains(c)).count() as f64;
+    let cjk_count = text
+        .chars()
+        .filter(|c| ('\u{4e00}'..='\u{9fff}').contains(c))
+        .count() as f64;
     // 统计英文单词数（按空格分割）
     let word_count = text.split_whitespace().count() as f64;
     // 句间停顿时长：句子数 - 1 个停顿，每个 0.35 秒
-    let sentence_count = soma_core::utils::split_string_by_punctuations(text).len().max(1) as f64;
+    let sentence_count = soma_core::utils::split_string_by_punctuations(text)
+        .len()
+        .max(1) as f64;
     let pause = (sentence_count - 1.0).max(0.0) * 0.35;
     // 取最短 3 秒
     (3.0_f64).max(cjk_count / 4.2 + word_count / 2.7 + pause)

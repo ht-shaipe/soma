@@ -69,7 +69,9 @@ fn subtitle_generate_disabled_returns_empty() {
             "subtitle_enabled": false
         }),
     };
-    let output = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+    let output = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap();
     assert_eq!(output.status, soma_feature::FeatureStatus::Success);
     assert_eq!(output.data["subtitle_path"], "");
 }
@@ -85,7 +87,9 @@ fn material_generate_missing_terms_fails_gracefully() {
         run_id: None,
         input: serde_json::json!({ "source": "pexels" }), // 缺少必填 terms
     };
-    let output = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+    let output = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap();
     assert_eq!(output.status, soma_feature::FeatureStatus::Failed);
     assert!(output.error.is_some());
 

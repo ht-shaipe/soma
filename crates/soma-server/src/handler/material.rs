@@ -6,9 +6,9 @@
 use actix_multipart::Multipart;
 use actix_web::HttpResponse;
 use futures::StreamExt;
+use soma_core::utils;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_core::utils;
 
 /// 素材模块请求分发
 ///
@@ -26,7 +26,9 @@ pub async fn distribute(param: &RequestParameter) -> Result<Value> {
 async fn list_materials(param: &RequestParameter) -> Result<Value> {
     let custom_dir = param.value.get_def_string("directory", "");
     let material_dir = if custom_dir.is_empty() {
-        utils::storage_dir("materials", true).to_string_lossy().to_string()
+        utils::storage_dir("materials", true)
+            .to_string_lossy()
+            .to_string()
     } else {
         custom_dir
     };
@@ -44,13 +46,21 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         if !soma_core::models::FILE_TYPE_VIDEOS.contains(&ext.as_str())
             && !soma_core::models::FILE_TYPE_IMAGES.contains(&ext.as_str())
         {
             continue;
         }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         let size = path.metadata().map(|m| m.len()).unwrap_or(0);
         items.push(value!({
             "name": name,
@@ -71,7 +81,9 @@ pub async fn distribute_portraits(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "list" => list_portraits().await,
         "delete" => delete_portrait(param).await,
-        "upload" => Err(error!("人像上传请使用 /api/v1/portraits/upload 接口（multipart/form-data）")),
+        "upload" => Err(error!(
+            "人像上传请使用 /api/v1/portraits/upload 接口（multipart/form-data）"
+        )),
         _ => Err(error!("不支持的方法: portraits.{}", param.method)),
     }
 }
@@ -92,11 +104,19 @@ async fn list_portraits() -> Result<Value> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         if !soma_core::models::DH_PORTRAIT_FILE_TYPES.contains(&ext.as_str()) {
             continue;
         }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         let metadata = match path.metadata() {
             Ok(m) => m,
             Err(_) => continue,
@@ -135,8 +155,8 @@ async fn delete_portrait(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少参数: name"));
     }
 
-    let safe_name = utils::sanitize_upload_filename(&name)
-        .map_err(|e| error!("文件名不合法: {}", e))?;
+    let safe_name =
+        utils::sanitize_upload_filename(&name).map_err(|e| error!("文件名不合法: {}", e))?;
 
     let portrait_dir = utils::storage_dir("portraits", false);
     let dest_path = portrait_dir.join(&safe_name);
@@ -334,9 +354,15 @@ async fn list_fonts() -> Result<Value> {
 
     if font_list.is_empty() {
         let system_font_dirs: Vec<String> = if cfg!(target_os = "macos") {
-            vec!["/Library/Fonts".to_string(), "/System/Library/Fonts".to_string()]
+            vec![
+                "/Library/Fonts".to_string(),
+                "/System/Library/Fonts".to_string(),
+            ]
         } else if cfg!(target_os = "linux") {
-            vec!["/usr/share/fonts".to_string(), "/usr/local/share/fonts".to_string()]
+            vec![
+                "/usr/share/fonts".to_string(),
+                "/usr/local/share/fonts".to_string(),
+            ]
         } else if cfg!(target_os = "windows") {
             let windir = std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
             vec![format!("{}/Fonts", windir.replace('\\', "/"))]

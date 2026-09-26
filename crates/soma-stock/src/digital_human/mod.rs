@@ -11,11 +11,11 @@ use async_trait::async_trait;
 use soma_core::config::DigitalHumanSection;
 use soma_core::error::SomaError;
 
-pub mod heygen;
-pub mod sadtalker;
 pub mod echomimic_v3;
 pub mod heygem;
+pub mod heygen;
 pub mod live2d;
+pub mod sadtalker;
 
 /// 数字人口播视频生成请求参数
 #[derive(Debug, Clone)]
@@ -107,7 +107,9 @@ pub async fn poll_until_done(
 /// 支持 "heygen"（云端 API）、"sadtalker"（本地 CPU/GPU 推理）、"echomimic_v3"（本地 GPU 推理）、
 /// "heygem"（HeyGem/Duix.Avatar HTTP API）和 "live2d"（Live2D 卡通口播，纯 CPU 渲染），
 /// 其他返回 `SomaError::Config`。
-pub fn create_provider(conf: &DigitalHumanSection) -> Result<Box<dyn DigitalHumanProvider>, SomaError> {
+pub fn create_provider(
+    conf: &DigitalHumanSection,
+) -> Result<Box<dyn DigitalHumanProvider>, SomaError> {
     let provider = conf.get_provider();
     match provider {
         "heygen" => {
@@ -117,12 +119,11 @@ pub fn create_provider(conf: &DigitalHumanSection) -> Result<Box<dyn DigitalHuma
                     "HeyGen API Key 未配置，请在 [digital_human] 段设置 api_key".into(),
                 ));
             }
-            let base_url = conf
-                .base_url
-                .as_deref()
-                .unwrap_or("https://api.heygen.com");
+            let base_url = conf.base_url.as_deref().unwrap_or("https://api.heygen.com");
             let model = conf.model.as_deref().unwrap_or("");
-            Ok(Box::new(heygen::HeyGenProvider::new(api_key, base_url, model)))
+            Ok(Box::new(heygen::HeyGenProvider::new(
+                api_key, base_url, model,
+            )))
         }
         "sadtalker" => {
             let sadtalker_conf = &conf.sadtalker;
@@ -136,21 +137,27 @@ pub fn create_provider(conf: &DigitalHumanSection) -> Result<Box<dyn DigitalHuma
                     "SadTalker 配置不完整，请在 [digital_human.sadtalker] 段设置 model_path".into(),
                 ));
             }
-            Ok(Box::new(sadtalker::SadTalkerProvider::new(sadtalker_conf.clone())))
+            Ok(Box::new(sadtalker::SadTalkerProvider::new(
+                sadtalker_conf.clone(),
+            )))
         }
         "echomimic_v3" => {
             let emv3_conf = &conf.echomimic_v3;
             if emv3_conf.get_env_path().is_empty() {
                 return Err(SomaError::Config(
-                    "EchoMimicV3 配置不完整，请在 [digital_human.echomimic_v3] 段设置 env_path".into(),
+                    "EchoMimicV3 配置不完整，请在 [digital_human.echomimic_v3] 段设置 env_path"
+                        .into(),
                 ));
             }
             if emv3_conf.get_model_path().is_empty() {
                 return Err(SomaError::Config(
-                    "EchoMimicV3 配置不完整，请在 [digital_human.echomimic_v3] 段设置 model_path".into(),
+                    "EchoMimicV3 配置不完整，请在 [digital_human.echomimic_v3] 段设置 model_path"
+                        .into(),
                 ));
             }
-            Ok(Box::new(echomimic_v3::EchoMimicV3Provider::new(emv3_conf.clone())))
+            Ok(Box::new(echomimic_v3::EchoMimicV3Provider::new(
+                emv3_conf.clone(),
+            )))
         }
         "heygem" => {
             let hg_conf = &conf.heygem;
@@ -190,8 +197,8 @@ pub fn create_provider(conf: &DigitalHumanSection) -> Result<Box<dyn DigitalHuma
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soma_core::config::DigitalHumanSection;
     use async_trait::async_trait;
+    use soma_core::config::DigitalHumanSection;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// 用于测试 poll_until_done 的 mock provider
@@ -231,7 +238,6 @@ mod tests {
             Ok("mock-download-path".to_string())
         }
     }
-
 
     /// 测试 create_provider heygen 提供商
     #[test]
@@ -291,7 +297,6 @@ mod tests {
             panic!("期望 SomaError::Config 错误");
         }
     }
-
 
     /// 测试 create_provider 使用默认 base_url
     #[test]

@@ -32,7 +32,12 @@ where
         match f() {
             Ok(v) => return Ok(v),
             Err(e) => {
-                log::warn!("retry attempt {}/{} failed: {:?}", attempt + 1, max_retries + 1, e);
+                log::warn!(
+                    "retry attempt {}/{} failed: {:?}",
+                    attempt + 1,
+                    max_retries + 1,
+                    e
+                );
                 if attempt < max_retries {
                     let delay = std::time::Duration::from_millis(500 * (1 << attempt) as u64);
                     std::thread::sleep(delay);

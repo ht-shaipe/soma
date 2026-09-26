@@ -3,9 +3,9 @@
 //! 定义视频生成任务的核心数据结构，包括任务状态枚举、视频参数、
 //! 字幕时间轴、素材信息等，以及相关常量。
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// 任务状态枚举
 ///
@@ -511,8 +511,8 @@ pub struct SubtitleCue {
 ///
 /// 包含中英文常见标点及阿拉伯语标点
 pub const PUNCTUATIONS: &[&str] = &[
-    "?", ",", ".", "、", ";", ":", "!", "…", "？", "，", "。", "；", "：", "！", "...",
-    "،", "؛", "؟",
+    "?", ",", ".", "、", ";", ":", "!", "…", "？", "，", "。", "；", "：", "！", "...", "،", "؛",
+    "؟",
 ];
 
 /// 支持的视频文件扩展名
@@ -757,35 +757,238 @@ impl Default for VisemeMapping {
     fn default() -> Self {
         let mut m = std::collections::HashMap::new();
         // 中文拼音音素 → Live2D 口型参数
-        m.insert("a".into(), Live2DMouthParams { mouth_open_y: 1.0, mouth_form: 0.0, mouth_open_x: 0.5 });
-        m.insert("o".into(), Live2DMouthParams { mouth_open_y: 0.8, mouth_form: -0.8, mouth_open_x: 0.3 });
-        m.insert("e".into(), Live2DMouthParams { mouth_open_y: 0.6, mouth_form: -0.3, mouth_open_x: 0.4 });
-        m.insert("i".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.8, mouth_open_x: 0.2 });
-        m.insert("u".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.9, mouth_open_x: 0.1 });
-        m.insert("v".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.8, mouth_open_x: 0.1 });
-        m.insert("b".into(), Live2DMouthParams { mouth_open_y: 0.1, mouth_form: 0.0, mouth_open_x: 0.3 });
-        m.insert("p".into(), Live2DMouthParams { mouth_open_y: 0.1, mouth_form: 0.0, mouth_open_x: 0.3 });
-        m.insert("m".into(), Live2DMouthParams { mouth_open_y: 0.1, mouth_form: 0.0, mouth_open_x: 0.3 });
-        m.insert("f".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: -0.5, mouth_open_x: 0.2 });
-        m.insert("d".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.3, mouth_open_x: 0.3 });
-        m.insert("t".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.3, mouth_open_x: 0.3 });
-        m.insert("n".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: 0.2, mouth_open_x: 0.3 });
-        m.insert("l".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.5, mouth_open_x: 0.3 });
-        m.insert("g".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: -0.2, mouth_open_x: 0.3 });
-        m.insert("k".into(), Live2DMouthParams { mouth_open_y: 0.2, mouth_form: -0.2, mouth_open_x: 0.3 });
-        m.insert("h".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.4 });
-        m.insert("j".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.6, mouth_open_x: 0.2 });
-        m.insert("q".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.6, mouth_open_x: 0.2 });
-        m.insert("x".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.5, mouth_open_x: 0.2 });
-        m.insert("zh".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.4, mouth_open_x: 0.3 });
-        m.insert("ch".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.4, mouth_open_x: 0.3 });
-        m.insert("sh".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.4, mouth_open_x: 0.3 });
-        m.insert("r".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.5, mouth_open_x: 0.3 });
-        m.insert("z".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.3 });
-        m.insert("c".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.3 });
-        m.insert("s".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.3, mouth_open_x: 0.4 });
-        m.insert("w".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: -0.7, mouth_open_x: 0.1 });
-        m.insert("y".into(), Live2DMouthParams { mouth_open_y: 0.3, mouth_form: 0.7, mouth_open_x: 0.2 });
+        m.insert(
+            "a".into(),
+            Live2DMouthParams {
+                mouth_open_y: 1.0,
+                mouth_form: 0.0,
+                mouth_open_x: 0.5,
+            },
+        );
+        m.insert(
+            "o".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.8,
+                mouth_form: -0.8,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "e".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.6,
+                mouth_form: -0.3,
+                mouth_open_x: 0.4,
+            },
+        );
+        m.insert(
+            "i".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.8,
+                mouth_open_x: 0.2,
+            },
+        );
+        m.insert(
+            "u".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.9,
+                mouth_open_x: 0.1,
+            },
+        );
+        m.insert(
+            "v".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.8,
+                mouth_open_x: 0.1,
+            },
+        );
+        m.insert(
+            "b".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.1,
+                mouth_form: 0.0,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "p".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.1,
+                mouth_form: 0.0,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "m".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.1,
+                mouth_form: 0.0,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "f".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.2,
+                mouth_form: -0.5,
+                mouth_open_x: 0.2,
+            },
+        );
+        m.insert(
+            "d".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.3,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "t".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.3,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "n".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.2,
+                mouth_form: 0.2,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "l".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.5,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "g".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.2,
+                mouth_form: -0.2,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "k".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.2,
+                mouth_form: -0.2,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "h".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.3,
+                mouth_open_x: 0.4,
+            },
+        );
+        m.insert(
+            "j".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.6,
+                mouth_open_x: 0.2,
+            },
+        );
+        m.insert(
+            "q".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.6,
+                mouth_open_x: 0.2,
+            },
+        );
+        m.insert(
+            "x".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.5,
+                mouth_open_x: 0.2,
+            },
+        );
+        m.insert(
+            "zh".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.4,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "ch".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.4,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "sh".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.4,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "r".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.5,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "z".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.3,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "c".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.3,
+                mouth_open_x: 0.3,
+            },
+        );
+        m.insert(
+            "s".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.3,
+                mouth_open_x: 0.4,
+            },
+        );
+        m.insert(
+            "w".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: -0.7,
+                mouth_open_x: 0.1,
+            },
+        );
+        m.insert(
+            "y".into(),
+            Live2DMouthParams {
+                mouth_open_y: 0.3,
+                mouth_form: 0.7,
+                mouth_open_x: 0.2,
+            },
+        );
         Self { mappings: m }
     }
 }
@@ -793,11 +996,14 @@ impl Default for VisemeMapping {
 impl VisemeMapping {
     /// 获取音素对应的口型参数，未知音素回退到中性口型
     pub fn get_params(&self, phoneme: &str) -> Live2DMouthParams {
-        self.mappings.get(phoneme).cloned().unwrap_or(Live2DMouthParams {
-            mouth_open_y: 0.0,
-            mouth_form: 0.0,
-            mouth_open_x: 0.0,
-        })
+        self.mappings
+            .get(phoneme)
+            .cloned()
+            .unwrap_or(Live2DMouthParams {
+                mouth_open_y: 0.0,
+                mouth_form: 0.0,
+                mouth_open_x: 0.0,
+            })
     }
 }
 
@@ -808,11 +1014,7 @@ impl DigitalHumanTaskInfo {
     }
 
     /// 创建新数字人任务，指定初始状态
-    pub fn with_status(
-        task_id: String,
-        params: DigitalHumanParams,
-        status: TaskStatus,
-    ) -> Self {
+    pub fn with_status(task_id: String, params: DigitalHumanParams, status: TaskStatus) -> Self {
         let now = Utc::now();
         Self {
             task_id,

@@ -14,14 +14,16 @@ use std::time::Duration;
 const FFMPEG_TIMEOUT_SECS: u64 = 600;
 
 fn run_with_timeout(cmd: &mut std::process::Command) -> Result<std::process::Output, SomaError> {
-    let mut child = cmd.stdout(std::process::Stdio::piped())
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg spawn failed: {}", e)))?;
     let timeout = Duration::from_secs(FFMPEG_TIMEOUT_SECS);
     match child.wait_timeout(timeout) {
         Ok(Some(status)) => {
-            let output = child.wait_with_output()
+            let output = child
+                .wait_with_output()
                 .map_err(|e| SomaError::Ffmpeg(format!("ffmpeg output read failed: {}", e)))?;
             if !status.success() {
                 return Ok(output);
@@ -31,7 +33,10 @@ fn run_with_timeout(cmd: &mut std::process::Command) -> Result<std::process::Out
         Ok(None) => {
             let _ = child.kill();
             let _ = child.wait();
-            Err(SomaError::Ffmpeg(format!("ffmpeg timed out after {}s", FFMPEG_TIMEOUT_SECS)))
+            Err(SomaError::Ffmpeg(format!(
+                "ffmpeg timed out after {}s",
+                FFMPEG_TIMEOUT_SECS
+            )))
         }
         Err(e) => {
             let _ = child.kill();
@@ -41,11 +46,17 @@ fn run_with_timeout(cmd: &mut std::process::Command) -> Result<std::process::Out
 }
 
 trait ChildWaitTimeout {
-    fn wait_timeout(&mut self, timeout: Duration) -> std::io::Result<Option<std::process::ExitStatus>>;
+    fn wait_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>>;
 }
 
 impl ChildWaitTimeout for std::process::Child {
-    fn wait_timeout(&mut self, timeout: Duration) -> std::io::Result<Option<std::process::ExitStatus>> {
+    fn wait_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>> {
         match self.try_wait() {
             Ok(Some(status)) => return Ok(Some(status)),
             Ok(None) => {}
@@ -133,7 +144,12 @@ pub struct Ffmpeg {
 const DEFAULT_CODEC: &str = "libx264";
 /// 支持的视频编码器列表，涵盖软编码和各平台硬编码
 const SUPPORTED_CODECS: &[&str] = &[
-    "libx264", "h264_nvenc", "h264_amf", "h264_qsv", "h264_mf", "h264_videotoolbox",
+    "libx264",
+    "h264_nvenc",
+    "h264_amf",
+    "h264_qsv",
+    "h264_mf",
+    "h264_videotoolbox",
 ];
 /// 默认输出帧率
 const FPS: u32 = 30;
@@ -149,8 +165,16 @@ impl Ffmpeg {
     /// # 返回
     /// 配置好的 Ffmpeg 实例
     pub fn new(path: &str, threads: u32, codec: &str) -> Self {
-        let effective_codec = if SUPPORTED_CODECS.contains(&codec) { codec } else { DEFAULT_CODEC };
-        Self { path: path.to_string(), threads, codec: effective_codec.to_string() }
+        let effective_codec = if SUPPORTED_CODECS.contains(&codec) {
+            codec
+        } else {
+            DEFAULT_CODEC
+        };
+        Self {
+            path: path.to_string(),
+            threads,
+            codec: effective_codec.to_string(),
+        }
     }
 
     /// 获取音频文件时长（秒）
@@ -167,10 +191,20 @@ impl Ffmpeg {
             // -v error: 只输出错误信息
             // -show_entries format=duration: 只显示 format 中的 duration 字段
             // -of default=noprint_wrappers=1:nokey=1: 不打印包裹行和键名，仅输出数值
-            .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path])
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                audio_path,
+            ])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
-        String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse::<f64>()
             .map_err(|e| SomaError::Ffmpeg(format!("parse duration failed: {}", e)))
     }
 
@@ -196,23 +230,32 @@ impl Ffmpeg {
             // 转换为绝对路径以确保 concat 分离器能正确解析
             let abs = std::fs::canonicalize(clip).unwrap_or_else(|_| PathBuf::from(clip));
             // 转义路径中的反斜杠和单引号，避免 concat 列表解析错误
-            let escaped = abs.to_string_lossy().replace('\\', "/").replace("'", "'\\''");
+            let escaped = abs
+                .to_string_lossy()
+                .replace('\\', "/")
+                .replace("'", "'\\''");
             content.push_str(&format!("file '{}'\n", escaped));
         }
         std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
 
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-max_delay", "500000",
-                "-i", concat_list.to_string_lossy().as_ref(),
-                "-c:v", &self.codec,
-                "-threads", &self.threads.to_string(),
-                "-pix_fmt", "yuv420p",
-                output_file,
-            ]))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-max_delay",
+            "500000",
+            "-i",
+            concat_list.to_string_lossy().as_ref(),
+            "-c:v",
+            &self.codec,
+            "-threads",
+            &self.threads.to_string(),
+            "-pix_fmt",
+            "yuv420p",
+            output_file,
+        ]))?;
 
         // 拼接完成后删除临时列表文件
         let _ = std::fs::remove_file(&concat_list);
@@ -223,7 +266,10 @@ impl Ffmpeg {
             if self.codec != DEFAULT_CODEC {
                 return self.concat_clips_fallback(clip_files, output_file, &concat_list);
             }
-            return Err(SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg concat failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -231,21 +277,36 @@ impl Ffmpeg {
     /// 拼接回退方法：使用默认编码器 libx264 重新拼接
     ///
     /// 当指定编码器拼接失败时，回退到 libx264 软编码重新尝试。
-    fn concat_clips_fallback(&self, _clip_files: &[String], output_file: &str, concat_list: &Path) -> Result<(), SomaError> {
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y", "-f", "concat", "-safe", "0",
-                "-i", concat_list.to_string_lossy().as_ref(),
-                "-c:v", DEFAULT_CODEC,
-                "-threads", &self.threads.to_string(),
-                "-pix_fmt", "yuv420p",
-                output_file,
-            ]))?;
+    fn concat_clips_fallback(
+        &self,
+        _clip_files: &[String],
+        output_file: &str,
+        concat_list: &Path,
+    ) -> Result<(), SomaError> {
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concat_list.to_string_lossy().as_ref(),
+            "-c:v",
+            DEFAULT_CODEC,
+            "-threads",
+            &self.threads.to_string(),
+            "-pix_fmt",
+            "yuv420p",
+            output_file,
+        ]))?;
         // 清理临时列表文件
         let _ = std::fs::remove_file(concat_list);
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg concat fallback failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg concat fallback failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -280,23 +341,32 @@ impl Ffmpeg {
              [blurred][fg]overlay=(W-w)/2:(H-h)/2",
             w = width, h = height
         );
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y",
-                "-ss", &start.to_string(),
-                "-i", input_path,
-                "-t", &duration.to_string(),
-                "-vf", &vf,
-                "-c:v", &self.codec,
-                "-an",
-                "-pix_fmt", "yuv420p",
-                "-r", &FPS.to_string(),
-                output_path,
-            ]))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-ss",
+            &start.to_string(),
+            "-i",
+            input_path,
+            "-t",
+            &duration.to_string(),
+            "-vf",
+            &vf,
+            "-c:v",
+            &self.codec,
+            "-an",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            &FPS.to_string(),
+            output_path,
+        ]))?;
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg clip+resize failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg clip+resize failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -313,7 +383,13 @@ impl Ffmpeg {
     ///
     /// # 返回
     /// 成功返回 Ok(())，无法识别的转场类型也返回 Ok(())（跳过），失败返回 SomaError
-    pub fn add_transition(&self, input_path: &str, output_path: &str, transition: &str, duration: f64) -> Result<(), SomaError> {
+    pub fn add_transition(
+        &self,
+        input_path: &str,
+        output_path: &str,
+        transition: &str,
+        duration: f64,
+    ) -> Result<(), SomaError> {
         let vf = match transition {
             "FadeIn" => format!("fade=t=in:st=0:d={}", duration),
             "FadeOut" => {
@@ -322,15 +398,34 @@ impl Ffmpeg {
             }
             "Dissolve" => {
                 let dur = self.get_video_duration(input_path)?;
-                format!("fade=t=in:st=0:d={},fade=t=out:st={}:d={}", duration.min(dur * 0.3), dur - duration, duration)
+                format!(
+                    "fade=t=in:st=0:d={},fade=t=out:st={}:d={}",
+                    duration.min(dur * 0.3),
+                    dur - duration,
+                    duration
+                )
             }
             _ => return Ok(()),
         };
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(["-y", "-i", input_path, "-vf", &vf, "-c:v", &self.codec, "-an", "-pix_fmt", "yuv420p", output_path]))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-i",
+            input_path,
+            "-vf",
+            &vf,
+            "-c:v",
+            &self.codec,
+            "-an",
+            "-pix_fmt",
+            "yuv420p",
+            output_path,
+        ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg transition failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg transition failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -378,8 +473,10 @@ impl Ffmpeg {
         // 构建 FFmpeg 命令参数
         let mut cmd_args = vec![
             "-y".to_string(),
-            "-i".to_string(), video_path.to_string(),   // 输入0：视频流
-            "-i".to_string(), audio_path.to_string(),    // 输入1：配音音频流
+            "-i".to_string(),
+            video_path.to_string(), // 输入0：视频流
+            "-i".to_string(),
+            audio_path.to_string(), // 输入1：配音音频流
         ];
 
         // 如果有背景音乐，添加第三个输入流
@@ -387,7 +484,7 @@ impl Ffmpeg {
             cmd_args.push("-stream_loop".to_string());
             cmd_args.push("-1".to_string());
             cmd_args.push("-i".to_string());
-            cmd_args.push(bgm_file.to_string());         // 输入2：背景音乐流
+            cmd_args.push(bgm_file.to_string()); // 输入2：背景音乐流
             Some(2u32)
         } else {
             None
@@ -404,77 +501,84 @@ impl Ffmpeg {
             if !has_subtitles_filter {
                 log::warn!("FFmpeg 不支持 subtitles 滤镜（缺少 libass），跳过字幕渲染");
             } else {
-            // 优先从字体目录查找字体文件，找不到则直接使用字体名称
-            let font_path = soma_core::utils::font_dir().join(font_name);
-            let font_path_str = if font_path.exists() {
-                font_path.to_string_lossy().to_string()
-            } else {
-                font_name.to_string()
-            };
-            // subtitles 滤镜会按 SRT 时间轴逐段渲染字幕文本
-            // force_style: 设置字幕样式（字体、大小、颜色、描边、位置等）
-            //   FontName: 字体文件路径
-            //   FontSize: 字体大小
-            //   PrimaryColour: 字体颜色（ASS 格式 &H00BBGGRR，注意 BGR 顺序且高位字节 00=不透明）
-            //   OutlineColour: 描边颜色（同上 BGR 格式）
-            //   Outline: 描边宽度
-            //   Alignment: 对齐方式 2=底部居中, 5=上方居中, 6=上方左对齐, 8=顶部居中, 9=顶部左对齐
-            //   MarginV: 垂直边距（像素）
-            let (alignment, margin_v) = match subtitle_position {
-                "top" => (8, 30),
-                "center" => (5, 0),
-                "custom" => {
-                    let pos = params.custom_position.unwrap_or(70.0) as u32;
-                    (2, pos)
-                },
-                _ => (2, 30),
-            };
-            // 将 #RRGGBB 颜色转为 ASS 的 &H00BBGGRR 格式
-            let ass_text_color = hex_to_ass_color(text_color);
-            let ass_stroke_color = hex_to_ass_color(stroke_color);
+                // 优先从字体目录查找字体文件，找不到则直接使用字体名称
+                let font_path = soma_core::utils::font_dir().join(font_name);
+                let font_path_str = if font_path.exists() {
+                    font_path.to_string_lossy().to_string()
+                } else {
+                    font_name.to_string()
+                };
+                // subtitles 滤镜会按 SRT 时间轴逐段渲染字幕文本
+                // force_style: 设置字幕样式（字体、大小、颜色、描边、位置等）
+                //   FontName: 字体文件路径
+                //   FontSize: 字体大小
+                //   PrimaryColour: 字体颜色（ASS 格式 &H00BBGGRR，注意 BGR 顺序且高位字节 00=不透明）
+                //   OutlineColour: 描边颜色（同上 BGR 格式）
+                //   Outline: 描边宽度
+                //   Alignment: 对齐方式 2=底部居中, 5=上方居中, 6=上方左对齐, 8=顶部居中, 9=顶部左对齐
+                //   MarginV: 垂直边距（像素）
+                let (alignment, margin_v) = match subtitle_position {
+                    "top" => (8, 30),
+                    "center" => (5, 0),
+                    "custom" => {
+                        let pos = params.custom_position.unwrap_or(70.0) as u32;
+                        (2, pos)
+                    }
+                    _ => (2, 30),
+                };
+                // 将 #RRGGBB 颜色转为 ASS 的 &H00BBGGRR 格式
+                let ass_text_color = hex_to_ass_color(text_color);
+                let ass_stroke_color = hex_to_ass_color(stroke_color);
 
-            // 字幕背景样式
-            // BackColour: 背景颜色（ASS 格式 &HAABBGGRR，AA=透明度 00=不透明 FF=全透明）
-            // BorderStyle: 3=不透明底框背景, 4=不透明底框+描边
-            let bg_style = if let Some(ref bg_color_val) = params.text_background_color {
-                let bg_hex = resolve_background_color(bg_color_val);
-                if !bg_hex.is_empty() {
-                    let is_rounded = params.rounded_subtitle_background.unwrap_or(false);
-                    // 圆角背景: 半透明(alpha=140 ≈ 0x8C)，否则不透明
-                    let alpha = if is_rounded { "8C" } else { "00" };
-                    let ass_bg = hex_to_ass_color_with_alpha(&bg_hex, alpha);
-                    let border_type = if stroke_width > 0.0 { 4 } else { 3 };
-                    // Shadow: 背景扩展量，模拟圆角/矩形的内边距
-                    let shadow = if is_rounded { (font_size as f32 * 0.15).ceil() as u32 } else { (font_size as f32 * 0.3).ceil() as u32 };
-                    format!(",BackColour={},BorderStyle={},Shadow={}", ass_bg, border_type, shadow)
+                // 字幕背景样式
+                // BackColour: 背景颜色（ASS 格式 &HAABBGGRR，AA=透明度 00=不透明 FF=全透明）
+                // BorderStyle: 3=不透明底框背景, 4=不透明底框+描边
+                let bg_style = if let Some(ref bg_color_val) = params.text_background_color {
+                    let bg_hex = resolve_background_color(bg_color_val);
+                    if !bg_hex.is_empty() {
+                        let is_rounded = params.rounded_subtitle_background.unwrap_or(false);
+                        // 圆角背景: 半透明(alpha=140 ≈ 0x8C)，否则不透明
+                        let alpha = if is_rounded { "8C" } else { "00" };
+                        let ass_bg = hex_to_ass_color_with_alpha(&bg_hex, alpha);
+                        let border_type = if stroke_width > 0.0 { 4 } else { 3 };
+                        // Shadow: 背景扩展量，模拟圆角/矩形的内边距
+                        let shadow = if is_rounded {
+                            (font_size as f32 * 0.15).ceil() as u32
+                        } else {
+                            (font_size as f32 * 0.3).ceil() as u32
+                        };
+                        format!(
+                            ",BackColour={},BorderStyle={},Shadow={}",
+                            ass_bg, border_type, shadow
+                        )
+                    } else {
+                        String::new()
+                    }
                 } else {
                     String::new()
-                }
-            } else {
-                String::new()
-            };
+                };
 
-            let style = format!(
+                let style = format!(
                 "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},Alignment={},MarginV={}{}",
                 font_path_str.replace('\\', "\\\\").replace(':', "\\:"), font_size, ass_text_color, ass_stroke_color, stroke_width, alignment, margin_v, bg_style
             );
-            let escaped_sub = subtitle_path.replace('\\', "/").replace(':', "\\:");
-            let escaped_style = style.replace(',', "\\,").replace(':', "\\:");
-            let sub_filter = format!("subtitles={}:force_style={}", escaped_sub, escaped_style);
-            cmd_args.push("-vf".to_string());
-            cmd_args.push(sub_filter);
+                let escaped_sub = subtitle_path.replace('\\', "/").replace(':', "\\:");
+                let escaped_style = style.replace(',', "\\,").replace(':', "\\:");
+                let sub_filter = format!("subtitles={}:force_style={}", escaped_sub, escaped_style);
+                cmd_args.push("-vf".to_string());
+                cmd_args.push(sub_filter);
             }
         }
 
         // 编码参数
         cmd_args.push("-c:v".to_string());
-        cmd_args.push(self.codec.clone());      // 视频编码器
+        cmd_args.push(self.codec.clone()); // 视频编码器
         cmd_args.push("-c:a".to_string());
-        cmd_args.push("aac".to_string());       // 音频编码器：AAC
+        cmd_args.push("aac".to_string()); // 音频编码器：AAC
         cmd_args.push("-b:a".to_string());
-        cmd_args.push("192k".to_string());      // 音频比特率：192kbps
+        cmd_args.push("192k".to_string()); // 音频比特率：192kbps
         cmd_args.push("-pix_fmt".to_string());
-        cmd_args.push("yuv420p".to_string());   // 像素格式
+        cmd_args.push("yuv420p".to_string()); // 像素格式
         cmd_args.push("-shortest".to_string()); // 以最短的流为准截断输出
 
         // 音频混合处理：背景音乐与配音混音
@@ -488,25 +592,29 @@ impl Ffmpeg {
             ));
             // 映射视频流和混合后的音频流
             cmd_args.push("-map".to_string());
-            cmd_args.push("0:v".to_string());    // 取输入0的视频流
+            cmd_args.push("0:v".to_string()); // 取输入0的视频流
             cmd_args.push("-map".to_string());
             cmd_args.push("[aout]".to_string()); // 取混合后的音频流
         } else {
             // 无背景音乐时，直接映射视频和配音音频
             cmd_args.push("-map".to_string());
-            cmd_args.push("0:v".to_string());    // 取输入0的视频流
+            cmd_args.push("0:v".to_string()); // 取输入0的视频流
             cmd_args.push("-map".to_string());
-            cmd_args.push("1:a".to_string());    // 取输入1的音频流
+            cmd_args.push("1:a".to_string()); // 取输入1的音频流
         }
 
         cmd_args.push(output_path.to_string());
 
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args(cmd_args.iter().map(|s| s.as_str())))?;
+        let result = run_with_timeout(
+            std::process::Command::new(&self.path).args(cmd_args.iter().map(|s| s.as_str())),
+        )?;
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg generate_video failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg generate_video failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -522,10 +630,20 @@ impl Ffmpeg {
     /// 成功返回时长（f64 秒），失败返回 SomaError
     pub fn get_video_duration(&self, video_path: &str) -> Result<f64, SomaError> {
         let output = std::process::Command::new("ffprobe")
-            .args(["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path])
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                video_path,
+            ])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe failed: {}", e)))?;
-        String::from_utf8_lossy(&output.stdout).trim().parse::<f64>()
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse::<f64>()
             .map_err(|e| SomaError::Ffmpeg(format!("parse duration failed: {}", e)))
     }
 
@@ -543,7 +661,17 @@ impl Ffmpeg {
             // -select_streams v:0: 选择第一个视频流
             // -show_entries stream=width,height: 显示宽高
             // -of csv=s=x:p=0: 用 x 分隔输出，不含前缀
-            .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", video_path])
+            .args([
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=s=x:p=0",
+                video_path,
+            ])
             .output()
             .map_err(|e| SomaError::Ffmpeg(format!("ffprobe resolution failed: {}", e)))?;
         let res_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -571,7 +699,12 @@ impl Ffmpeg {
     ///
     /// # 返回
     /// 成功返回处理后的视频文件路径列表，失败返回 SomaError
-    pub fn preprocess_local_materials(&self, materials: &[soma_core::models::MaterialInfo], clip_duration: u32, aspect: &soma_core::models::VideoAspect) -> Result<Vec<String>, SomaError> {
+    pub fn preprocess_local_materials(
+        &self,
+        materials: &[soma_core::models::MaterialInfo],
+        clip_duration: u32,
+        aspect: &soma_core::models::VideoAspect,
+    ) -> Result<Vec<String>, SomaError> {
         let (target_w, target_h) = aspect.to_resolution();
         let mut result = Vec::new();
 
@@ -581,7 +714,10 @@ impl Ffmpeg {
             if !Path::new(path).exists() {
                 continue;
             }
-            let ext = Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("");
+            let ext = Path::new(path)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
             if soma_core::models::FILE_TYPE_IMAGES.contains(&ext) {
                 // 图片文件：转换为同名的 .mp4 视频
                 let output = format!("{}.mp4", path.trim_end_matches(&format!(".{}", ext)));
@@ -610,30 +746,45 @@ impl Ffmpeg {
     ///
     /// # 返回
     /// 成功返回 Ok(())，失败返回 SomaError
-    fn image_to_video(&self, image_path: &str, output_path: &str, duration: f64, width: u32, height: u32) -> Result<(), SomaError> {
+    fn image_to_video(
+        &self,
+        image_path: &str,
+        output_path: &str,
+        duration: f64,
+        width: u32,
+        height: u32,
+    ) -> Result<(), SomaError> {
         // 图片缩放效果：从1.0逐渐放大到1.0+clip_duration*0.03
         // 使用 zoompan 滤镜实现动态缩放，zoom 从 1.0 线性增长
         // zoom='min(zoom+0.0005,1.2)' 每帧增大0.0005，最大1.2倍
         // d=帧数 指定动画总帧数，x/y 居中
         let total_frames = (duration * FPS as f64).ceil() as u32;
         let zoom_expr = format!("min(zoom+0.0005,{:.3})", 1.0 + duration * 0.03);
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y",
-                "-loop", "1",
-                "-i", image_path,
-                "-vf", &format!(
-                    "zoompan=z='{}':d={}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={}x{}:fps={}",
-                    zoom_expr, total_frames, width, height, FPS
-                ),
-                "-c:v", &self.codec,
-                "-pix_fmt", "yuv420p",
-                "-t", &duration.to_string(),
-                output_path,
-            ]))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-loop",
+            "1",
+            "-i",
+            image_path,
+            "-vf",
+            &format!(
+                "zoompan=z='{}':d={}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={}x{}:fps={}",
+                zoom_expr, total_frames, width, height, FPS
+            ),
+            "-c:v",
+            &self.codec,
+            "-pix_fmt",
+            "yuv420p",
+            "-t",
+            &duration.to_string(),
+            output_path,
+        ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg image_to_video failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg image_to_video failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -643,21 +794,34 @@ impl Ffmpeg {
     /// - `input_path`: 输入视频路径
     /// - `watermark_path`: 水印图片路径
     /// - `output_path`: 输出视频路径
-    pub fn add_watermark(&self, input_path: &str, watermark_path: &str, output_path: &str) -> Result<(), SomaError> {
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y",
-                "-i", input_path,
-                "-i", watermark_path,
-                "-filter_complex", "[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[0:v][wm]overlay=W-w-10:H-h-10",
-                "-c:v", &self.codec,
-                "-pix_fmt", "yuv420p",
-                "-c:a", "copy",
-                output_path,
-            ]))?;
+    pub fn add_watermark(
+        &self,
+        input_path: &str,
+        watermark_path: &str,
+        output_path: &str,
+    ) -> Result<(), SomaError> {
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-i",
+            input_path,
+            "-i",
+            watermark_path,
+            "-filter_complex",
+            "[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[0:v][wm]overlay=W-w-10:H-h-10",
+            "-c:v",
+            &self.codec,
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "copy",
+            output_path,
+        ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg add_watermark failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg add_watermark failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -686,17 +850,24 @@ impl Ffmpeg {
         std::fs::write(&list_path, &list_content)
             .map_err(|e| SomaError::Ffmpeg(format!("写入 concat 列表失败: {}", e)))?;
 
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y",
-                "-f", "concat", "-safe", "0",
-                "-i", list_path.to_str().unwrap_or(""),
-                "-c", "copy",
-                output_path,
-            ]))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            list_path.to_str().unwrap_or(""),
+            "-c",
+            "copy",
+            output_path,
+        ]))?;
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg concat failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg concat failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }
@@ -705,7 +876,11 @@ impl Ffmpeg {
     ///
     /// - `audio_files`: 音频文件路径列表（按顺序拼接）
     /// - `output_file`: 输出音频路径
-    pub fn concat_audios(&self, audio_files: &[String], output_file: &str) -> Result<(), SomaError> {
+    pub fn concat_audios(
+        &self,
+        audio_files: &[String],
+        output_file: &str,
+    ) -> Result<(), SomaError> {
         if audio_files.is_empty() {
             return Err(SomaError::VideoGen("音频拼接输入为空".into()));
         }
@@ -721,26 +896,35 @@ impl Ffmpeg {
         let mut content = String::new();
         for audio in audio_files {
             let abs = std::fs::canonicalize(audio).unwrap_or_else(|_| PathBuf::from(audio));
-            let escaped = abs.to_string_lossy().replace('\\', "/").replace("'", "'\\''");
+            let escaped = abs
+                .to_string_lossy()
+                .replace('\\', "/")
+                .replace("'", "'\\''");
             content.push_str(&format!("file '{}'\n", escaped));
         }
         std::fs::write(&concat_list, &content).map_err(SomaError::Io)?;
 
-        let result = run_with_timeout(std::process::Command::new(&self.path)
-            .args([
-                "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concat_list.to_string_lossy().as_ref(),
-                "-c", "copy",
-                output_file,
-            ]))?;
+        let result = run_with_timeout(std::process::Command::new(&self.path).args([
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concat_list.to_string_lossy().as_ref(),
+            "-c",
+            "copy",
+            output_file,
+        ]))?;
 
         let _ = std::fs::remove_file(&concat_list);
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(SomaError::Ffmpeg(format!("ffmpeg concat_audios failed: {}", stderr)));
+            return Err(SomaError::Ffmpeg(format!(
+                "ffmpeg concat_audios failed: {}",
+                stderr
+            )));
         }
         Ok(())
     }

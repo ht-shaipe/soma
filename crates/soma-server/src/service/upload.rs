@@ -1,9 +1,9 @@
+use soma_core::config::UiSection;
 /// 跨平台视频发布模块
 ///
 /// 通过 Upload-Post API 将生成的视频发布到 TikTok、Instagram、YouTube Shorts 等平台。
 /// API 文档：https://docs.upload-post.com
 use soma_core::error::SomaError;
-use soma_core::config::UiSection;
 use std::path::Path;
 
 const API_BASE: &str = "https://api.upload-post.com";
@@ -50,7 +50,10 @@ pub async fn upload_video(
 
     let api_key = ui.upload_post_api_key.as_deref().unwrap_or("");
     let username = ui.upload_post_username.as_deref().unwrap_or("");
-    let privacy = ui.upload_post_youtube_privacy_status.as_deref().unwrap_or("public");
+    let privacy = ui
+        .upload_post_youtube_privacy_status
+        .as_deref()
+        .unwrap_or("public");
 
     let file_bytes = std::fs::read(video_path).map_err(SomaError::Io)?;
     let file_name = Path::new(video_path)
@@ -80,7 +83,10 @@ pub async fn upload_video(
                     }
                 }
             }
-            let yt_privacy = ye.get("privacyStatus").and_then(|p| p.as_str()).unwrap_or(privacy);
+            let yt_privacy = ye
+                .get("privacyStatus")
+                .and_then(|p| p.as_str())
+                .unwrap_or(privacy);
             form = form.text("privacyStatus", yt_privacy.to_string());
             form = form.text("containsSyntheticMedia", "true".to_string());
         }
@@ -105,16 +111,30 @@ pub async fn upload_video(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(SomaError::Upload(format!("Upload-Post API 错误: {} - {}", status, body)));
+        return Err(SomaError::Upload(format!(
+            "Upload-Post API 错误: {} - {}",
+            status, body
+        )));
     }
 
-    let resp_json: serde_json::Value = resp.json().await
+    let resp_json: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| SomaError::Http(e.to_string()))?;
 
     Ok(UploadResult {
-        success: resp_json.get("success").and_then(|s| s.as_bool()).unwrap_or(false),
-        request_id: resp_json.get("request_id").and_then(|r| r.as_str()).map(String::from),
-        message: resp_json.get("message").and_then(|m| m.as_str()).map(String::from),
+        success: resp_json
+            .get("success")
+            .and_then(|s| s.as_bool())
+            .unwrap_or(false),
+        request_id: resp_json
+            .get("request_id")
+            .and_then(|r| r.as_str())
+            .map(String::from),
+        message: resp_json
+            .get("message")
+            .and_then(|m| m.as_str())
+            .map(String::from),
         error: None,
         platform_results: resp_json.get("platform_results").cloned(),
     })
@@ -132,5 +152,7 @@ pub async fn check_status(request_id: &str, api_key: &str) -> Result<serde_json:
         .await
         .map_err(|e| SomaError::Http(e.to_string()))?;
 
-    resp.json().await.map_err(|e| SomaError::Http(e.to_string()))
+    resp.json()
+        .await
+        .map_err(|e| SomaError::Http(e.to_string()))
 }

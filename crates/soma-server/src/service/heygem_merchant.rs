@@ -4,11 +4,11 @@
 //! 资产以 `{assets_dir}/{merchant_id}/asset.json` 形式持久化，
 //! 支持就绪校验、绑定、状态更新、删除等操作。
 
-use std::path::PathBuf;
+use crate::state;
 use soma_core::error::SomaError;
 use soma_core::models::{AssetStatus, MerchantAsset, TaskStatus};
 use soma_core::utils::validate_merchant_id;
-use crate::state;
+use std::path::PathBuf;
 
 /// 商户模型资产存储
 pub struct MerchantAssetStore {
@@ -42,27 +42,19 @@ impl MerchantAssetStore {
         if asset.asset_status != AssetStatus::Ready {
             return Ok(false);
         }
-        Ok(
-            std::path::Path::new(&asset.silent_video_path).exists()
-                && std::path::Path::new(&asset.reference_audio).exists(),
-        )
+        Ok(std::path::Path::new(&asset.silent_video_path).exists()
+            && std::path::Path::new(&asset.reference_audio).exists())
     }
 
     /// 读取商户资产元数据
     pub fn get_asset(&self, merchant_id: &str) -> Result<MerchantAsset, SomaError> {
         let path = self.asset_json_path(merchant_id)?;
         if !path.exists() {
-            return Err(SomaError::Config(format!(
-                "商户 {} 不存在",
-                merchant_id
-            )));
+            return Err(SomaError::Config(format!("商户 {} 不存在", merchant_id)));
         }
         let content = std::fs::read_to_string(&path).map_err(SomaError::Io)?;
-        let asset: MerchantAsset =
-            serde_json::from_str(&content).map_err(|e| SomaError::Config(format!(
-                "解析 asset.json 失败: {}",
-                e
-            )))?;
+        let asset: MerchantAsset = serde_json::from_str(&content)
+            .map_err(|e| SomaError::Config(format!("解析 asset.json 失败: {}", e)))?;
         Ok(asset)
     }
 
@@ -96,11 +88,7 @@ impl MerchantAssetStore {
     }
 
     /// 更新资产状态
-    pub fn set_status(
-        &self,
-        merchant_id: &str,
-        status: AssetStatus,
-    ) -> Result<(), SomaError> {
+    pub fn set_status(&self, merchant_id: &str, status: AssetStatus) -> Result<(), SomaError> {
         let mut asset = self.get_asset(merchant_id)?;
         asset.asset_status = status;
         self.write_asset_atomic(merchant_id, &asset)
@@ -110,9 +98,9 @@ impl MerchantAssetStore {
     pub fn has_running_tasks(&self, merchant_id: &str) -> bool {
         let (tasks, _) = state::get_all_dh_tasks(1, 10000);
         let processing = TaskStatus::Processing.as_i32();
-        tasks.iter().any(|t| {
-            t.merchant_id.as_deref() == Some(merchant_id) && t.state == processing
-        })
+        tasks
+            .iter()
+            .any(|t| t.merchant_id.as_deref() == Some(merchant_id) && t.state == processing)
     }
 
     /// 删除商户资产，存在进行中任务时拒绝

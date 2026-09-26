@@ -1,3 +1,4 @@
+use crate::{get_api_key, SomaStockProvider};
 /// Pexels 视频素材供应商实现
 ///
 /// 封装 Pexels API（https://www.pexels.com/api/）的视频搜索功能。
@@ -6,7 +7,6 @@
 use async_trait::async_trait;
 use soma_core::error::SomaError;
 use soma_core::models::{MaterialInfo, VideoAspect};
-use crate::{SomaStockProvider, get_api_key};
 
 /// Pexels 视频素材供应商
 ///
@@ -22,7 +22,9 @@ impl Pexels {
     /// # 参数
     /// - `api_keys`: Pexels API 密钥列表
     pub fn new(api_keys: &[String]) -> Self {
-        Self { api_keys: api_keys.to_vec() }
+        Self {
+            api_keys: api_keys.to_vec(),
+        }
     }
 }
 
@@ -40,7 +42,12 @@ impl SomaStockProvider for Pexels {
     ///
     /// # 返回
     /// 符合条件的素材信息列表，每个视频包含精确匹配分辨率的下载链接
-    async fn search(&self, keyword: &str, video_aspect: &VideoAspect, min_duration: u32) -> Result<Vec<MaterialInfo>, SomaError> {
+    async fn search(
+        &self,
+        keyword: &str,
+        video_aspect: &VideoAspect,
+        min_duration: u32,
+    ) -> Result<Vec<MaterialInfo>, SomaError> {
         let api_key = get_api_key(&self.api_keys)?;
         // 获取视频方向参数（landscape/portrait/square）
         let orientation = video_aspect.orientation();
@@ -63,9 +70,13 @@ impl SomaStockProvider for Pexels {
             .map_err(|e| SomaError::Http(e.to_string()))?;
 
         // 解析 JSON 响应体
-        let body: serde_json::Value = resp.json().await.map_err(|e| SomaError::Http(e.to_string()))?;
+        let body: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| SomaError::Http(e.to_string()))?;
         // 提取 videos 数组，无数据时返回空列表
-        let videos = body.get("videos")
+        let videos = body
+            .get("videos")
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
@@ -90,12 +101,21 @@ impl SomaStockProvider for Pexels {
                     let exact = w == target_w && h == target_h;
                     let wide_enough = w >= target_w && h >= target_h;
                     let near_match = w >= (target_w as f64 * 0.8) as u32;
-                    let quality = if exact { 3 } else if wide_enough { 2 } else if near_match { 1 } else { 0 };
+                    let quality = if exact {
+                        3
+                    } else if wide_enough {
+                        2
+                    } else if near_match {
+                        1
+                    } else {
+                        0
+                    };
                     let current_best = best_match.as_ref().map(|(q, _)| *q).unwrap_or(0);
                     if (quality > current_best || (quality == current_best && quality > 0))
-                        && quality > 0 {
-                            best_match = Some((quality, vf));
-                        }
+                        && quality > 0
+                    {
+                        best_match = Some((quality, vf));
+                    }
                 }
                 if let Some((_, vf)) = best_match {
                     if let Some(link) = vf.get("link").and_then(|l| l.as_str()) {

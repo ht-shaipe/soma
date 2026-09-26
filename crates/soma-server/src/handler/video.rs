@@ -1,3 +1,5 @@
+use crate::state;
+use soma_core::models::VideoParams;
 /// 视频任务 API 处理器
 ///
 /// 处理视频创建（/videos）和任务管理（/tasks）两类 API 请求：
@@ -5,8 +7,6 @@
 /// - tasks 模块：任务列表查询、单个任务查询、任务删除
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_core::models::VideoParams;
-use crate::state;
 
 fn ai_video_logs_to_value(logs: &Option<Vec<soma_core::models::AiVideoSegmentLog>>) -> Value {
     match logs {
@@ -245,7 +245,9 @@ async fn update_config(param: &RequestParameter) -> Result<Value> {
     }
 
     if let Some(v) = full_json.get("storyboard") {
-        if let Ok(storyboard) = serde_json::from_value::<Vec<soma_core::models::StoryboardScene>>(v.clone()) {
+        if let Ok(storyboard) =
+            serde_json::from_value::<Vec<soma_core::models::StoryboardScene>>(v.clone())
+        {
             if !storyboard.is_empty() {
                 data.storyboard = Some(storyboard);
                 has_extra = true;
@@ -290,17 +292,20 @@ async fn start_task(param: &RequestParameter) -> Result<Value> {
     let stop_at = param.value.get_def_string("stopAt", "");
 
     crate::state::set_task_state(&task_id, soma_core::models::TaskStatus::Processing);
-    crate::state::update_task_data(&task_id, &crate::state::TaskUpdateData {
-        error_message: Some(String::new()),
-        materials: Some(Vec::new()),
-        audio_file: Some(String::new()),
-        audio_duration: Some(0.0),
-        subtitle_path: Some(String::new()),
-        videos: Some(Vec::new()),
-        combined_videos: Some(Vec::new()),
-        ai_video_logs: Some(Vec::new()),
-        ..Default::default()
-    });
+    crate::state::update_task_data(
+        &task_id,
+        &crate::state::TaskUpdateData {
+            error_message: Some(String::new()),
+            materials: Some(Vec::new()),
+            audio_file: Some(String::new()),
+            audio_duration: Some(0.0),
+            subtitle_path: Some(String::new()),
+            videos: Some(Vec::new()),
+            combined_videos: Some(Vec::new()),
+            ai_video_logs: Some(Vec::new()),
+            ..Default::default()
+        },
+    );
     crate::task::add_task(&task_id, &task.params, &stop_at)
         .map_err(|e| error!("任务启动失败: {:?}", e))?;
 
@@ -321,9 +326,14 @@ async fn fetch_materials(param: &RequestParameter) -> Result<Value> {
     let params = task.params.clone();
     let terms: Vec<String> = if let Some(ref t) = params.video_terms {
         if let Some(arr) = t.as_array() {
-            arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
         } else if let Some(s) = t.as_str() {
-            s.split(&[',', '，'][..]).map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()
+            s.split(&[',', '，'][..])
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect()
         } else {
             vec![]
         }
@@ -348,7 +358,9 @@ async fn fetch_materials(param: &RequestParameter) -> Result<Value> {
         let _ = tx.send(result);
     });
 
-    let materials = rx.recv().map_err(|_| error!("素材获取线程异常退出"))?
+    let materials = rx
+        .recv()
+        .map_err(|_| error!("素材获取线程异常退出"))?
         .map_err(|e| {
             let msg = if let Some(s) = e.downcast_ref::<&str>() {
                 s.to_string()
@@ -361,10 +373,13 @@ async fn fetch_materials(param: &RequestParameter) -> Result<Value> {
         })?
         .map_err(|e| error!("素材获取失败: {:?}", e))?;
 
-    state::update_task_data(&task_id, &state::TaskUpdateData {
-        materials: Some(materials.clone()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        &task_id,
+        &state::TaskUpdateData {
+            materials: Some(materials.clone()),
+            ..Default::default()
+        },
+    );
 
     let materials_val: Vec<Value> = materials.iter().map(|s| value!(s.clone())).collect();
     let total = materials_val.len();
@@ -395,7 +410,9 @@ async fn generate_narration(param: &RequestParameter) -> Result<Value> {
         return Err(error!("请先生成或填写脚本"));
     }
 
-    let storyboard_json = task.storyboard.as_ref()
+    let storyboard_json = task
+        .storyboard
+        .as_ref()
         .map(|sb| serde_json::to_value(sb).unwrap_or(serde_json::Value::Null))
         .unwrap_or(serde_json::Value::Null);
 
@@ -414,10 +431,22 @@ async fn generate_narration(param: &RequestParameter) -> Result<Value> {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-                .map_err(|e| soma_core::error::SomaError::Llm(e.to_string())).ok();
+                .map_err(|e| soma_core::error::SomaError::Llm(e.to_string()))
+                .ok();
             if let Some(rt) = rt {
                 let local = tokio::task::LocalSet::new();
-                let result = local.block_on(&rt, crate::service::llm::generate_narration(provider, &script, &storyboard_json_val, style, mood, language, &conf));
+                let result = local.block_on(
+                    &rt,
+                    crate::service::llm::generate_narration(
+                        provider,
+                        &script,
+                        &storyboard_json_val,
+                        style,
+                        mood,
+                        language,
+                        &conf,
+                    ),
+                );
                 result.map_err(|e| error!("LLM narration error: {:?}", e))
             } else {
                 Err(error!("tokio runtime 创建失败"))
@@ -426,7 +455,9 @@ async fn generate_narration(param: &RequestParameter) -> Result<Value> {
         let _ = tx.send(result);
     });
 
-    let narration = rx.recv().map_err(|_| error!("旁白生成线程异常退出"))?
+    let narration = rx
+        .recv()
+        .map_err(|_| error!("旁白生成线程异常退出"))?
         .map_err(|e| {
             let msg = if let Some(s) = e.downcast_ref::<&str>() {
                 s.to_string()
@@ -439,10 +470,13 @@ async fn generate_narration(param: &RequestParameter) -> Result<Value> {
         })?
         .map_err(|e| error!("旁白生成失败: {:?}", e))?;
 
-    state::update_task_data(&task_id, &state::TaskUpdateData {
-        narration: Some(narration.clone()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        &task_id,
+        &state::TaskUpdateData {
+            narration: Some(narration.clone()),
+            ..Default::default()
+        },
+    );
 
     Ok(value!({
         "taskId": task_id,
@@ -478,7 +512,10 @@ async fn generate_audio(param: &RequestParameter) -> Result<Value> {
             if sb.is_empty() {
                 task.script.as_deref().unwrap_or("").to_string()
             } else {
-                sb.iter().map(|s| s.narration.as_str()).collect::<Vec<&str>>().join(" ")
+                sb.iter()
+                    .map(|s| s.narration.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(" ")
             }
         } else {
             task.script.as_deref().unwrap_or("").to_string()
@@ -487,7 +524,10 @@ async fn generate_audio(param: &RequestParameter) -> Result<Value> {
         if sb.is_empty() {
             task.script.as_deref().unwrap_or("").to_string()
         } else {
-            sb.iter().map(|s| s.narration.as_str()).collect::<Vec<&str>>().join(" ")
+            sb.iter()
+                .map(|s| s.narration.as_str())
+                .collect::<Vec<&str>>()
+                .join(" ")
         }
     } else {
         task.script.as_deref().unwrap_or("").to_string()
@@ -505,7 +545,9 @@ async fn generate_audio(param: &RequestParameter) -> Result<Value> {
         let _ = tx.send(result);
     });
 
-    let (audio_file, audio_duration) = rx.recv().map_err(|_| error!("音频生成线程异常退出"))?
+    let (audio_file, audio_duration) = rx
+        .recv()
+        .map_err(|_| error!("音频生成线程异常退出"))?
         .map_err(|e| {
             let msg = if let Some(s) = e.downcast_ref::<&str>() {
                 s.to_string()
@@ -518,11 +560,14 @@ async fn generate_audio(param: &RequestParameter) -> Result<Value> {
         })?
         .map_err(|e| error!("音频生成失败: {:?}", e))?;
 
-    state::update_task_data(&task_id, &state::TaskUpdateData {
-        audio_file: Some(audio_file.clone()),
-        audio_duration: Some(audio_duration),
-        ..Default::default()
-    });
+    state::update_task_data(
+        &task_id,
+        &state::TaskUpdateData {
+            audio_file: Some(audio_file.clone()),
+            audio_duration: Some(audio_duration),
+            ..Default::default()
+        },
+    );
 
     Ok(value!({
         "taskId": task_id,
@@ -543,11 +588,14 @@ async fn stop_task(param: &RequestParameter) -> Result<Value> {
         return Err(error!("仅处理中的任务可以停止（当前状态: {}）", task.state));
     }
 
-    state::update_task_data(&task_id, &state::TaskUpdateData {
-        state: Some(soma_core::models::TaskStatus::Failed.as_i32()),
-        error_message: Some("用户手动停止".to_string()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        &task_id,
+        &state::TaskUpdateData {
+            state: Some(soma_core::models::TaskStatus::Failed.as_i32()),
+            error_message: Some("用户手动停止".to_string()),
+            ..Default::default()
+        },
+    );
 
     Ok(value!({
         "stopped": true,

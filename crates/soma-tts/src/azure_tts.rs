@@ -4,11 +4,11 @@
 //! 支持 V2 语音（如 zh-CN-XiaoxiaoNeural-V2），自动检测 V2 后缀并映射到正确 API。
 //! 返回的音频格式为 MP3（通过请求 audio-24khz-96kbitrate-mono-mp3 output 格式）。
 
-use async_trait::async_trait;
-use soma_core::error::SomaError;
+use crate::edge_tts::{generate_subtitle_cues_from_text, get_audio_duration};
 use crate::provider::{SomaTtsProvider, TtsResult};
 use crate::voices;
-use crate::edge_tts::{get_audio_duration, generate_subtitle_cues_from_text};
+use async_trait::async_trait;
+use soma_core::error::SomaError;
 use std::path::Path;
 
 /// Azure TTS 语音合成器
@@ -77,10 +77,17 @@ impl SomaTtsProvider for AzureTts {
             }
             let result = tokio::process::Command::new("ffmpeg")
                 .args([
-                    "-y", "-f", "lavfi",
-                    "-i", "anullsrc=r=44100:cl=mono",
-                    "-t", &format!("{:.3}", duration),
-                    "-codec:a", "libmp3lame", "-q:a", "4",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "anullsrc=r=44100:cl=mono",
+                    "-t",
+                    &format!("{:.3}", duration),
+                    "-codec:a",
+                    "libmp3lame",
+                    "-q:a",
+                    "4",
                     &output_str,
                 ])
                 .output()
@@ -116,7 +123,10 @@ impl SomaTtsProvider for AzureTts {
             .post(&url)
             .header("Ocp-Apim-Subscription-Key", &self.speech_key)
             .header("Content-Type", "application/ssml+xml")
-            .header("X-Microsoft-OutputFormat", "audio-24khz-96kbitrate-mono-mp3")
+            .header(
+                "X-Microsoft-OutputFormat",
+                "audio-24khz-96kbitrate-mono-mp3",
+            )
             .header("User-Agent", "soma-tts")
             .body(ssml)
             .send()
@@ -127,7 +137,8 @@ impl SomaTtsProvider for AzureTts {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(SomaError::Tts(format!(
-                "Azure TTS API error: {} - {}", status, body
+                "Azure TTS API error: {} - {}",
+                status, body
             )));
         }
 

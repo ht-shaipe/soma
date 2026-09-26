@@ -57,7 +57,8 @@ impl Config {
         if conf_path.is_empty() {
             return Err("配置文件路径未设置".to_string());
         }
-        let toml_str = toml::to_string_pretty(&conf.app).map_err(|e| format!("序列化失败: {}", e))?;
+        let toml_str =
+            toml::to_string_pretty(&conf.app).map_err(|e| format!("序列化失败: {}", e))?;
         std::fs::write(&conf_path, toml_str).map_err(|e| format!("写入失败: {}", e))
     }
 }

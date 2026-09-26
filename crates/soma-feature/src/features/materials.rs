@@ -88,12 +88,10 @@ pub fn generate_materials(
     // 本地素材预处理
     if source == "local" {
         let codec = req.video_encoder.unwrap_or(conf.get_video_codec());
-        let ffmpeg = soma_video::Ffmpeg::new(
-            &conf.get_ffmpeg_binary(),
-            req.n_threads.unwrap_or(2),
-            codec,
-        );
-        let materials = ffmpeg.preprocess_local_materials(req.local_materials, clip_dur, &aspect)?;
+        let ffmpeg =
+            soma_video::Ffmpeg::new(&conf.get_ffmpeg_binary(), req.n_threads.unwrap_or(2), codec);
+        let materials =
+            ffmpeg.preprocess_local_materials(req.local_materials, clip_dur, &aspect)?;
         return Ok((materials, vec![]));
     }
 
@@ -101,13 +99,7 @@ pub fn generate_materials(
     if source == "cogvideox" || source == "kling" || source == "minimax" {
         let save_dir = req.ai_output_dir.clone().unwrap_or_else(default_dir);
         let (paths, logs) = block_on_async(soma_stock::generate_ai_videos(
-            &save_dir,
-            req.terms,
-            source,
-            &aspect,
-            clip_dur,
-            conf,
-            None,
+            &save_dir, req.terms, source, &aspect, clip_dur, conf, None,
         ))??;
         return Ok((paths, logs));
     }
@@ -408,9 +400,13 @@ impl TypedFeature for MaterialDownloadFeature {
         let mut failed = Vec::new();
         for (i, url) in input.urls.iter().enumerate() {
             progress.report(
-                FeatureProgress::new(ctx.feature_id(), ctx.run_id(), (i as u32 * 100 / total.max(1) as u32).min(99))
-                    .with_step("download")
-                    .with_message(format!("下载 {}/{}: {}", i + 1, total, url)),
+                FeatureProgress::new(
+                    ctx.feature_id(),
+                    ctx.run_id(),
+                    (i as u32 * 100 / total.max(1) as u32).min(99),
+                )
+                .with_step("download")
+                .with_message(format!("下载 {}/{}: {}", i + 1, total, url)),
             );
             let downloaded: Result<String, SomaError> =
                 block_on_async(soma_stock::save_video(url, &save_dir))?;
@@ -429,7 +425,9 @@ impl TypedFeature for MaterialDownloadFeature {
                 }
             }
         }
-        progress.report(FeatureProgress::new(ctx.feature_id(), ctx.run_id(), 100).with_step("download"));
+        progress.report(
+            FeatureProgress::new(ctx.feature_id(), ctx.run_id(), 100).with_step("download"),
+        );
         Ok(MaterialDownloadOutput { files, failed })
     }
 }

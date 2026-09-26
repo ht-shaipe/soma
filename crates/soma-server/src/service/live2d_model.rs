@@ -4,11 +4,11 @@
 //! 模型以 `{models_dir}/{model_id}/` 目录形式持久化，
 //! 支持上传、列表、删除、就绪校验等操作。
 
-use std::path::{Path, PathBuf};
+use crate::state;
 use soma_core::error::SomaError;
 use soma_core::models::{Live2DModel, Live2DModelStatus, TaskStatus};
 use soma_core::utils::validate_live2d_model_id;
-use crate::state;
+use std::path::{Path, PathBuf};
 
 /// Live2D 模型资产存储
 pub struct Live2DModelStore {
@@ -128,8 +128,8 @@ impl Live2DModelStore {
             return Ok(false);
         }
         let content = std::fs::read_to_string(&meta_path).map_err(SomaError::Io)?;
-        let model: Live2DModel =
-            serde_json::from_str(&content).map_err(|e| SomaError::Config(format!("解析 model.json 失败: {}", e)))?;
+        let model: Live2DModel = serde_json::from_str(&content)
+            .map_err(|e| SomaError::Config(format!("解析 model.json 失败: {}", e)))?;
         if model.model_status != Live2DModelStatus::Available {
             return Ok(false);
         }
@@ -141,9 +141,9 @@ impl Live2DModelStore {
     pub fn has_running_tasks(&self, model_id: &str) -> bool {
         let (tasks, _) = state::get_all_dh_tasks(1, 10000);
         let processing = TaskStatus::Processing.as_i32();
-        tasks.iter().any(|t| {
-            t.live2d_model_id.as_deref() == Some(model_id) && t.state == processing
-        })
+        tasks
+            .iter()
+            .any(|t| t.live2d_model_id.as_deref() == Some(model_id) && t.state == processing)
     }
 
     /// 删除模型
@@ -190,9 +190,8 @@ impl Live2DModelStore {
                 break;
             }
         }
-        let model3_json = model3_json.ok_or_else(|| {
-            SomaError::Config("模型文件不完整：缺少 .model3.json".into())
-        })?;
+        let model3_json = model3_json
+            .ok_or_else(|| SomaError::Config("模型文件不完整：缺少 .model3.json".into()))?;
 
         // 计算包大小
         let package_size_mb = dir_size_mb(&dir)?;
@@ -216,10 +215,7 @@ impl Live2DModelStore {
         // 校验纹理文件存在
         for tex in &textures {
             if !dir.join(tex).exists() {
-                return Err(SomaError::Config(format!(
-                    "模型纹理文件缺失：{}",
-                    tex
-                )));
+                return Err(SomaError::Config(format!("模型纹理文件缺失：{}", tex)));
             }
         }
 
@@ -241,10 +237,11 @@ impl Live2DModelStore {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if dangerous_exts.iter().any(|ext| name.ends_with(ext))
-                    && std::fs::remove_file(entry.path()).is_ok() {
-                        log::warn!("已剥离可执行文件 {}，仅保留模型资产", name);
-                        stripped.push(name);
-                    }
+                    && std::fs::remove_file(entry.path()).is_ok()
+                {
+                    log::warn!("已剥离可执行文件 {}，仅保留模型资产", name);
+                    stripped.push(name);
+                }
             }
         }
         stripped

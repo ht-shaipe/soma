@@ -2,9 +2,9 @@
 //!
 //! 提供字幕翻译、校正、合并和格式转换功能。
 
+use soma_core::subtitle;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_core::subtitle;
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
@@ -24,17 +24,19 @@ async fn parse(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少 path 参数"));
     }
 
-    let entries = subtitle::load_subtitle(&path)
-        .map_err(|e| error!("{}", e))?;
+    let entries = subtitle::load_subtitle(&path).map_err(|e| error!("{}", e))?;
 
-    let cues: Vec<Value> = entries.iter().map(|e| {
-        value!({
-            "index": e.index,
-            "startMs": e.start_ms,
-            "endMs": e.end_ms,
-            "text": e.text.clone(),
+    let cues: Vec<Value> = entries
+        .iter()
+        .map(|e| {
+            value!({
+                "index": e.index,
+                "startMs": e.start_ms,
+                "endMs": e.end_ms,
+                "text": e.text.clone(),
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(value!({
         "count": entries.len(),
@@ -50,11 +52,9 @@ async fn convert(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少 inputPath 或 outputPath 参数"));
     }
 
-    let entries = subtitle::load_subtitle(&input_path)
-        .map_err(|e| error!("{}", e))?;
+    let entries = subtitle::load_subtitle(&input_path).map_err(|e| error!("{}", e))?;
 
-    subtitle::save_subtitle(&entries, &output_path)
-        .map_err(|e| error!("{}", e))?;
+    subtitle::save_subtitle(&entries, &output_path).map_err(|e| error!("{}", e))?;
 
     Ok(value!({
         "success": true,
@@ -77,11 +77,9 @@ async fn merge(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少 paths 参数"));
     };
 
-    let merged = subtitle::merge_srt_files(&paths)
-        .map_err(|e| error!("{}", e))?;
+    let merged = subtitle::merge_srt_files(&paths).map_err(|e| error!("{}", e))?;
 
-    subtitle::save_subtitle(&merged, &output_path)
-        .map_err(|e| error!("{}", e))?;
+    subtitle::save_subtitle(&merged, &output_path).map_err(|e| error!("{}", e))?;
 
     Ok(value!({
         "success": true,
@@ -101,29 +99,42 @@ async fn translate(param: &RequestParameter) -> Result<Value> {
 
     let conf = crate::Config::get();
     let api_key = conf.app.app.openai_api_key.clone().unwrap_or_default();
-    let base_url = conf.app.app.openai_base_url.clone().unwrap_or_else(|| "https://api.openai.com/v1".to_string());
-    let model = conf.app.app.openai_model_name.clone().unwrap_or_else(|| "gpt-4o-mini".to_string());
+    let base_url = conf
+        .app
+        .app
+        .openai_base_url
+        .clone()
+        .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
+    let model = conf
+        .app
+        .app
+        .openai_model_name
+        .clone()
+        .unwrap_or_else(|| "gpt-4o-mini".to_string());
 
     if api_key.is_empty() {
         return Err(error!("LLM API Key 未配置"));
     }
 
-    let entries = subtitle::load_subtitle(&input_path)
-        .map_err(|e| error!("{}", e))?;
+    let entries = subtitle::load_subtitle(&input_path).map_err(|e| error!("{}", e))?;
 
     let params = subtitle::TranslateParams {
         api_key,
         base_url,
         model,
         target_lang: target_lang.to_string(),
-        batch_size: param.value.get("batchSize").and_then(|v| v.as_u64()).unwrap_or(20) as usize,
+        batch_size: param
+            .value
+            .get("batchSize")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(20) as usize,
     };
 
-    let translated = subtitle::translate_subtitles(&entries, &params).await
+    let translated = subtitle::translate_subtitles(&entries, &params)
+        .await
         .map_err(|e| error!("{}", e))?;
 
-    subtitle::save_subtitle(&translated, &output_path)
-        .map_err(|e| error!("{}", e))?;
+    subtitle::save_subtitle(&translated, &output_path).map_err(|e| error!("{}", e))?;
 
     Ok(value!({
         "success": true,
@@ -142,15 +153,24 @@ async fn correct(param: &RequestParameter) -> Result<Value> {
 
     let conf = crate::Config::get();
     let api_key = conf.app.app.openai_api_key.clone().unwrap_or_default();
-    let base_url = conf.app.app.openai_base_url.clone().unwrap_or_else(|| "https://api.openai.com/v1".to_string());
-    let model = conf.app.app.openai_model_name.clone().unwrap_or_else(|| "gpt-4o-mini".to_string());
+    let base_url = conf
+        .app
+        .app
+        .openai_base_url
+        .clone()
+        .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
+    let model = conf
+        .app
+        .app
+        .openai_model_name
+        .clone()
+        .unwrap_or_else(|| "gpt-4o-mini".to_string());
 
     if api_key.is_empty() {
         return Err(error!("LLM API Key 未配置"));
     }
 
-    let entries = subtitle::load_subtitle(&input_path)
-        .map_err(|e| error!("{}", e))?;
+    let entries = subtitle::load_subtitle(&input_path).map_err(|e| error!("{}", e))?;
 
     let correct_type = param.value.get_def_string("correctType", "all");
     let params = subtitle::CorrectParams {
@@ -160,11 +180,11 @@ async fn correct(param: &RequestParameter) -> Result<Value> {
         correct_type: correct_type.to_string(),
     };
 
-    let corrected = subtitle::correct_subtitles(&entries, &params).await
+    let corrected = subtitle::correct_subtitles(&entries, &params)
+        .await
         .map_err(|e| error!("{}", e))?;
 
-    subtitle::save_subtitle(&corrected, &output_path)
-        .map_err(|e| error!("{}", e))?;
+    subtitle::save_subtitle(&corrected, &output_path).map_err(|e| error!("{}", e))?;
 
     Ok(value!({
         "success": true,

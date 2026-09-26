@@ -1,13 +1,13 @@
 //! FeatureRegistry 集成测试：注册、描述、运行、进度、失败路径与历史记录
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use soma_core::config::AppConfig;
+use soma_core::error::SomaError;
 use soma_feature::{
     ArtifactKind, FeatureContext, FeatureKind, FeatureMeta, FeatureRegistry, FeatureRequest,
     FnReporter, NoopProgress, ProgressReporter, TypedFeature,
 };
-use soma_core::config::AppConfig;
-use soma_core::error::SomaError;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
 // ---------- 测试用功能点 ----------
@@ -171,7 +171,9 @@ fn run_success_produces_output_artifacts_and_records() {
     registry.register(Arc::new(EchoFeature)).unwrap();
 
     let req = echo_request(serde_json::json!({ "text": "你好世界", "repeat": 3 }));
-    let output = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+    let output = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap();
 
     assert_eq!(output.status, soma_feature::FeatureStatus::Success);
     assert_eq!(output.data["text"], "你好世界");
@@ -235,8 +237,13 @@ fn run_unknown_feature_returns_err() {
         run_id: None,
         input: serde_json::json!({}),
     };
-    let err = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap_err();
-    assert!(err.to_string().contains("功能点不存在"), "unexpected: {err}");
+    let err = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("功能点不存在"),
+        "unexpected: {err}"
+    );
 }
 
 #[test]
@@ -246,13 +253,18 @@ fn run_invalid_input_records_failure() {
 
     // 缺少必填字段 text → 反序列化失败 → 状态 Failed
     let req = echo_request(serde_json::json!({ "repeat": 2 }));
-    let output = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+    let output = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap();
     assert_eq!(output.status, soma_feature::FeatureStatus::Failed);
     assert!(output.error.is_some());
     assert!(output.data.is_null());
 
     // 失败同样持久化运行记录
-    let record_path = root.join("test.echo").join(&output.run_id).join("run_record.json");
+    let record_path = root
+        .join("test.echo")
+        .join(&output.run_id)
+        .join("run_record.json");
     let record = std::fs::read_to_string(record_path).unwrap();
     let parsed: soma_feature::FeatureOutput = serde_json::from_str(&record).unwrap();
     assert_eq!(parsed.status, soma_feature::FeatureStatus::Failed);
@@ -268,7 +280,9 @@ fn run_feature_error_records_failure() {
         run_id: None,
         input: serde_json::json!({ "text": "x" }),
     };
-    let output = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+    let output = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap();
     assert_eq!(output.status, soma_feature::FeatureStatus::Failed);
     assert!(output.error.unwrap().contains("故意的失败"));
 }
@@ -283,7 +297,9 @@ fn run_panicking_feature_is_caught() {
         run_id: None,
         input: serde_json::json!({ "text": "x" }),
     };
-    let output = registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+    let output = registry
+        .run(&req, AppConfig::default(), &NoopProgress)
+        .unwrap();
     assert_eq!(output.status, soma_feature::FeatureStatus::Failed);
     assert!(output.error.unwrap().contains("panic"));
 }
@@ -295,7 +311,9 @@ fn list_runs_returns_records_sorted_desc() {
 
     for text in ["第一次", "第二次"] {
         let req = echo_request(serde_json::json!({ "text": text }));
-        registry.run(&req, AppConfig::default(), &NoopProgress).unwrap();
+        registry
+            .run(&req, AppConfig::default(), &NoopProgress)
+            .unwrap();
     }
 
     let runs = registry.list_runs("test.echo").unwrap();
@@ -304,7 +322,9 @@ fn list_runs_returns_records_sorted_desc() {
         2,
         "应恰有 2 条运行记录，实际 {}：{:?}",
         runs.len(),
-        runs.iter().map(|r| (&r.run_id, &r.input)).collect::<Vec<_>>()
+        runs.iter()
+            .map(|r| (&r.run_id, &r.input))
+            .collect::<Vec<_>>()
     );
     assert_eq!(
         (&runs[0].input["text"], &runs[1].input["text"]),

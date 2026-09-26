@@ -7,10 +7,10 @@
 //!
 //! 这些算法均为纯计算逻辑，无外部依赖。
 
-pub mod sm3;
-pub mod rc4;
 pub mod abogus;
 pub mod mstoken;
+pub mod rc4;
+pub mod sm3;
 pub mod wbi;
 
 /// 抖音签名工具集

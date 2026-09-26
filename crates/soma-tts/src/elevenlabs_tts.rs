@@ -3,10 +3,10 @@
 //! 基于 ElevenLabs 云端 TTS API 进行语音合成。
 //! 支持多语言模型（默认 eleven_multilingual_v2）。
 
-use async_trait::async_trait;
-use soma_core::error::SomaError;
 use crate::edge_tts::{generate_subtitle_cues_from_text, get_audio_duration};
 use crate::provider::{SomaTtsProvider, TtsResult};
+use async_trait::async_trait;
+use soma_core::error::SomaError;
 use std::path::Path;
 
 /// ElevenLabs TTS 语音合成器
@@ -27,7 +27,11 @@ impl ElevenlabsTts {
     pub fn new(api_key: &str, model_id: &str) -> Self {
         Self {
             api_key: api_key.to_string(),
-            model_id: if model_id.is_empty() { "eleven_multilingual_v2".into() } else { model_id.into() },
+            model_id: if model_id.is_empty() {
+                "eleven_multilingual_v2".into()
+            } else {
+                model_id.into()
+            },
         }
     }
 }
@@ -69,7 +73,7 @@ impl SomaTtsProvider for ElevenlabsTts {
             .post(&url)
             .header("xi-api-key", &self.api_key)
             .header("Content-Type", "application/json")
-            .header("Accept", "audio/mpeg")  // 请求返回 MP3 格式音频
+            .header("Accept", "audio/mpeg") // 请求返回 MP3 格式音频
             .json(&payload)
             .timeout(std::time::Duration::from_secs(120))
             .send()
@@ -78,11 +82,17 @@ impl SomaTtsProvider for ElevenlabsTts {
 
         // 检查 API 响应状态
         if !resp.status().is_success() {
-            return Err(SomaError::Tts(format!("ElevenLabs TTS failed: {}", resp.status())));
+            return Err(SomaError::Tts(format!(
+                "ElevenLabs TTS failed: {}",
+                resp.status()
+            )));
         }
 
         // 将返回的音频数据写入文件
-        let bytes = resp.bytes().await.map_err(|e| SomaError::Http(e.to_string()))?;
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| SomaError::Http(e.to_string()))?;
         let output_str = output_path.to_string_lossy().to_string();
         std::fs::write(output_path, &bytes).map_err(SomaError::Io)?;
 

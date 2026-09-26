@@ -243,7 +243,8 @@ impl SshExecutor {
             return SshErrorKind::Success;
         }
         if exit_code == 255 {
-            if stderr.contains("Connection refused") || stderr.contains("Could not resolve hostname")
+            if stderr.contains("Connection refused")
+                || stderr.contains("Could not resolve hostname")
             {
                 return SshErrorKind::ConnectionRefused;
             }
@@ -322,7 +323,10 @@ impl VoiceCloneEnvChecker {
             .enable_all()
             .build()
             .ok()?;
-        let result = rt.block_on(self.ssh_executor.execute("echo ok", Duration::from_secs(10)));
+        let result = rt.block_on(
+            self.ssh_executor
+                .execute("echo ok", Duration::from_secs(10)),
+        );
         match result {
             Ok(o) if o.exit_code == 0 && o.stdout.trim() == "ok" => None,
             Ok(o) => Some(MissingItem {
@@ -519,9 +523,7 @@ pub fn validate_reference_audio(reference_audio: &str) -> Result<(), SomaError> 
         .map_err(|e| SomaError::Tts(format!("读取参考音频文件信息失败: {}", e)))?;
     let size_mb = metadata.len() as f64 / 1024.0 / 1024.0;
     if size_mb > 10.0 {
-        return Err(SomaError::Tts(
-            "参考音频文件过大，要求 ≤ 10MB".into(),
-        ));
+        return Err(SomaError::Tts("参考音频文件过大，要求 ≤ 10MB".into()));
     }
 
     Ok(())
@@ -627,8 +629,11 @@ impl SomaTtsProvider for VoiceCloneTts {
         if self.config.get_preflight_check() {
             let health = self.env_checker.check();
             if !health.ready {
-                let missing: Vec<String> =
-                    health.missing.iter().map(|m| m.description.clone()).collect();
+                let missing: Vec<String> = health
+                    .missing
+                    .iter()
+                    .map(|m| m.description.clone())
+                    .collect();
                 return Err(SomaError::Config(format!(
                     "声音克隆运行环境未就绪: {}",
                     missing.join("; ")
@@ -657,9 +662,7 @@ impl SomaTtsProvider for VoiceCloneTts {
             return Err(SomaError::Tts("文案不能为空".into()));
         }
         if trimmed.chars().count() > 1000 {
-            return Err(SomaError::Tts(
-                "文案长度不能超过 1000 字".into(),
-            ));
+            return Err(SomaError::Tts("文案长度不能超过 1000 字".into()));
         }
 
         self.insert_task(&task_id).await;
@@ -750,9 +753,9 @@ impl SomaTtsProvider for VoiceCloneTts {
 
                     if json.get("status").and_then(|v| v.as_str()) == Some("success") {
                         if let Some(parent) = output_path.parent() {
-                            tokio::fs::create_dir_all(parent).await.map_err(|e| {
-                                SomaError::Tts(format!("创建输出目录失败: {}", e))
-                            })?;
+                            tokio::fs::create_dir_all(parent)
+                                .await
+                                .map_err(|e| SomaError::Tts(format!("创建输出目录失败: {}", e)))?;
                         }
 
                         if let Err(e) = self
@@ -774,10 +777,8 @@ impl SomaTtsProvider for VoiceCloneTts {
                         }
 
                         let audio_file = output_path.to_string_lossy().to_string();
-                        let audio_duration = json
-                            .get("duration")
-                            .and_then(|v| v.as_f64())
-                            .unwrap_or(0.0);
+                        let audio_duration =
+                            json.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0);
 
                         let subtitle_cues =
                             generate_subtitle_cues_from_text(trimmed, audio_duration);
@@ -807,11 +808,7 @@ impl SomaTtsProvider for VoiceCloneTts {
                 }
                 Ok(o) => {
                     let kind = SshExecutor::classify_ssh_error(o.exit_code, &o.stderr);
-                    last_error = format!(
-                        "SSH 推理失败 (exit={}): {}",
-                        o.exit_code,
-                        o.stderr
-                    );
+                    last_error = format!("SSH 推理失败 (exit={}): {}", o.exit_code, o.stderr);
                     match kind {
                         SshErrorKind::ConnectionRefused | SshErrorKind::AuthFailed => break,
                         _ => {}
@@ -844,9 +841,18 @@ mod tests {
 
     #[test]
     fn test_clone_model_from_str() {
-        assert_eq!(CloneModel::from_str("gpt_sovits").unwrap(), CloneModel::GptSovits);
-        assert_eq!(CloneModel::from_str("cosyvoice").unwrap(), CloneModel::CosyVoice);
-        assert_eq!(CloneModel::from_str("fish_speech").unwrap(), CloneModel::FishSpeech);
+        assert_eq!(
+            CloneModel::from_str("gpt_sovits").unwrap(),
+            CloneModel::GptSovits
+        );
+        assert_eq!(
+            CloneModel::from_str("cosyvoice").unwrap(),
+            CloneModel::CosyVoice
+        );
+        assert_eq!(
+            CloneModel::from_str("fish_speech").unwrap(),
+            CloneModel::FishSpeech
+        );
         assert!(CloneModel::from_str("unknown").is_err());
         assert!(CloneModel::from_str("").is_err());
     }
@@ -860,7 +866,10 @@ mod tests {
 
     #[test]
     fn test_classify_ssh_error() {
-        assert_eq!(SshExecutor::classify_ssh_error(0, ""), SshErrorKind::Success);
+        assert_eq!(
+            SshExecutor::classify_ssh_error(0, ""),
+            SshErrorKind::Success
+        );
         assert_eq!(
             SshExecutor::classify_ssh_error(255, "Connection refused"),
             SshErrorKind::ConnectionRefused

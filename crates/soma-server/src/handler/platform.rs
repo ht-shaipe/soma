@@ -18,7 +18,11 @@ pub async fn distribute(param: &RequestParameter) -> Result<Value> {
 /// 构建抖音客户端
 fn build_client(param: &RequestParameter) -> Result<DouyinClient> {
     let cookie = param.value.get_def_string("cookie", "");
-    let cookie = if cookie.is_empty() { None } else { Some(cookie) };
+    let cookie = if cookie.is_empty() {
+        None
+    } else {
+        Some(cookie)
+    };
 
     let proxy = param.value.get_def_string("proxy", "");
     let proxy = if proxy.is_empty() { None } else { Some(proxy) };
@@ -37,11 +41,16 @@ async fn douyin_detail(param: &RequestParameter) -> Result<Value> {
         .ok_or_else(|| error!("无法从输入中提取视频 ID: {}", input))?;
 
     let client = build_client(param)?;
-    let detail = client.video_detail(&aweme_id).await
+    let detail = client
+        .video_detail(&aweme_id)
+        .await
         .map_err(|e| error!("获取视频详情失败: {}", e))?;
 
     let desc = detail.get("desc").and_then(|v| v.as_str()).unwrap_or("");
-    let create_time = detail.get("create_time").and_then(|v| v.as_i64()).unwrap_or(0);
+    let create_time = detail
+        .get("create_time")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let stats = detail.get("statistics").cloned().unwrap_or_default();
     let author = detail.get("author").cloned().unwrap_or_default();
     let video = detail.get("video").cloned().unwrap_or_default();
@@ -75,14 +84,23 @@ async fn douyin_posts(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少 secUserId 参数（sec_uid 或用户主页 URL）"));
     }
 
-    let sec_uid = douyin::extract_sec_uid(&input)
-        .unwrap_or_else(|| input.trim().to_string());
+    let sec_uid = douyin::extract_sec_uid(&input).unwrap_or_else(|| input.trim().to_string());
 
-    let count = param.value.get("count").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
-    let cursor = param.value.get("cursor").and_then(|v| v.as_u64()).unwrap_or(0);
+    let count = param
+        .value
+        .get("count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(20) as u32;
+    let cursor = param
+        .value
+        .get("cursor")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     let client = build_client(param)?;
-    let body = client.user_posts(&sec_uid, count, cursor).await
+    let body = client
+        .user_posts(&sec_uid, count, cursor)
+        .await
         .map_err(|e| error!("获取作品列表失败: {}", e))?;
 
     let posts: Vec<Value> = body

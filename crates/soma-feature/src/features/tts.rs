@@ -38,8 +38,8 @@ pub fn synthesize_to(
 
     // Fish-Speech 引擎支持文本内嵌情感标签（如 [whisper] [excited]），保留原文；
     // 其他引擎会把标签当普通文本朗读，合成前统一剥离。
-    let use_fishspeech = tts_provider == "fishspeech"
-        || soma_tts::voices::is_fishspeech_voice(voice_name);
+    let use_fishspeech =
+        tts_provider == "fishspeech" || soma_tts::voices::is_fishspeech_voice(voice_name);
     let effective_text = if use_fishspeech {
         text.to_string()
     } else {
@@ -87,13 +87,18 @@ pub fn synthesize_to(
         let max_retries = vc_conf.get_max_retries() as usize;
         retry(max_retries, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
     } else if tts_provider == "heygem" {
         let hg_conf = &conf.digital_human.heygem;
-        let (reference_audio, reference_text) = get_heygem_asset(hg_conf.get_assets_dir(), merchant_id)?;
+        let (reference_audio, reference_text) =
+            get_heygem_asset(hg_conf.get_assets_dir(), merchant_id)?;
         let tts = soma_tts::heygem_tts::HeyGemTts::new(
             hg_conf.clone(),
             &reference_audio,
@@ -103,7 +108,11 @@ pub fn synthesize_to(
         let max_retries = hg_conf.get_max_retries() as usize;
         retry(max_retries, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -117,7 +126,11 @@ pub fn synthesize_to(
         let tts = soma_tts::fishspeech_tts::FishspeechTts::from_config(fs_conf);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -126,17 +139,29 @@ pub fn synthesize_to(
         let tts = soma_tts::siliconflow_tts::SiliconflowTts::new(sf_key);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
     } else if soma_tts::voices::is_elevenlabs_voice(voice_name) {
         let el_key = conf.elevenlabs.api_key.as_deref().unwrap_or("");
-        let el_model = conf.elevenlabs.model_id.as_deref().unwrap_or("eleven_multilingual_v2");
+        let el_model = conf
+            .elevenlabs
+            .model_id
+            .as_deref()
+            .unwrap_or("eleven_multilingual_v2");
         let tts = soma_tts::elevenlabs_tts::ElevenlabsTts::new(el_key, el_model);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -148,17 +173,29 @@ pub fn synthesize_to(
         let tts = soma_tts::mimo_tts::MimoTts::new(mimo_key, mimo_base, mimo_model, mimo_style);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
     } else if soma_tts::voices::is_gemini_voice(voice_name) {
         let gemini_key = conf.app.gemini_api_key.as_deref().unwrap_or("");
-        let gemini_model = conf.app.gemini_model_name.as_deref().unwrap_or("gemini-2.5-flash-preview-tts");
+        let gemini_model = conf
+            .app
+            .gemini_model_name
+            .as_deref()
+            .unwrap_or("gemini-2.5-flash-preview-tts");
         let tts = soma_tts::gemini_tts::GeminiTts::new(gemini_key, "", gemini_model);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -168,7 +205,11 @@ pub fn synthesize_to(
         let tts = soma_tts::azure_tts::AzureTts::new(azure_key, azure_region);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -176,10 +217,15 @@ pub fn synthesize_to(
         let volc_appid = conf.volcengine.app_id.as_deref().unwrap_or("");
         let volc_token = conf.volcengine.access_token.as_deref().unwrap_or("");
         let volc_cluster = conf.volcengine.cluster.as_deref().unwrap_or("volcano_tts");
-        let tts = soma_tts::volcengine_tts::VolcengineTts::new(volc_appid, volc_token, volc_cluster);
+        let tts =
+            soma_tts::volcengine_tts::VolcengineTts::new(volc_appid, volc_token, volc_cluster);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -190,7 +236,11 @@ pub fn synthesize_to(
         let tts = soma_tts::xfyun_tts::XfyunTts::new(xfyun_appid, xfyun_key, xfyun_secret);
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -198,7 +248,11 @@ pub fn synthesize_to(
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.get_edge_tts_timeout());
         retry(3, || {
             let fut = soma_tts::provider::SomaTtsProvider::synthesize(
-                &tts, text, voice_name, voice_rate, std::path::Path::new(output_path),
+                &tts,
+                text,
+                voice_name,
+                voice_rate,
+                std::path::Path::new(output_path),
             );
             block_on_async(fut)?
         })
@@ -215,11 +269,12 @@ fn get_heygem_asset(
     assets_dir: &str,
     merchant_id: Option<&str>,
 ) -> Result<(String, String), SomaError> {
-    let merchant_id = merchant_id.ok_or_else(|| {
-        SomaError::Config("HeyGem TTS 需要商户标识（merchant_id）".into())
-    })?;
+    let merchant_id = merchant_id
+        .ok_or_else(|| SomaError::Config("HeyGem TTS 需要商户标识（merchant_id）".into()))?;
     soma_core::utils::validate_merchant_id(merchant_id)?;
-    let path = std::path::Path::new(assets_dir).join(merchant_id).join("asset.json");
+    let path = std::path::Path::new(assets_dir)
+        .join(merchant_id)
+        .join("asset.json");
     if !path.exists() {
         return Err(SomaError::Config(format!("商户 {} 不存在", merchant_id)));
     }

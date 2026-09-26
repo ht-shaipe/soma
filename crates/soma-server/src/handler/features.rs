@@ -1,3 +1,5 @@
+use crate::Config;
+use soma_feature::{FeatureRequest, FeatureStatus, NoopProgress};
 /// 功能点统一 API 处理器
 ///
 /// - list: 列举全部已注册功能点（含输入输出 JSON Schema，前端据此渲染工作台表单）
@@ -8,8 +10,6 @@
 /// 避免阻塞 actix worker。功能点执行失败（status=failed）按既有约定返回错误响应。
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_feature::{FeatureRequest, FeatureStatus, NoopProgress};
-use crate::Config;
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {

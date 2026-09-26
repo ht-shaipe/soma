@@ -12,15 +12,15 @@ extern crate tube;
 
 use async_trait::async_trait;
 use soma_core::error::SomaError;
-use soma_core::models::{MaterialInfo, VideoAspect, AiVideoSegmentLog};
+use soma_core::models::{AiVideoSegmentLog, MaterialInfo, VideoAspect};
 
+pub mod aivideo;
+pub mod coverr;
+pub mod digital_human;
+pub mod douyin;
 pub mod pexels;
 pub mod pixabay;
-pub mod coverr;
-pub mod aivideo;
-pub mod digital_human;
 pub mod ytdlp;
-pub mod douyin;
 
 /// 素材供应商特征（Trait）
 ///
@@ -38,7 +38,12 @@ pub trait SomaStockProvider: Send + Sync {
     ///
     /// # 返回
     /// 匹配搜索条件的素材信息列表，失败时返回 SomaError
-    async fn search(&self, keyword: &str, video_aspect: &VideoAspect, min_duration: u32) -> Result<Vec<MaterialInfo>, SomaError>;
+    async fn search(
+        &self,
+        keyword: &str,
+        video_aspect: &VideoAspect,
+        min_duration: u32,
+    ) -> Result<Vec<MaterialInfo>, SomaError>;
 }
 
 /// 从 API 密钥列表中轮换获取密钥
@@ -134,11 +139,21 @@ pub async fn save_video(video_url: &str, save_dir: &str) -> Result<String, SomaE
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
 
-    let resp = client.get(video_url).send().await.map_err(|e| SomaError::Http(e.to_string()))?;
+    let resp = client
+        .get(video_url)
+        .send()
+        .await
+        .map_err(|e| SomaError::Http(e.to_string()))?;
     if !resp.status().is_success() {
-        return Err(SomaError::Stock(format!("download failed: status {}", resp.status())));
+        return Err(SomaError::Stock(format!(
+            "download failed: status {}",
+            resp.status()
+        )));
     }
-    let bytes = resp.bytes().await.map_err(|e| SomaError::Http(e.to_string()))?;
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| SomaError::Http(e.to_string()))?;
     std::fs::write(&video_path, &bytes).map_err(SomaError::Io)?;
 
     if video_path.exists() && video_path.metadata().map(|m| m.len()).unwrap_or(0) > 0 {
@@ -188,7 +203,16 @@ pub async fn download_videos(
     let mut seen_urls: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for term in search_terms {
-        let items = search_videos(source, term, video_aspect, max_clip_duration, pexels_keys, pixabay_keys, coverr_keys).await?;
+        let items = search_videos(
+            source,
+            term,
+            video_aspect,
+            max_clip_duration,
+            pexels_keys,
+            pixabay_keys,
+            coverr_keys,
+        )
+        .await?;
         let mut group = Vec::new();
         for item in items {
             if seen_urls.insert(item.url.clone()) {
@@ -279,14 +303,16 @@ pub async fn generate_ai_videos(
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout);
     let start = std::time::Instant::now();
 
-    let mut seg_logs: Vec<AiVideoSegmentLog> = search_terms.iter().enumerate().map(|(i, term)| {
-        AiVideoSegmentLog {
+    let mut seg_logs: Vec<AiVideoSegmentLog> = search_terms
+        .iter()
+        .enumerate()
+        .map(|(i, term)| AiVideoSegmentLog {
             scene_id: (i + 1) as u32,
             prompt: term.clone(),
             status: "pending".to_string(),
             message: None,
-        }
-    }).collect();
+        })
+        .collect();
 
     // 阶段1：串行提交任务（间隔2秒避免限流），带重试
     let mut pending: Vec<(usize, String)> = Vec::new(); // (idx, ai_task_id)
@@ -313,7 +339,12 @@ pub async fn generate_ai_videos(
         for attempt in 1..=3 {
             match provider.create_task(&params).await {
                 Ok(ai_task_id) => {
-                    log!("AI视频生成 任务已提交 [{}/{}], task_id={}", idx + 1, total, ai_task_id);
+                    log!(
+                        "AI视频生成 任务已提交 [{}/{}], task_id={}",
+                        idx + 1,
+                        total,
+                        ai_task_id
+                    );
                     seg_logs[idx].status = "submitted".to_string();
                     seg_logs[idx].message = Some(format!("task_id={}", ai_task_id));
                     pending.push((idx, ai_task_id));
@@ -321,7 +352,13 @@ pub async fn generate_ai_videos(
                     break;
                 }
                 Err(e) => {
-                    log!("AI视频生成 提交失败 [{}/{}] 第{}次: {:?}", idx + 1, total, attempt, e);
+                    log!(
+                        "AI视频生成 提交失败 [{}/{}] 第{}次: {:?}",
+                        idx + 1,
+                        total,
+                        attempt,
+                        e
+                    );
                     if attempt < 3 {
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     }
@@ -346,7 +383,11 @@ pub async fn generate_ai_videos(
         return Err(SomaError::VideoGen("所有AI视频任务提交失败".into()));
     }
 
-    log!("AI视频生成: 提交完成 {}/{}, 开始并发轮询...", pending.len(), total);
+    log!(
+        "AI视频生成: 提交完成 {}/{}, 开始并发轮询...",
+        pending.len(),
+        total
+    );
 
     // 阶段2：并发轮询所有任务状态
     let mut completed: Vec<(usize, aivideo::VideoGenStatus)> = Vec::new();
@@ -355,7 +396,8 @@ pub async fn generate_ai_videos(
         let elapsed_secs = start.elapsed().as_secs();
         let interval = if elapsed_secs < 30 { 3 } else { 8 };
 
-        let poll_futs: Vec<_> = pending.iter()
+        let poll_futs: Vec<_> = pending
+            .iter()
             .map(|(idx, ai_task_id)| {
                 let p = provider.clone();
                 let tid = ai_task_id.clone();
@@ -400,14 +442,24 @@ pub async fn generate_ai_videos(
                     log!("AI视频 轮询失败 [{}/{}]: {:?}", idx + 1, total, e);
                     seg_logs[idx].status = "failed".to_string();
                     seg_logs[idx].message = Some(format!("{:?}", e));
-                    completed.push((idx, aivideo::VideoGenStatus::Failed { message: format!("{:?}", e) }));
+                    completed.push((
+                        idx,
+                        aivideo::VideoGenStatus::Failed {
+                            message: format!("{:?}", e),
+                        },
+                    ));
                 }
             }
         }
 
         pending = still_pending;
         if !pending.is_empty() {
-            log!("AI视频生成 轮询中: {}/{} 完成, {} 等待中...", done_count, total - failed_indices.len(), pending.len());
+            log!(
+                "AI视频生成 轮询中: {}/{} 完成, {} 等待中...",
+                done_count,
+                total - failed_indices.len(),
+                pending.len()
+            );
             tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
         }
     }
@@ -417,7 +469,12 @@ pub async fn generate_ai_videos(
         log!("AI视频生成 超时 [{}/{}]", idx + 1, total);
         seg_logs[*idx].status = "timeout".to_string();
         seg_logs[*idx].message = Some("生成超时".to_string());
-        completed.push((*idx, aivideo::VideoGenStatus::Failed { message: "生成超时".into() }));
+        completed.push((
+            *idx,
+            aivideo::VideoGenStatus::Failed {
+                message: "生成超时".into(),
+            },
+        ));
     }
 
     // 按 idx 排序
@@ -460,19 +517,33 @@ pub async fn generate_ai_videos(
 
     // 部分失败容忍：如果有成功的视频就返回，而不是一个失败全部放弃
     if indexed_paths.is_empty() {
-        let first_err = completed.iter()
-            .filter_map(|(_, s)| if let aivideo::VideoGenStatus::Failed { message } = s { Some(message.clone()) } else { None })
+        let first_err = completed
+            .iter()
+            .filter_map(|(_, s)| {
+                if let aivideo::VideoGenStatus::Failed { message } = s {
+                    Some(message.clone())
+                } else {
+                    None
+                }
+            })
             .next()
             .unwrap_or_else(|| "所有AI视频生成失败".into());
         return Err(SomaError::VideoGen(first_err));
     }
 
     if !failed_indices.is_empty() || !download_failures.is_empty() || !pending.is_empty() {
-        log!("AI视频生成: 部分失败，成功 {}/{} 个视频", indexed_paths.len(), total);
+        log!(
+            "AI视频生成: 部分失败，成功 {}/{} 个视频",
+            indexed_paths.len(),
+            total
+        );
     }
 
     indexed_paths.sort_by_key(|(idx, _)| *idx);
-    Ok((indexed_paths.into_iter().map(|(_, path)| path).collect(), seg_logs))
+    Ok((
+        indexed_paths.into_iter().map(|(_, path)| path).collect(),
+        seg_logs,
+    ))
 }
 
 /// 验证视频文件是否有效可播放
@@ -481,13 +552,23 @@ pub async fn generate_ai_videos(
 /// 无效文件（时长为0或无法读取）返回 false。
 fn validate_video_file(path: &str) -> bool {
     let output = std::process::Command::new("ffprobe")
-        .args(["-v", "error", "-show_entries", "format=duration:stream=r_frame_rate", "-of", "default=noprint_wrappers=1", path])
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration:stream=r_frame_rate",
+            "-of",
+            "default=noprint_wrappers=1",
+            path,
+        ])
         .output();
     match output {
         Ok(out) => {
             let info = String::from_utf8_lossy(&out.stdout);
             // 检查有时长信息且非零
-            info.contains("duration=") && !info.contains("duration=N/A") && !info.contains("duration=0")
+            info.contains("duration=")
+                && !info.contains("duration=N/A")
+                && !info.contains("duration=0")
         }
         Err(_) => false,
     }

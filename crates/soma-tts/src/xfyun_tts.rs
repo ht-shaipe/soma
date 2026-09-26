@@ -4,13 +4,13 @@
 //! 使用 HMAC-SHA256 签名进行认证。
 //! API 文档：https://www.xfyun.cn/doc/tts/OnlineTTS/API.html
 
-use async_trait::async_trait;
-use soma_core::error::SomaError;
 use crate::edge_tts::{generate_subtitle_cues_from_text, get_audio_duration};
 use crate::provider::{SomaTtsProvider, TtsResult};
-use std::path::Path;
+use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use soma_core::error::SomaError;
+use std::path::Path;
 
 /// 科大讯飞 TTS 语音合成器
 pub struct XfyunTts {
@@ -36,13 +36,15 @@ impl XfyunTts {
     /// 使用 HMAC-SHA256 算法对 host + date + request-line 进行签名，
     /// 返回 (authorization, date) 元组用于 HTTP 请求头。
     fn build_auth(&self, host: &str, path: &str, method: &str) -> (String, String) {
-        let date = chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
+        let date = chrono::Utc::now()
+            .format("%a, %d %b %Y %H:%M:%S GMT")
+            .to_string();
         let request_line = format!("{} {} HTTP/1.1", method, path);
         let signature_origin = format!("host: {}\ndate: {}\n{}", host, date, request_line);
 
         type HmacSha256 = Hmac<Sha256>;
-        let mut mac = HmacSha256::new_from_slice(self.api_secret.as_bytes())
-            .expect("HMAC key length error");
+        let mut mac =
+            HmacSha256::new_from_slice(self.api_secret.as_bytes()).expect("HMAC key length error");
         mac.update(signature_origin.as_bytes());
         let signature = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
@@ -68,14 +70,14 @@ impl SomaTtsProvider for XfyunTts {
         output_path: &Path,
     ) -> Result<TtsResult, SomaError> {
         if self.app_id.is_empty() || self.api_key.is_empty() || self.api_secret.is_empty() {
-            return Err(SomaError::Tts("讯飞 App ID / API Key / API Secret 未设置".into()));
+            return Err(SomaError::Tts(
+                "讯飞 App ID / API Key / API Secret 未设置".into(),
+            ));
         }
 
         let vcn = crate::voices::extract_xfyun_voice(voice).unwrap_or_else(|| voice.to_string());
-        let text_b64 = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            text.as_bytes(),
-        );
+        let text_b64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, text.as_bytes());
 
         let speed = ((rate * 50.0).round() as i32).clamp(0, 100);
 
@@ -121,7 +123,10 @@ impl SomaTtsProvider for XfyunTts {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(SomaError::Tts(format!("讯飞 TTS 失败: {} - {}", status, body)));
+            return Err(SomaError::Tts(format!(
+                "讯飞 TTS 失败: {} - {}",
+                status, body
+            )));
         }
 
         let resp_json: serde_json::Value = resp
@@ -140,7 +145,10 @@ impl SomaTtsProvider for XfyunTts {
                 .and_then(|h| h.get("message"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
-            return Err(SomaError::Tts(format!("讯飞 TTS 错误: code={}, message={}", code, message)));
+            return Err(SomaError::Tts(format!(
+                "讯飞 TTS 错误: code={}, message={}",
+                code, message
+            )));
         }
 
         let audio_b64 = resp_json
@@ -150,10 +158,9 @@ impl SomaTtsProvider for XfyunTts {
             .and_then(|v| v.as_str())
             .ok_or_else(|| SomaError::Tts("讯飞响应缺少音频数据".into()))?;
 
-        let audio_bytes = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            audio_b64,
-        ).map_err(|e| SomaError::Tts(format!("Base64 解码失败: {}", e)))?;
+        let audio_bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, audio_b64)
+                .map_err(|e| SomaError::Tts(format!("Base64 解码失败: {}", e)))?;
 
         if let Some(parent) = output_path.parent() {
             std::fs::create_dir_all(parent).map_err(SomaError::Io)?;

@@ -2,9 +2,9 @@
 //!
 //! 基于 yt-dlp 的通用视频下载，支持 1000+ 站点。
 
+use soma_stock::ytdlp;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_stock::ytdlp;
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
@@ -40,21 +40,30 @@ async fn info(param: &RequestParameter) -> Result<Value> {
     }
 
     let proxy = param.value.get_def_string("proxy", "");
-    let proxy = if proxy.is_empty() { None } else { Some(proxy.as_str()) };
+    let proxy = if proxy.is_empty() {
+        None
+    } else {
+        Some(proxy.as_str())
+    };
 
-    let vinfo = ytdlp::get_info(&url, proxy).await
+    let vinfo = ytdlp::get_info(&url, proxy)
+        .await
         .map_err(|e| error!("获取视频信息失败: {:?}", e))?;
 
-    let formats: Vec<Value> = vinfo.formats.iter().map(|f| {
-        value!({
-            "formatId": f.format_id.clone(),
-            "ext": f.ext.clone(),
-            "resolution": f.resolution.as_deref().unwrap_or(""),
-            "filesize": f.filesize.unwrap_or(0),
-            "hasVideo": f.has_video,
-            "hasAudio": f.has_audio,
+    let formats: Vec<Value> = vinfo
+        .formats
+        .iter()
+        .map(|f| {
+            value!({
+                "formatId": f.format_id.clone(),
+                "ext": f.ext.clone(),
+                "resolution": f.resolution.as_deref().unwrap_or(""),
+                "filesize": f.filesize.unwrap_or(0),
+                "hasVideo": f.has_video,
+                "hasAudio": f.has_audio,
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(value!({
         "id": vinfo.id,
@@ -85,14 +94,23 @@ async fn download(param: &RequestParameter) -> Result<Value> {
         save_dir,
         output_template: param.value.get("outputTemplate").and_then(|v| v.as_str()),
         format: param.value.get("format").and_then(|v| v.as_str()),
-        audio_only: param.value.get("audioOnly").and_then(|v| v.as_bool()).unwrap_or(false),
+        audio_only: param
+            .value
+            .get("audioOnly")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
         audio_quality: param.value.get("audioQuality").and_then(|v| v.as_str()),
         proxy: param.value.get("proxy").and_then(|v| v.as_str()),
         rate_limit: param.value.get("rateLimit").and_then(|v| v.as_str()),
-        skip_existing: param.value.get("skipExisting").and_then(|v| v.as_bool()).unwrap_or(true),
+        skip_existing: param
+            .value
+            .get("skipExisting")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
     };
 
-    let path = ytdlp::download(&params).await
+    let path = ytdlp::download(&params)
+        .await
         .map_err(|e| error!("下载失败: {:?}", e))?;
 
     Ok(value!({
@@ -121,10 +139,19 @@ async fn batch(param: &RequestParameter) -> Result<Value> {
     }
 
     let proxy = param.value.get_def_string("proxy", "");
-    let audio_only = param.value.get("audioOnly").and_then(|v| v.as_bool()).unwrap_or(false);
-    let proxy = if proxy.is_empty() { None } else { Some(proxy.as_str()) };
+    let audio_only = param
+        .value
+        .get("audioOnly")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let proxy = if proxy.is_empty() {
+        None
+    } else {
+        Some(proxy.as_str())
+    };
 
-    let paths = ytdlp::download_batch(&urls, &save_dir, proxy, audio_only).await
+    let paths = ytdlp::download_batch(&urls, &save_dir, proxy, audio_only)
+        .await
         .map_err(|e| error!("批量下载失败: {:?}", e))?;
 
     Ok(value!({
@@ -142,12 +169,15 @@ async fn extract_urls(param: &RequestParameter) -> Result<Value> {
     }
 
     let urls = ytdlp::extract_urls(&text);
-    let results: Vec<Value> = urls.iter().map(|u| {
-        value!({
-            "url": u,
-            "platform": ytdlp::detect_platform(u),
+    let results: Vec<Value> = urls
+        .iter()
+        .map(|u| {
+            value!({
+                "url": u,
+                "platform": ytdlp::detect_platform(u),
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(value!({
         "urls": results,

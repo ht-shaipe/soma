@@ -1,3 +1,5 @@
+use crate::state::{self, TaskUpdateData};
+use crate::Config;
 /// 视频生成流水线编排器
 ///
 /// 0.1.2 起各步骤已功能点化（见 soma-feature::features），
@@ -18,7 +20,7 @@
 /// 兼容说明：generate_audio / generate_audio_to / get_video_materials
 /// 保留原签名供数字人服务与 handler 层调用，内部委托功能点层实现。
 use soma_core::error::SomaError;
-use soma_core::models::{StoryboardScene, TaskStatus, VideoParams, AiVideoSegmentLog};
+use soma_core::models::{AiVideoSegmentLog, StoryboardScene, TaskStatus, VideoParams};
 use soma_feature::features::compose::VideoComposeOutput;
 use soma_feature::features::llm::{
     derive_terms, LlmIntentOutput, LlmNarrationOutput, LlmScriptOutput, LlmStoryboardOutput,
@@ -27,8 +29,6 @@ use soma_feature::features::materials::MaterialGenerateOutput;
 use soma_feature::features::subtitle::SubtitleGenerateOutput;
 use soma_feature::features::tts::TtsSynthesizeOutput;
 use soma_feature::progress::{FeatureProgress, FnReporter, NoopProgress};
-use crate::state::{self, TaskUpdateData};
-use crate::Config;
 
 pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<(), SomaError> {
     let conf = Config::get();
@@ -87,12 +87,15 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     state::update_task(task_id, None, Some(5));
 
     if stop_at == "intent" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            script: Some(intent.to_string()),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                script: Some(intent.to_string()),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -108,11 +111,14 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     };
 
     if stop_at == "script" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -153,18 +159,24 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         derive_terms(&storyboard)
     };
 
-    state::update_task_data(task_id, &TaskUpdateData {
-        terms: Some(video_terms.clone()),
-        storyboard: Some(storyboard.clone()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            terms: Some(video_terms.clone()),
+            storyboard: Some(storyboard.clone()),
+            ..Default::default()
+        },
+    );
 
     if stop_at == "terms" || stop_at == "storyboard" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -188,18 +200,28 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         log::info!("task {}: 开始生成旁白文案(无task_data)...", task_id);
         step_narration(task_id, params, &video_script, &storyboard, &conf)?
     };
-    log::info!("task {}: 旁白文案生成完成 ({}字)", task_id, narration_text.len());
-    state::update_task_data(task_id, &TaskUpdateData {
-        narration: Some(narration_text.clone()),
-        ..Default::default()
-    });
+    log::info!(
+        "task {}: 旁白文案生成完成 ({}字)",
+        task_id,
+        narration_text.len()
+    );
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            narration: Some(narration_text.clone()),
+            ..Default::default()
+        },
+    );
 
     if stop_at == "narration" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -220,22 +242,31 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         step_materials(task_id, params, &video_terms, 0.0, &conf, &task_dir_str)?
     };
     if !ai_video_logs.is_empty() {
-        state::update_task_data(task_id, &TaskUpdateData {
-            ai_video_logs: Some(ai_video_logs),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                ai_video_logs: Some(ai_video_logs),
+                ..Default::default()
+            },
+        );
     }
-    state::update_task_data(task_id, &TaskUpdateData {
-        materials: Some(materials.clone()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            materials: Some(materials.clone()),
+            ..Default::default()
+        },
+    );
 
     if stop_at == "materials" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -246,7 +277,8 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         if storyboard.is_empty() {
             video_script.clone()
         } else {
-            storyboard.iter()
+            storyboard
+                .iter()
                 .map(|s| s.narration.as_str())
                 .collect::<Vec<&str>>()
                 .join(" ")
@@ -269,18 +301,24 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     } else {
         step_tts(task_id, params, &tts_text, &conf, &task_dir)?
     };
-    state::update_task_data(task_id, &TaskUpdateData {
-        audio_file: Some(audio_file.clone()),
-        audio_duration: Some(audio_duration),
-        ..Default::default()
-    });
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            audio_file: Some(audio_file.clone()),
+            audio_duration: Some(audio_duration),
+            ..Default::default()
+        },
+    );
 
     if stop_at == "audio" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -297,17 +335,23 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
     } else {
         step_subtitle(task_id, params, &tts_text, &audio_file, &conf, &task_dir)?
     };
-    state::update_task_data(task_id, &TaskUpdateData {
-        subtitle_path: Some(subtitle_path.clone()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            subtitle_path: Some(subtitle_path.clone()),
+            ..Default::default()
+        },
+    );
 
     if stop_at == "subtitle" {
-        state::update_task_data(task_id, &TaskUpdateData {
-            state: Some(TaskStatus::Completed.as_i32()),
-            progress: Some(100),
-            ..Default::default()
-        });
+        state::update_task_data(
+            task_id,
+            &TaskUpdateData {
+                state: Some(TaskStatus::Completed.as_i32()),
+                progress: Some(100),
+                ..Default::default()
+            },
+        );
         return Ok(());
     }
 
@@ -348,16 +392,19 @@ pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<()
         }
     }
 
-    state::update_task_data(task_id, &TaskUpdateData {
-        state: Some(TaskStatus::Completed.as_i32()),
-        progress: Some(100),
-        script: Some(video_script),
-        terms: Some(video_terms),
-        storyboard: Some(storyboard),
-        videos: Some(final_videos),
-        combined_videos: Some(combined_videos),
-        ..Default::default()
-    });
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            state: Some(TaskStatus::Completed.as_i32()),
+            progress: Some(100),
+            script: Some(video_script),
+            terms: Some(video_terms),
+            storyboard: Some(storyboard),
+            videos: Some(final_videos),
+            combined_videos: Some(combined_videos),
+            ..Default::default()
+        },
+    );
 
     Ok(())
 }
@@ -383,7 +430,12 @@ fn block_on_upload(
 /// 第2步：文案/剧情（llm.script 功能点）
 ///
 /// 与原实现一致：用户随任务提交的脚本（video_script 非空）直接使用，跳过 LLM。
-fn step_script(task_id: &str, params: &VideoParams, intent: &serde_json::Value, conf: &Config) -> Result<String, SomaError> {
+fn step_script(
+    task_id: &str,
+    params: &VideoParams,
+    intent: &serde_json::Value,
+    conf: &Config,
+) -> Result<String, SomaError> {
     let provided = params.video_script.trim().to_string();
     let script = if !provided.is_empty() {
         provided
@@ -405,15 +457,24 @@ fn step_script(task_id: &str, params: &VideoParams, intent: &serde_json::Value, 
         )?)?;
         out.script
     };
-    state::update_task_data(task_id, &TaskUpdateData {
-        script: Some(script.clone()),
-        ..Default::default()
-    });
+    state::update_task_data(
+        task_id,
+        &TaskUpdateData {
+            script: Some(script.clone()),
+            ..Default::default()
+        },
+    );
     Ok(script)
 }
 
 /// 第3步：分镜脚本（llm.storyboard 功能点）
-fn step_storyboard(task_id: &str, params: &VideoParams, script: &str, intent: &serde_json::Value, conf: &Config) -> Result<Vec<StoryboardScene>, SomaError> {
+fn step_storyboard(
+    task_id: &str,
+    params: &VideoParams,
+    script: &str,
+    intent: &serde_json::Value,
+    conf: &Config,
+) -> Result<Vec<StoryboardScene>, SomaError> {
     // 用户已提供关键词（数组或逗号分隔字符串）时，作为视觉提示词的约束传入
     let user_terms: Vec<String> = match &params.video_terms {
         Some(serde_json::Value::Array(arr)) => arr
@@ -444,7 +505,13 @@ fn step_storyboard(task_id: &str, params: &VideoParams, script: &str, intent: &s
 }
 
 /// 第3.5步：旁白文案（llm.narration 功能点）
-fn step_narration(task_id: &str, params: &VideoParams, script: &str, storyboard: &[StoryboardScene], conf: &Config) -> Result<String, SomaError> {
+fn step_narration(
+    task_id: &str,
+    params: &VideoParams,
+    script: &str,
+    storyboard: &[StoryboardScene],
+    conf: &Config,
+) -> Result<String, SomaError> {
     let out: LlmNarrationOutput = serde_json::from_value(super::registry::run_feature(
         "llm.narration",
         task_id,
@@ -466,7 +533,14 @@ fn step_narration(task_id: &str, params: &VideoParams, script: &str, storyboard:
 /// 目录解析与原实现一致：
 /// - AI 视频保存到任务目录
 /// - 在线素材按配置 material_directory（空→缓存目录 / "task"→任务目录 / 自定义路径）
-fn step_materials(task_id: &str, params: &VideoParams, terms: &[String], audio_duration: f64, conf: &Config, task_dir_str: &str) -> Result<(Vec<String>, Vec<AiVideoSegmentLog>), SomaError> {
+fn step_materials(
+    task_id: &str,
+    params: &VideoParams,
+    terms: &[String],
+    audio_duration: f64,
+    conf: &Config,
+    task_dir_str: &str,
+) -> Result<(Vec<String>, Vec<AiVideoSegmentLog>), SomaError> {
     let source = params.video_source.as_deref().unwrap_or("pexels");
     let material_dir = conf.app.app.material_directory.clone().unwrap_or_default();
     let is_ai_branch = (params.portrait_image.is_some() && source != "local")
@@ -508,7 +582,13 @@ fn step_materials(task_id: &str, params: &VideoParams, terms: &[String], audio_d
 }
 
 /// 第5步（音频）：TTS 合成（tts.synthesize 功能点），输出到任务目录 audio.mp3
-fn step_tts(task_id: &str, params: &VideoParams, tts_text: &str, conf: &Config, task_dir: &std::path::Path) -> Result<(String, f64), SomaError> {
+fn step_tts(
+    task_id: &str,
+    params: &VideoParams,
+    tts_text: &str,
+    conf: &Config,
+    task_dir: &std::path::Path,
+) -> Result<(String, f64), SomaError> {
     let out: TtsSynthesizeOutput = serde_json::from_value(super::registry::run_feature(
         "tts.synthesize",
         task_id,
@@ -530,7 +610,14 @@ fn step_tts(task_id: &str, params: &VideoParams, tts_text: &str, conf: &Config, 
 }
 
 /// 第5步（字幕）：字幕生成（subtitle.generate 功能点），输出到任务目录 subtitle.srt
-fn step_subtitle(task_id: &str, params: &VideoParams, tts_text: &str, audio_file: &str, conf: &Config, task_dir: &std::path::Path) -> Result<String, SomaError> {
+fn step_subtitle(
+    task_id: &str,
+    params: &VideoParams,
+    tts_text: &str,
+    audio_file: &str,
+    conf: &Config,
+    task_dir: &std::path::Path,
+) -> Result<String, SomaError> {
     let out: SubtitleGenerateOutput = serde_json::from_value(super::registry::run_feature(
         "subtitle.generate",
         task_id,
@@ -551,16 +638,30 @@ fn step_subtitle(task_id: &str, params: &VideoParams, tts_text: &str, audio_file
 /// 兼容入口：TTS 合成到任务目录（数字人服务与 handler 层使用）
 ///
 /// 行为与原实现一致：失败时同步把任务标记为 Failed。
-pub fn generate_audio(task_id: &str, params: &VideoParams, script: &str, conf: &crate::Config) -> Result<(String, f64), SomaError> {
+pub fn generate_audio(
+    task_id: &str,
+    params: &VideoParams,
+    script: &str,
+    conf: &crate::Config,
+) -> Result<(String, f64), SomaError> {
     let task_audio_dir = soma_core::utils::task_dir(task_id);
-    let audio_file = task_audio_dir.join("audio.mp3").to_string_lossy().to_string();
+    let audio_file = task_audio_dir
+        .join("audio.mp3")
+        .to_string_lossy()
+        .to_string();
     generate_audio_to(task_id, params, script, &audio_file, conf)
 }
 
 /// 兼容入口：TTS 合成到指定路径（数字人服务使用）
 ///
 /// 行为与原实现一致：失败时同步把任务标记为 Failed。
-pub fn generate_audio_to(task_id: &str, params: &VideoParams, script: &str, output_path: &str, conf: &crate::Config) -> Result<(String, f64), SomaError> {
+pub fn generate_audio_to(
+    task_id: &str,
+    params: &VideoParams,
+    script: &str,
+    output_path: &str,
+    conf: &crate::Config,
+) -> Result<(String, f64), SomaError> {
     let result = soma_feature::features::tts::synthesize_to(
         &conf.app,
         script,
@@ -581,8 +682,21 @@ pub fn generate_audio_to(task_id: &str, params: &VideoParams, script: &str, outp
 /// 兼容入口：素材生成（handler 层的独立素材获取使用）
 ///
 /// 目录解析与原实现一致（AI 视频保存到任务目录，在线素材按配置解析）。
-pub fn get_video_materials(task_id: &str, params: &VideoParams, terms: &[String], audio_duration: f64, conf: &crate::Config) -> Result<Vec<String>, SomaError> {
+pub fn get_video_materials(
+    task_id: &str,
+    params: &VideoParams,
+    terms: &[String],
+    audio_duration: f64,
+    conf: &crate::Config,
+) -> Result<Vec<String>, SomaError> {
     let task_dir = soma_core::utils::task_dir(task_id);
-    let (materials, _) = step_materials(task_id, params, terms, audio_duration, conf, &task_dir.to_string_lossy())?;
+    let (materials, _) = step_materials(
+        task_id,
+        params,
+        terms,
+        audio_duration,
+        conf,
+        &task_dir.to_string_lossy(),
+    )?;
     Ok(materials)
 }

@@ -1,3 +1,5 @@
+use ai_llm_kit::{LlmFactory, LlmProvider};
+use soma_core::config::AppConfig;
 /// LLM（大语言模型）服务模块（功能点层共享实现）
 ///
 /// 从 soma-server 迁入，供 `llm.*` 系列功能点与宿主兼容层共同复用：
@@ -11,8 +13,6 @@
 /// 配置参数为 `AppConfig`（宿主各自的配置管理负责装载）。
 use soma_core::error::SomaError;
 use soma_core::models::StoryboardScene;
-use ai_llm_kit::{LlmFactory, LlmProvider};
-use soma_core::config::AppConfig;
 
 /// 编译正则表达式，失败时 panic 并给出明确错误信息
 macro_rules! regex_or_panic {
@@ -23,7 +23,8 @@ macro_rules! regex_or_panic {
 
 lazy_static! {
     static ref RE_THINK: regex::Regex = regex_or_panic!(r"(?s)<think>.*?</think>");
-    static ref RE_THINKING: regex::Regex = regex_or_panic!(r"(?m)^.{0,5}(思考过程|思维过程|Reasoning|Thinking)[:：]\s*");
+    static ref RE_THINKING: regex::Regex =
+        regex_or_panic!(r"(?m)^.{0,5}(思考过程|思维过程|Reasoning|Thinking)[:：]\s*");
     static ref RE_HEADING: regex::Regex = regex_or_panic!(r"(?m)^#{1,6}\s*");
     static ref RE_BOLD: regex::Regex = regex_or_panic!(r"\*\*(.+?)\*\*");
     static ref RE_ITALIC: regex::Regex = regex_or_panic!(r"\*(.+?)\*");
@@ -52,16 +53,32 @@ pub async fn generate_script(
 
     let intent_desc = format!(
         "主题：{}\n风格：{}\n情感基调：{}\n目标受众：{}\n时长建议：{}\n目标平台：{}",
-        intent.get("theme").and_then(|v| v.as_str()).unwrap_or(subject),
+        intent
+            .get("theme")
+            .and_then(|v| v.as_str())
+            .unwrap_or(subject),
         intent.get("style").and_then(|v| v.as_str()).unwrap_or(""),
         intent.get("mood").and_then(|v| v.as_str()).unwrap_or(""),
-        intent.get("audience").and_then(|v| v.as_str()).unwrap_or(""),
-        intent.get("duration").and_then(|v| v.as_str()).unwrap_or("30s"),
-        intent.get("platform").and_then(|v| v.as_str()).unwrap_or(""),
+        intent
+            .get("audience")
+            .and_then(|v| v.as_str())
+            .unwrap_or(""),
+        intent
+            .get("duration")
+            .and_then(|v| v.as_str())
+            .unwrap_or("30s"),
+        intent
+            .get("platform")
+            .and_then(|v| v.as_str())
+            .unwrap_or(""),
     );
 
     let sys_msg = if system_prompt.is_empty() {
-        let lang_label = if language.is_empty() { "中文" } else { language };
+        let lang_label = if language.is_empty() {
+            "中文"
+        } else {
+            language
+        };
         format!(
             "你是一位顶尖短视频脚本作家，擅长创作引人入胜、信息丰富且情感饱满的短视频旁白脚本。\n\n\
              任务：根据创作参数撰写短视频旁白脚本，并为每个段落提取素材搜索关键词。\n\n\
@@ -91,7 +108,10 @@ pub async fn generate_script(
     let user_msg = if prompt.is_empty() {
         format!("创作参数：\n{}\n\n请撰写脚本并提取关键词：", intent_desc)
     } else {
-        format!("{}\n\n创作参数：\n{}\n主题：{}", prompt, intent_desc, subject)
+        format!(
+            "{}\n\n创作参数：\n{}\n主题：{}",
+            prompt, intent_desc, subject
+        )
     };
 
     let body = serde_json::json!({
@@ -105,7 +125,9 @@ pub async fn generate_script(
     });
 
     let body_value = serde_json_to_tube_value(&body);
-    let result = llm.chat(&body_value).await
+    let result = llm
+        .chat(&body_value)
+        .await
         .map_err(|e| SomaError::Llm(format!("LLM chat failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
@@ -162,7 +184,9 @@ pub async fn generate_terms(
     });
 
     let body_value = serde_json_to_tube_value(&body);
-    let result = llm.chat(&body_value).await
+    let result = llm
+        .chat(&body_value)
+        .await
         .map_err(|e| SomaError::Llm(format!("LLM terms failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
@@ -189,9 +213,14 @@ pub async fn generate_narration(
 
     let storyboard_hint = if let Some(scenes) = storyboard.as_array() {
         if !scenes.is_empty() {
-            let scene_narrations: Vec<String> = scenes.iter().filter_map(|s| {
-                s.get("narration").and_then(|n| n.as_str()).map(|n| n.to_string())
-            }).collect();
+            let scene_narrations: Vec<String> = scenes
+                .iter()
+                .filter_map(|s| {
+                    s.get("narration")
+                        .and_then(|n| n.as_str())
+                        .map(|n| n.to_string())
+                })
+                .collect();
             if !scene_narrations.is_empty() {
                 format!("\n\n参考分镜中各场景的旁白文本（请在此基础上优化为更自然流畅的口语化旁白）：\n{}", scene_narrations.join("\n"))
             } else {
@@ -256,7 +285,9 @@ pub async fn generate_narration(
     });
 
     let body_value = serde_json_to_tube_value(&body);
-    let result = llm.chat(&body_value).await
+    let result = llm
+        .chat(&body_value)
+        .await
         .map_err(|e| SomaError::Llm(format!("LLM narration failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
@@ -304,7 +335,16 @@ pub async fn generate_intent(
                    - platform: 目标平台（抖音、视频号、YouTube等）\n\
                    只输出JSON，不要代码围栏或解释。";
 
-    let user_msg = format!("请提炼以下视频创意：{}\n参考画幅：{}\n参考语言：{}", subject, aspect_ratio, if language.is_empty() { "中文" } else { language });
+    let user_msg = format!(
+        "请提炼以下视频创意：{}\n参考画幅：{}\n参考语言：{}",
+        subject,
+        aspect_ratio,
+        if language.is_empty() {
+            "中文"
+        } else {
+            language
+        }
+    );
 
     let body = serde_json::json!({
         "model": model_name,
@@ -317,7 +357,9 @@ pub async fn generate_intent(
     });
 
     let body_value = serde_json_to_tube_value(&body);
-    let result = llm.chat(&body_value).await
+    let result = llm
+        .chat(&body_value)
+        .await
         .map_err(|e| SomaError::Llm(format!("LLM intent failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
@@ -345,9 +387,15 @@ pub async fn generate_storyboard(
 
     let style = intent.get("style").and_then(|v| v.as_str()).unwrap_or("");
     let mood = intent.get("mood").and_then(|v| v.as_str()).unwrap_or("");
-    let user_keywords = intent.get("user_visual_keywords")
+    let user_keywords = intent
+        .get("user_visual_keywords")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<&str>>().join(", "))
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
+        })
         .unwrap_or_default();
 
     let keyword_instruction = if user_keywords.is_empty() {
@@ -410,7 +458,9 @@ pub async fn generate_storyboard(
     });
 
     let body_value = serde_json_to_tube_value(&body);
-    let result = llm.chat(&body_value).await
+    let result = llm
+        .chat(&body_value)
+        .await
         .map_err(|e| SomaError::Llm(format!("LLM storyboard failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
@@ -419,7 +469,11 @@ pub async fn generate_storyboard(
 }
 
 /// 解析分镜脚本 LLM 输出，支持多种格式和容错回退
-fn parse_storyboard_output(content: &str, original_script: &str, clip_duration: u32) -> Result<Vec<StoryboardScene>, SomaError> {
+fn parse_storyboard_output(
+    content: &str,
+    original_script: &str,
+    clip_duration: u32,
+) -> Result<Vec<StoryboardScene>, SomaError> {
     let stripped = strip_code_fence(content);
 
     if let Ok(scenes) = serde_json::from_str::<Vec<StoryboardScene>>(&stripped) {
@@ -446,9 +500,10 @@ fn parse_storyboard_output(content: &str, original_script: &str, clip_duration: 
 fn fallback_storyboard(script: &str, clip_duration: u32) -> Vec<StoryboardScene> {
     use soma_core::models::PUNCTUATIONS;
 
-    let sentences: Vec<&str> = script.split(|c: char| {
-        PUNCTUATIONS.contains(&c.to_string().as_str())
-    }).filter(|s| !s.trim().is_empty()).collect();
+    let sentences: Vec<&str> = script
+        .split(|c: char| PUNCTUATIONS.contains(&c.to_string().as_str()))
+        .filter(|s| !s.trim().is_empty())
+        .collect();
 
     if sentences.is_empty() {
         return vec![StoryboardScene {
@@ -465,8 +520,10 @@ fn fallback_storyboard(script: &str, clip_duration: u32) -> Vec<StoryboardScene>
         }];
     }
 
-    sentences.iter().enumerate().map(|(i, s)| {
-        StoryboardScene {
+    sentences
+        .iter()
+        .enumerate()
+        .map(|(i, s)| StoryboardScene {
             scene_id: (i + 1) as u32,
             duration: Some(clip_duration),
             narration: s.trim().to_string(),
@@ -474,15 +531,24 @@ fn fallback_storyboard(script: &str, clip_duration: u32) -> Vec<StoryboardScene>
             visual_prompt: s.trim().to_string(),
             search_keyword: None,
             camera_movement: Some("static".to_string()),
-            transition: if i + 1 < sentences.len() { Some("cut".to_string()) } else { None },
+            transition: if i + 1 < sentences.len() {
+                Some("cut".to_string())
+            } else {
+                None
+            },
             text_overlay: None,
             mood: None,
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 /// 解析需求理解 LLM 输出，容错回退
-fn parse_intent_output(content: &str, subject: &str, language: &str, aspect_ratio: &str) -> Result<serde_json::Value, SomaError> {
+fn parse_intent_output(
+    content: &str,
+    subject: &str,
+    language: &str,
+    aspect_ratio: &str,
+) -> Result<serde_json::Value, SomaError> {
     let stripped = strip_code_fence(content);
 
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&stripped) {
@@ -567,7 +633,9 @@ pub async fn generate_social_metadata(
     });
 
     let body_value = serde_json_to_tube_value(&body);
-    let result = llm.chat(&body_value).await
+    let result = llm
+        .chat(&body_value)
+        .await
         .map_err(|e| SomaError::Llm(format!("LLM social metadata failed: {:?}", e)))?;
 
     let content = extract_content_from_response(&result);
@@ -603,12 +671,36 @@ struct SocialPlatformSpec {
 
 fn get_social_platform_spec(platform: &str) -> SocialPlatformSpec {
     match platform {
-        "tiktok" => SocialPlatformSpec { title_max: 100, caption_max: 2200, hashtag_count: 5 },
-        "youtube_shorts" | "youtube" => SocialPlatformSpec { title_max: 100, caption_max: 5000, hashtag_count: 3 },
-        "instagram_reels" | "instagram" => SocialPlatformSpec { title_max: 125, caption_max: 2200, hashtag_count: 8 },
-        "facebook_reels" | "facebook" => SocialPlatformSpec { title_max: 125, caption_max: 2200, hashtag_count: 5 },
-        "x" | "twitter" => SocialPlatformSpec { title_max: 70, caption_max: 280, hashtag_count: 3 },
-        _ => SocialPlatformSpec { title_max: 100, caption_max: 2200, hashtag_count: 5 },
+        "tiktok" => SocialPlatformSpec {
+            title_max: 100,
+            caption_max: 2200,
+            hashtag_count: 5,
+        },
+        "youtube_shorts" | "youtube" => SocialPlatformSpec {
+            title_max: 100,
+            caption_max: 5000,
+            hashtag_count: 3,
+        },
+        "instagram_reels" | "instagram" => SocialPlatformSpec {
+            title_max: 125,
+            caption_max: 2200,
+            hashtag_count: 8,
+        },
+        "facebook_reels" | "facebook" => SocialPlatformSpec {
+            title_max: 125,
+            caption_max: 2200,
+            hashtag_count: 5,
+        },
+        "x" | "twitter" => SocialPlatformSpec {
+            title_max: 70,
+            caption_max: 280,
+            hashtag_count: 3,
+        },
+        _ => SocialPlatformSpec {
+            title_max: 100,
+            caption_max: 2200,
+            hashtag_count: 5,
+        },
     }
 }
 
@@ -625,9 +717,26 @@ fn get_social_platform_label(platform: &str) -> &str {
 }
 
 /// LLM 失败时的社交元数据兜底生成
-fn fallback_social_metadata(subject: &str, script: &str, spec: &SocialPlatformSpec) -> serde_json::Value {
-    let default_tags = ["#shorts", "#viral", "#trending", "#fyp", "#video", "#reels", "#creator", "#content"];
-    let tags: Vec<String> = default_tags.iter().take(spec.hashtag_count).map(|t| t.to_string()).collect();
+fn fallback_social_metadata(
+    subject: &str,
+    script: &str,
+    spec: &SocialPlatformSpec,
+) -> serde_json::Value {
+    let default_tags = [
+        "#shorts",
+        "#viral",
+        "#trending",
+        "#fyp",
+        "#video",
+        "#reels",
+        "#creator",
+        "#content",
+    ];
+    let tags: Vec<String> = default_tags
+        .iter()
+        .take(spec.hashtag_count)
+        .map(|t| t.to_string())
+        .collect();
     serde_json::json!({
         "title": subject.chars().take(spec.title_max).collect::<String>(),
         "description": script.chars().take(spec.caption_max).collect::<String>(),
@@ -665,16 +774,27 @@ fn clean_llm_output(text: &str) -> String {
 /// - `conf`: 全局配置引用
 ///
 /// 返回：(LlmProvider, api_key, model_name) 三元组，或配置错误
-fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider, String, String), SomaError> {
+fn get_provider_config(
+    provider: &str,
+    conf: &AppConfig,
+) -> Result<(LlmProvider, String, String), SomaError> {
     match provider {
         "openai" => {
             let key = conf.app.openai_api_key.as_deref().unwrap_or("");
-            let model = conf.app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .openai_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "deepseek" => {
             let key = conf.app.deepseek_api_key.as_deref().unwrap_or("");
-            let model = conf.app.deepseek_model_name.as_deref().unwrap_or("deepseek-chat");
+            let model = conf
+                .app
+                .deepseek_model_name
+                .as_deref()
+                .unwrap_or("deepseek-chat");
             Ok((LlmProvider::DeepSeek, key.to_string(), model.to_string()))
         }
         "qwen" => {
@@ -684,7 +804,11 @@ fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider,
         }
         "moonshot" | "kimi" => {
             let key = conf.app.moonshot_api_key.as_deref().unwrap_or("");
-            let model = conf.app.moonshot_model_name.as_deref().unwrap_or("moonshot-v1-8k");
+            let model = conf
+                .app
+                .moonshot_model_name
+                .as_deref()
+                .unwrap_or("moonshot-v1-8k");
             Ok((LlmProvider::Kimi, key.to_string(), model.to_string()))
         }
         "ollama" => {
@@ -694,7 +818,11 @@ fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider,
         }
         "minimax" => {
             let key = conf.app.minimax_api_key.as_deref().unwrap_or("");
-            let model = conf.app.minimax_model_name.as_deref().unwrap_or("abab6.5s-chat");
+            let model = conf
+                .app
+                .minimax_model_name
+                .as_deref()
+                .unwrap_or("abab6.5s-chat");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "mimo" => {
@@ -705,7 +833,11 @@ fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider,
         "gemini" => {
             // Gemini 通过 OpenAI 兼容接口调用
             let key = conf.app.gemini_api_key.as_deref().unwrap_or("");
-            let model = conf.app.gemini_model_name.as_deref().unwrap_or("gemini-2.0-flash");
+            let model = conf
+                .app
+                .gemini_model_name
+                .as_deref()
+                .unwrap_or("gemini-2.0-flash");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "azure" => {
@@ -715,7 +847,11 @@ fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider,
         }
         "groq" => {
             let key = conf.app.groq_api_key.as_deref().unwrap_or("");
-            let model = conf.app.groq_model_name.as_deref().unwrap_or("llama-3.1-8b-instant");
+            let model = conf
+                .app
+                .groq_model_name
+                .as_deref()
+                .unwrap_or("llama-3.1-8b-instant");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "grok" => {
@@ -725,57 +861,101 @@ fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider,
         }
         "doubao" => {
             let key = conf.app.doubao_api_key.as_deref().unwrap_or("");
-            let model = conf.app.doubao_model_name.as_deref().unwrap_or("doubao-pro-32k");
+            let model = conf
+                .app
+                .doubao_model_name
+                .as_deref()
+                .unwrap_or("doubao-pro-32k");
             Ok((LlmProvider::Doubao, key.to_string(), model.to_string()))
         }
         "hunyuan" => {
             let key = conf.app.hunyuan_api_key.as_deref().unwrap_or("");
-            let model = conf.app.hunyuan_model_name.as_deref().unwrap_or("hunyuan-turbo");
+            let model = conf
+                .app
+                .hunyuan_model_name
+                .as_deref()
+                .unwrap_or("hunyuan-turbo");
             Ok((LlmProvider::Hunyuan, key.to_string(), model.to_string()))
         }
         "zhipu" => {
             let key = conf.app.zhipu_api_key.as_deref().unwrap_or("");
-            let model = conf.app.zhipu_model_name.as_deref().unwrap_or("glm-4-flash");
+            let model = conf
+                .app
+                .zhipu_model_name
+                .as_deref()
+                .unwrap_or("glm-4-flash");
             Ok((LlmProvider::Zhipu, key.to_string(), model.to_string()))
         }
         "wenxin" => {
             let key = conf.app.wenxin_api_key.as_deref().unwrap_or("");
-            let model = conf.app.wenxin_model_name.as_deref().unwrap_or("ernie-4.0-8k");
+            let model = conf
+                .app
+                .wenxin_model_name
+                .as_deref()
+                .unwrap_or("ernie-4.0-8k");
             Ok((LlmProvider::Wenxin, key.to_string(), model.to_string()))
         }
         "xunfei" => {
             let key = conf.app.xunfei_api_key.as_deref().unwrap_or("");
-            let model = conf.app.xunfei_model_name.as_deref().unwrap_or("generalv3.5");
+            let model = conf
+                .app
+                .xunfei_model_name
+                .as_deref()
+                .unwrap_or("generalv3.5");
             Ok((LlmProvider::Xunfei, key.to_string(), model.to_string()))
         }
         "oneapi" => {
             let key = conf.app.oneapi_api_key.as_deref().unwrap_or("");
-            let model = conf.app.oneapi_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .oneapi_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "aihubmix" => {
             let key = conf.app.aihubmix_api_key.as_deref().unwrap_or("");
-            let model = conf.app.aihubmix_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .aihubmix_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "evolink" => {
             let key = conf.app.evolink_api_key.as_deref().unwrap_or("");
-            let model = conf.app.evolink_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .evolink_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "aiml" | "aimlapi" => {
             let key = conf.app.aimlapi_api_key.as_deref().unwrap_or("");
-            let model = conf.app.aimlapi_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .aimlapi_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "modelscope" => {
             let key = conf.app.modelscope_api_key.as_deref().unwrap_or("");
-            let model = conf.app.modelscope_model_name.as_deref().unwrap_or("qwen-turbo");
+            let model = conf
+                .app
+                .modelscope_model_name
+                .as_deref()
+                .unwrap_or("qwen-turbo");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "pollinations" => {
             let key = conf.app.pollinations_api_key.as_deref().unwrap_or("");
-            let model = conf.app.pollinations_model_name.as_deref().unwrap_or("openai");
+            let model = conf
+                .app
+                .pollinations_model_name
+                .as_deref()
+                .unwrap_or("openai");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "g4f" => {
@@ -785,17 +965,29 @@ fn get_provider_config(provider: &str, conf: &AppConfig) -> Result<(LlmProvider,
         }
         "cloudflare" => {
             let key = conf.app.openai_api_key.as_deref().unwrap_or("");
-            let model = conf.app.openai_model_name.as_deref().unwrap_or("@cf/meta/llama-3-8b-instruct");
+            let model = conf
+                .app
+                .openai_model_name
+                .as_deref()
+                .unwrap_or("@cf/meta/llama-3-8b-instruct");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         "litellm" => {
             let key = conf.app.oneapi_api_key.as_deref().unwrap_or("");
-            let model = conf.app.litellm_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .litellm_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
         _ => {
             let key = conf.app.openai_api_key.as_deref().unwrap_or("");
-            let model = conf.app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini");
+            let model = conf
+                .app
+                .openai_model_name
+                .as_deref()
+                .unwrap_or("gpt-4o-mini");
             Ok((LlmProvider::ChatGPT, key.to_string(), model.to_string()))
         }
     }
@@ -844,7 +1036,8 @@ fn parse_terms_output(content: &str, amount: usize) -> Vec<String> {
 
     // 阶段1：直接 JSON 解析
     if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&stripped) {
-        let terms: Vec<String> = arr.iter()
+        let terms: Vec<String> = arr
+            .iter()
             .filter_map(|v| v.as_str().map(String::from))
             .filter(|t| !t.is_empty())
             .take(amount)
@@ -858,7 +1051,8 @@ fn parse_terms_output(content: &str, amount: usize) -> Vec<String> {
     if let Ok(re) = regex::Regex::new(r"\[.*\]") {
         if let Some(caps) = re.find(&stripped) {
             if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(caps.as_str()) {
-                let terms: Vec<String> = arr.iter()
+                let terms: Vec<String> = arr
+                    .iter()
                     .filter_map(|v| v.as_str().map(String::from))
                     .filter(|t| !t.is_empty())
                     .take(amount)

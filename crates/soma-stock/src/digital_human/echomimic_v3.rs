@@ -6,11 +6,11 @@
 //! 与 SadTalker 的区别：GPU 强制推理、8 步 Flash 快速生成、视频扩散模型、768×768 分辨率。
 //! 关键约束：create_task 必须同步执行（不可 tokio::spawn，因 block_on_async 创建临时 runtime）。
 
+use super::{DhVideoGenParams, DhVideoGenStatus, DigitalHumanProvider};
 use async_trait::async_trait;
 use soma_core::config::EchoMimicV3Config;
 use soma_core::error::SomaError;
 use soma_core::utils::validate_local_path;
-use super::{DigitalHumanProvider, DhVideoGenParams, DhVideoGenStatus};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -181,7 +181,11 @@ impl EchoMimicV3EnvChecker {
         let mut missing_files = Vec::new();
         for (file, is_file) in &required_files {
             let path = flash_dir.join(file);
-            let exists = if *is_file { path.is_file() } else { path.exists() };
+            let exists = if *is_file {
+                path.is_file()
+            } else {
+                path.exists()
+            };
             if !exists {
                 missing_files.push(file.to_string());
             }
@@ -226,7 +230,10 @@ impl EchoMimicV3EnvChecker {
                         if min_gb > 0 && total_gb < min_gb {
                             return Some(MissingItem {
                                 kind: MissingKind::GpuMemory,
-                                description: format!("GPU 显存不足: {}GB (配置要求 ≥{}GB)", total_gb, min_gb),
+                                description: format!(
+                                    "GPU 显存不足: {}GB (配置要求 ≥{}GB)",
+                                    total_gb, min_gb
+                                ),
                             });
                         }
                     }
@@ -262,7 +269,9 @@ impl EchoMimicV3EnvChecker {
                 }
                 let parts: Vec<&str> = version.split('.').collect();
                 if parts.len() >= 2 {
-                    if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                    if let (Ok(major), Ok(minor)) =
+                        (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+                    {
                         if major < 12 || (major == 12 && minor < 1) {
                             return Some(MissingItem {
                                 kind: MissingKind::Cuda,
@@ -372,15 +381,24 @@ impl EchoMimicV3Provider {
 
         let mut cmd = tokio::process::Command::new(&python);
         cmd.arg(&script)
-            .arg("--portrait").arg(&params.portrait_path)
-            .arg("--audio").arg(&params.audio_path)
-            .arg("--outfile").arg(output_path)
-            .arg("--model_dir").arg(model_path)
-            .arg("--device").arg(device)
-            .arg("--resolution").arg(resolution.to_string())
-            .arg("--infer_steps").arg(infer_steps.to_string())
-            .arg("--video_length").arg("0")
-            .arg("--config_path").arg(&config_path);
+            .arg("--portrait")
+            .arg(&params.portrait_path)
+            .arg("--audio")
+            .arg(&params.audio_path)
+            .arg("--outfile")
+            .arg(output_path)
+            .arg("--model_dir")
+            .arg(model_path)
+            .arg("--device")
+            .arg(device)
+            .arg("--resolution")
+            .arg(resolution.to_string())
+            .arg("--infer_steps")
+            .arg(infer_steps.to_string())
+            .arg("--video_length")
+            .arg("0")
+            .arg("--config_path")
+            .arg(&config_path);
 
         if !env_path.is_empty() {
             cmd.current_dir(env_path);
@@ -415,8 +433,9 @@ impl EchoMimicV3Provider {
                     )));
                 }
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                let json: serde_json::Value = serde_json::from_str(&stdout)
-                    .map_err(|e| SomaError::VideoGen(format!("解析推理输出失败: {} (stdout: {})", e, stdout)))?;
+                let json: serde_json::Value = serde_json::from_str(&stdout).map_err(|e| {
+                    SomaError::VideoGen(format!("解析推理输出失败: {} (stdout: {})", e, stdout))
+                })?;
 
                 let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if status == "success" {
@@ -426,19 +445,31 @@ impl EchoMimicV3Provider {
                         .unwrap_or(output_path);
                     if !PathBuf::from(video_path).exists() {
                         return Err(SomaError::VideoGen(format!(
-                            "推理输出文件不存在: {}", video_path
+                            "推理输出文件不存在: {}",
+                            video_path
                         )));
                     }
-                    log!("EchoMimicV3 推理成功: task_id={}, video={}", task_id, video_path);
+                    log!(
+                        "EchoMimicV3 推理成功: task_id={}, video={}",
+                        task_id,
+                        video_path
+                    );
                     Ok(video_path.to_string())
                 } else {
-                    let error = json.get("error").and_then(|v| v.as_str()).unwrap_or("未知错误");
-                    Err(SomaError::VideoGen(format!("EchoMimicV3 推理失败: {}", error)))
+                    let error = json
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("未知错误");
+                    Err(SomaError::VideoGen(format!(
+                        "EchoMimicV3 推理失败: {}",
+                        error
+                    )))
                 }
             }
             Ok(Err(e)) => Err(SomaError::VideoGen(format!("等待子进程失败: {}", e))),
             Err(_) => Err(SomaError::VideoGen(format!(
-                "EchoMimicV3 推理超时（{}秒）", self.config.get_timeout()
+                "EchoMimicV3 推理超时（{}秒）",
+                self.config.get_timeout()
             ))),
         }
     }
@@ -477,8 +508,7 @@ impl DigitalHumanProvider for EchoMimicV3Provider {
         let task_id = soma_core::utils::get_uuid();
         self.insert_task(&task_id).await;
 
-        let temp_dir = soma_core::utils::storage_dir("tasks", true)
-            .join(&task_id);
+        let temp_dir = soma_core::utils::storage_dir("tasks", true).join(&task_id);
         let _ = tokio::fs::create_dir_all(&temp_dir).await;
         let output_path = temp_dir.join("portrait_video.mp4");
         let output_str = output_path.to_string_lossy().to_string();
@@ -487,15 +517,24 @@ impl DigitalHumanProvider for EchoMimicV3Provider {
         let mut last_error = String::new();
 
         for attempt in 1..=max_retries {
-            log!("EchoMimicV3 推理尝试 {}/{}: task_id={}", attempt, max_retries, task_id);
+            log!(
+                "EchoMimicV3 推理尝试 {}/{}: task_id={}",
+                attempt,
+                max_retries,
+                task_id
+            );
 
             let result = self
-                .run_inference(&task_id, &DhVideoGenParams {
-                    portrait_path: params.portrait_path.clone(),
-                    audio_path: params.audio_path.clone(),
-                    aspect_ratio: "auto".to_string(),
-                    model: None,
-                }, &output_str)
+                .run_inference(
+                    &task_id,
+                    &DhVideoGenParams {
+                        portrait_path: params.portrait_path.clone(),
+                        audio_path: params.audio_path.clone(),
+                        aspect_ratio: "auto".to_string(),
+                        model: None,
+                    },
+                    &output_str,
+                )
                 .await;
 
             match result {
@@ -506,13 +545,22 @@ impl DigitalHumanProvider for EchoMimicV3Provider {
                 }
                 Err(e) => {
                     last_error = format!("{:?}", e);
-                    log!("EchoMimicV3 推理失败 (尝试 {}): task_id={}, error={}", attempt, task_id, last_error);
+                    log!(
+                        "EchoMimicV3 推理失败 (尝试 {}): task_id={}, error={}",
+                        attempt,
+                        task_id,
+                        last_error
+                    );
                 }
             }
         }
 
         self.update_task_failed(&task_id, &last_error).await;
-        log!("EchoMimicV3 任务最终失败: task_id={}, error={}", task_id, last_error);
+        log!(
+            "EchoMimicV3 任务最终失败: task_id={}, error={}",
+            task_id,
+            last_error
+        );
 
         Ok(task_id)
     }
@@ -526,7 +574,10 @@ impl DigitalHumanProvider for EchoMimicV3Provider {
                     video_url: state.video_path.clone().unwrap_or_default(),
                 }),
                 EchoMimicV3RunStatus::Failed => Ok(DhVideoGenStatus::Failed {
-                    message: state.error.clone().unwrap_or_else(|| "未知错误".to_string()),
+                    message: state
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "未知错误".to_string()),
                 }),
             },
             None => Err(SomaError::VideoGen(format!("任务不存在: {}", task_id))),
@@ -659,9 +710,7 @@ impl EchoMimicV3ModelDownloader {
 
         let model_path = self.config.get_model_path();
         if model_path.is_empty() {
-            return Err(SomaError::Config(
-                "模型权重目录未配置 (model_path)".into(),
-            ));
+            return Err(SomaError::Config("模型权重目录未配置 (model_path)".into()));
         }
 
         {
@@ -683,9 +732,12 @@ impl EchoMimicV3ModelDownloader {
 
         let mut cmd = tokio::process::Command::new(&python);
         cmd.arg(&downloader_script)
-            .arg("--model_source").arg(source)
-            .arg("--target_dir").arg(model_path)
-            .arg("--repo_id").arg("BadToBest/EchoMimicV3");
+            .arg("--model_source")
+            .arg(source)
+            .arg("--target_dir")
+            .arg(model_path)
+            .arg("--repo_id")
+            .arg("BadToBest/EchoMimicV3");
 
         if !env_path.is_empty() {
             cmd.current_dir(env_path);
@@ -763,7 +815,9 @@ impl EchoMimicV3ModelDownloader {
                 let mut progress = self.progress.lock().await;
                 progress.status = DownloadStatus::Failed;
                 progress.error = Some("下载超时".into());
-                Err(SomaError::VideoGen("EchoMimicV3 模型下载超时（300秒）".into()))
+                Err(SomaError::VideoGen(
+                    "EchoMimicV3 模型下载超时（300秒）".into(),
+                ))
             }
         }
     }
@@ -829,7 +883,9 @@ mod tests {
         let config = EchoMimicV3Config::default();
         let provider = EchoMimicV3Provider::new(config);
         provider.insert_task("test-task-2").await;
-        provider.update_task_success("test-task-2", "/tmp/video.mp4").await;
+        provider
+            .update_task_success("test-task-2", "/tmp/video.mp4")
+            .await;
         let result = provider.query_task("test-task-2").await;
         assert!(result.is_ok());
         match result.unwrap() {
@@ -863,7 +919,10 @@ mod tests {
         let report = checker.check();
         assert!(!report.ready);
         assert!(!report.missing.is_empty());
-        let has_env_issue = report.missing.iter().any(|m| m.description.contains("env_path"));
+        let has_env_issue = report
+            .missing
+            .iter()
+            .any(|m| m.description.contains("env_path"));
         assert!(has_env_issue);
     }
 
@@ -877,7 +936,10 @@ mod tests {
         let checker = EchoMimicV3EnvChecker::new(config);
         let report = checker.check();
         assert!(!report.ready);
-        let has_model_issue = report.missing.iter().any(|m| m.description.contains("模型权重"));
+        let has_model_issue = report
+            .missing
+            .iter()
+            .any(|m| m.description.contains("模型权重"));
         assert!(has_model_issue);
     }
 

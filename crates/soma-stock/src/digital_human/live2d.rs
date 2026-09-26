@@ -7,11 +7,11 @@
 //! 关键约束：create_task 必须同步执行（不可 tokio::spawn，因 block_on_async 创建临时 runtime）。
 //! Live2D 路径下 DhVideoGenParams.portrait_path 复用为模型目录路径。
 
+use super::{DhVideoGenParams, DhVideoGenStatus, DigitalHumanProvider};
 use async_trait::async_trait;
 use soma_core::config::Live2DConfig;
 use soma_core::error::SomaError;
 use soma_core::utils::validate_local_path;
-use super::{DigitalHumanProvider, DhVideoGenParams, DhVideoGenStatus};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -100,9 +100,7 @@ impl Live2DEnvChecker {
 
     fn check_python_callable(&self) -> Option<Live2DMissingItem> {
         let python = self.config.get_python_path();
-        let output = std::process::Command::new(python)
-            .arg("--version")
-            .output();
+        let output = std::process::Command::new(python).arg("--version").output();
         match output {
             Ok(o) if o.status.success() => {
                 let version = String::from_utf8_lossy(&o.stdout).to_string();
@@ -278,13 +276,20 @@ impl Live2DProvider {
 
         let mut cmd = tokio::process::Command::new(python);
         cmd.arg(script)
-            .arg("--audio").arg(&params.audio_path)
-            .arg("--model_dir").arg(&params.portrait_path)
-            .arg("--outfile").arg(output_path)
-            .arg("--fps").arg(fps.to_string())
-            .arg("--width").arg(width.to_string())
-            .arg("--height").arg(height.to_string())
-            .arg("--render_threads").arg(render_threads.to_string());
+            .arg("--audio")
+            .arg(&params.audio_path)
+            .arg("--model_dir")
+            .arg(&params.portrait_path)
+            .arg("--outfile")
+            .arg(output_path)
+            .arg("--fps")
+            .arg(fps.to_string())
+            .arg("--width")
+            .arg(width.to_string())
+            .arg("--height")
+            .arg(height.to_string())
+            .arg("--render_threads")
+            .arg(render_threads.to_string());
 
         cmd.stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
@@ -309,10 +314,9 @@ impl Live2DProvider {
                     )));
                 }
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                let json: serde_json::Value = serde_json::from_str(&stdout)
-                    .map_err(|e| SomaError::VideoGen(format!(
-                        "解析渲染输出失败: {} (stdout: {})", e, stdout
-                    )))?;
+                let json: serde_json::Value = serde_json::from_str(&stdout).map_err(|e| {
+                    SomaError::VideoGen(format!("解析渲染输出失败: {} (stdout: {})", e, stdout))
+                })?;
 
                 let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if status == "success" {
@@ -322,7 +326,8 @@ impl Live2DProvider {
                         .unwrap_or(output_path);
                     if !PathBuf::from(video_path).exists() {
                         return Err(SomaError::VideoGen(format!(
-                            "渲染输出文件不存在: {}", video_path
+                            "渲染输出文件不存在: {}",
+                            video_path
                         )));
                     }
                     log::info!("Live2D 渲染成功: task_id={}, video={}", task_id, video_path);
@@ -337,7 +342,8 @@ impl Live2DProvider {
             }
             Ok(Err(e)) => Err(SomaError::VideoGen(format!("等待子进程失败: {}", e))),
             Err(_) => Err(SomaError::VideoGen(format!(
-                "Live2D 渲染超时（{}秒）", self.config.get_timeout()
+                "Live2D 渲染超时（{}秒）",
+                self.config.get_timeout()
             ))),
         }
     }
@@ -376,8 +382,7 @@ impl DigitalHumanProvider for Live2DProvider {
         let task_id = soma_core::utils::get_uuid();
         self.insert_task(&task_id).await;
 
-        let temp_dir = soma_core::utils::storage_dir("tasks", true)
-            .join(&task_id);
+        let temp_dir = soma_core::utils::storage_dir("tasks", true).join(&task_id);
         let _ = tokio::fs::create_dir_all(&temp_dir).await;
         let output_path = temp_dir.join("portrait_video.mp4");
         let output_str = output_path.to_string_lossy().to_string();
@@ -388,12 +393,12 @@ impl DigitalHumanProvider for Live2DProvider {
         for attempt in 1..=max_retries {
             log::info!(
                 "Live2D 渲染尝试 {}/{}: task_id={}",
-                attempt, max_retries, task_id
+                attempt,
+                max_retries,
+                task_id
             );
 
-            let result = self
-                .run_render(&task_id, params, &output_str)
-                .await;
+            let result = self.run_render(&task_id, params, &output_str).await;
 
             match result {
                 Ok(video_path) => {
@@ -405,7 +410,9 @@ impl DigitalHumanProvider for Live2DProvider {
                     last_error = format!("{:?}", e);
                     log::warn!(
                         "Live2D 渲染失败 (尝试 {}): task_id={}, error={}",
-                        attempt, task_id, last_error
+                        attempt,
+                        task_id,
+                        last_error
                     );
                     if attempt < max_retries {
                         let backoff = 1u64 << (attempt - 1);
@@ -418,7 +425,8 @@ impl DigitalHumanProvider for Live2DProvider {
         self.update_task_failed(&task_id, &last_error).await;
         log::error!(
             "Live2D 任务最终失败: task_id={}, error={}",
-            task_id, last_error
+            task_id,
+            last_error
         );
 
         Ok(task_id)
@@ -433,7 +441,10 @@ impl DigitalHumanProvider for Live2DProvider {
                     video_url: state.video_path.clone().unwrap_or_default(),
                 }),
                 Live2DRunStatus::Failed => Ok(DhVideoGenStatus::Failed {
-                    message: state.error.clone().unwrap_or_else(|| "未知错误".to_string()),
+                    message: state
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "未知错误".to_string()),
                 }),
             },
             None => Ok(DhVideoGenStatus::Failed {
@@ -448,16 +459,12 @@ impl DigitalHumanProvider for Live2DProvider {
 
         let dest = PathBuf::from(save_path);
         if let Some(parent) = dest.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| SomaError::Io(std::io::Error::other(
-                    format!("创建目录失败: {}", e),
-                )))?;
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                SomaError::Io(std::io::Error::other(format!("创建目录失败: {}", e)))
+            })?;
         }
 
-        tokio::fs::copy(&src, &dest)
-            .await
-            .map_err(SomaError::Io)?;
+        tokio::fs::copy(&src, &dest).await.map_err(SomaError::Io)?;
 
         log::info!("Live2D 视频已拷贝: {} -> {}", src.display(), save_path);
         Ok(save_path.to_string())
@@ -517,7 +524,9 @@ mod tests {
         let config = Live2DConfig::default();
         let provider = Live2DProvider::new(config);
         provider.insert_task("test-task-2").await;
-        provider.update_task_success("test-task-2", "/tmp/video.mp4").await;
+        provider
+            .update_task_success("test-task-2", "/tmp/video.mp4")
+            .await;
         let result = provider.query_task("test-task-2").await;
         assert!(result.is_ok());
         match result.unwrap() {

@@ -3,11 +3,11 @@
 //! 定义应用所有配置项的结构体，支持从 TOML 文件加载配置，
 //! 并提供各配置项的带默认值访问方法。
 
+use crate::error::SomaError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use crate::error::SomaError;
 
 /// 应用总配置，对应 TOML 配置文件的顶层结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -485,7 +485,9 @@ pub struct Live2DConfig {
 impl Live2DConfig {
     /// 获取 Live2D 模型存放目录（缺省 `storage/live2d_models`）
     pub fn get_models_dir(&self) -> &str {
-        self.models_dir.as_deref().unwrap_or("./storage/live2d_models")
+        self.models_dir
+            .as_deref()
+            .unwrap_or("./storage/live2d_models")
     }
     /// 获取 Live2D 渲染所用 Python 解释器路径
     pub fn get_python_path(&self) -> &str {
@@ -493,7 +495,9 @@ impl Live2DConfig {
     }
     /// 获取 Live2D 渲染脚本路径
     pub fn get_script_path(&self) -> &str {
-        self.script_path.as_deref().unwrap_or("resource/live2d_runner.py")
+        self.script_path
+            .as_deref()
+            .unwrap_or("resource/live2d_runner.py")
     }
     /// 获取 Live2D 渲染帧率（FPS）
     pub fn get_fps(&self) -> u32 {
@@ -522,7 +526,9 @@ impl Live2DConfig {
     /// 获取 Live2D 渲染线程数
     pub fn get_render_threads(&self) -> u32 {
         let requested = self.render_threads.unwrap_or(1);
-        let max = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
+        let max = std::thread::available_parallelism()
+            .map(|n| n.get() as u32)
+            .unwrap_or(1);
         requested.clamp(1, max)
     }
     /// 获取是否启用渲染前环境预检
@@ -566,11 +572,15 @@ pub struct HeyGemConfig {
 impl HeyGemConfig {
     /// 获取 HeyGem TTS 服务地址
     pub fn get_tts_base_url(&self) -> &str {
-        self.tts_base_url.as_deref().unwrap_or("http://127.0.0.1:18180")
+        self.tts_base_url
+            .as_deref()
+            .unwrap_or("http://127.0.0.1:18180")
     }
     /// 获取 HeyGem 视频合成服务地址
     pub fn get_video_base_url(&self) -> &str {
-        self.video_base_url.as_deref().unwrap_or("http://127.0.0.1:8383")
+        self.video_base_url
+            .as_deref()
+            .unwrap_or("http://127.0.0.1:8383")
     }
     /// 获取 Live2D 渲染超时（秒）
     pub fn get_timeout(&self) -> u64 {
@@ -602,7 +612,9 @@ impl HeyGemConfig {
     }
     /// 获取 HeyGem 商户资产目录（静默视频/参考音频）
     pub fn get_assets_dir(&self) -> &str {
-        self.assets_dir.as_deref().unwrap_or("./storage/heygem_assets")
+        self.assets_dir
+            .as_deref()
+            .unwrap_or("./storage/heygem_assets")
     }
     /// 获取合成产物是否自动覆盖同名文件
     pub fn get_auto_overwrite(&self) -> bool {
@@ -658,7 +670,9 @@ impl SadTalkerConfig {
 
     /// 获取 Python 解释器路径，默认 "python3"
     pub fn get_python_path(&self) -> String {
-        self.python_path.clone().unwrap_or_else(|| "python3".to_string())
+        self.python_path
+            .clone()
+            .unwrap_or_else(|| "python3".to_string())
     }
 
     /// 获取封装脚本路径，默认 "{env_path}/sadtalker_runner.py"
@@ -775,7 +789,9 @@ impl EchoMimicV3Config {
 
     /// 获取 Python 解释器路径，默认 "python3"
     pub fn get_python_path(&self) -> String {
-        self.python_path.clone().unwrap_or_else(|| "python3".to_string())
+        self.python_path
+            .clone()
+            .unwrap_or_else(|| "python3".to_string())
     }
 
     /// 获取推理封装脚本路径，默认 "{env_path}/echomimic_v3_runner.py"
@@ -922,7 +938,9 @@ impl VoiceCloneConfig {
 
     /// 获取远程 Python 解释器路径，默认 "python3"
     pub fn get_remote_python_path(&self) -> String {
-        self.remote_python_path.clone().unwrap_or_else(|| "python3".to_string())
+        self.remote_python_path
+            .clone()
+            .unwrap_or_else(|| "python3".to_string())
     }
 
     /// 获取远程推理封装脚本路径，默认 "{remote_env_path}/voice_clone_runner.py"
@@ -1210,8 +1228,14 @@ mod tests {
             env_path: Some("/opt/EchoMimicV3".to_string()),
             ..Default::default()
         };
-        assert_eq!(config.get_script_path(), "/opt/EchoMimicV3/echomimic_v3_runner.py");
-        assert_eq!(config.get_config_path(), "/opt/EchoMimicV3/config/prompts/flash.yaml");
+        assert_eq!(
+            config.get_script_path(),
+            "/opt/EchoMimicV3/echomimic_v3_runner.py"
+        );
+        assert_eq!(
+            config.get_config_path(),
+            "/opt/EchoMimicV3/config/prompts/flash.yaml"
+        );
     }
 
     #[test]

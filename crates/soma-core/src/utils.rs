@@ -3,9 +3,9 @@
 //! 提供路径处理、字符串分割、SRT 字幕生成、文件名清理等通用工具函数，
 //! 供视频生成流水线的各个环节调用。
 
-use std::path::{Path, PathBuf};
 use crate::error::SomaError;
 use crate::models::PUNCTUATIONS;
+use std::path::{Path, PathBuf};
 
 /// 生成 UUID v4 字符串，用于任务 ID 等唯一标识
 pub fn get_uuid() -> String {
@@ -32,7 +32,11 @@ pub fn root_dir() -> PathBuf {
 /// - `create`: 是否在目录不存在时自动创建
 pub fn storage_dir(sub_dir: &str, create: bool) -> PathBuf {
     let d = root_dir().join("storage");
-    let d = if sub_dir.is_empty() { d } else { d.join(sub_dir) };
+    let d = if sub_dir.is_empty() {
+        d
+    } else {
+        d.join(sub_dir)
+    };
     if create && !d.exists() {
         let _ = std::fs::create_dir_all(&d);
     }
@@ -58,7 +62,11 @@ pub fn tasks_dir() -> PathBuf {
 /// 与 storage_dir 不同，resource 目录不会自动创建
 pub fn resource_dir(sub_dir: &str) -> PathBuf {
     let d = root_dir().join("resource");
-    if sub_dir.is_empty() { d } else { d.join(sub_dir) }
+    if sub_dir.is_empty() {
+        d
+    } else {
+        d.join(sub_dir)
+    }
 }
 
 /// 获取字体资源目录（resource/fonts/）
@@ -91,7 +99,10 @@ pub fn local_videos_dir() -> PathBuf {
 ///
 /// # 返回
 /// 解析成功返回规范化的绝对路径字符串，否则返回 `SomaError::UnsafePath`
-pub fn resolve_path_within_directory(base_dir: &str, unsafe_path: &str) -> Result<String, SomaError> {
+pub fn resolve_path_within_directory(
+    base_dir: &str,
+    unsafe_path: &str,
+) -> Result<String, SomaError> {
     if unsafe_path.is_empty() {
         return Err(SomaError::UnsafePath("empty path is not allowed".into()));
     }
@@ -109,7 +120,9 @@ pub fn resolve_path_within_directory(base_dir: &str, unsafe_path: &str) -> Resul
     let resolved_str = resolved.to_string_lossy();
     // 安全检查：解析后的路径必须以基础目录为前缀
     if !resolved_str.starts_with(base_str.as_ref()) {
-        return Err(SomaError::UnsafePath("path is outside the allowed directory".into()));
+        return Err(SomaError::UnsafePath(
+            "path is outside the allowed directory".into(),
+        ));
     }
     if !resolved.exists() {
         return Err(SomaError::UnsafePath("file does not exist".into()));
@@ -244,7 +257,13 @@ pub fn text_to_srt(idx: u32, msg: &str, start_time: f64, end_time: f64) -> Strin
 /// 仅保留文件名的最后一段（去除目录前缀），
 /// 拒绝空文件名、`.` 和 `..` 等特殊路径。
 pub fn sanitize_upload_filename(filename: &str) -> Result<String, SomaError> {
-    let normalized = filename.replace('\\', "/").split('/').next_back().unwrap_or("").trim().to_string();
+    let normalized = filename
+        .replace('\\', "/")
+        .split('/')
+        .next_back()
+        .unwrap_or("")
+        .trim()
+        .to_string();
     if normalized.is_empty() || normalized == "." || normalized == ".." {
         return Err(SomaError::Config("invalid filename".into()));
     }
@@ -267,7 +286,10 @@ pub fn validate_merchant_id(merchant_id: &str) -> Result<(), SomaError> {
             "商户标识格式非法，仅允许字母、数字、下划线，长度 ≤ 64".into(),
         ));
     }
-    if !merchant_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+    if !merchant_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
         return Err(SomaError::Config(
             "商户标识格式非法，仅允许字母、数字、下划线，长度 ≤ 64".into(),
         ));
@@ -290,7 +312,11 @@ pub fn validate_live2d_model_id(model_id: &str) -> Result<(), SomaError> {
 /// - `status`: 状态码（如 200 表示成功，-1 表示失败）
 /// - `data`: 可选的数据载荷
 /// - `message`: 可选的消息文本
-pub fn get_response(status: i32, data: Option<serde_json::Value>, message: &str) -> serde_json::Value {
+pub fn get_response(
+    status: i32,
+    data: Option<serde_json::Value>,
+    message: &str,
+) -> serde_json::Value {
     let mut obj = serde_json::json!({ "status": status });
     if let Some(d) = data {
         obj["data"] = d;

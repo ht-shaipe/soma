@@ -3,8 +3,8 @@
 /// 负责加载配置、初始化日志、创建存储目录、初始化任务队列，
 /// 并启动 Actix Web HTTP 服务，挂载 CORS 中间件、静态文件服务和 API 路由。
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
 use actix_files as afs;
+use actix_web::{middleware, web, App, HttpServer};
 use clap::Parser;
 
 /// 默认配置文件路径（相对于工作目录）
@@ -36,7 +36,8 @@ async fn main() -> std::io::Result<()> {
     let args = Args::parse();
 
     // 获取配置文件绝对路径，未指定则使用默认路径
-    let conf_path = tube_web::utils::get_abs_path(&args.config.unwrap_or(DEF_CONFIG_PATH.to_owned()));
+    let conf_path =
+        tube_web::utils::get_abs_path(&args.config.unwrap_or(DEF_CONFIG_PATH.to_owned()));
 
     // 加载配置，加载失败时打印错误并使用默认配置
     let conf = match soma_server::Config::load(&conf_path) {
@@ -83,7 +84,11 @@ async fn main() -> std::io::Result<()> {
     soma_server::state::init_sqlite_store(&db_path);
 
     // 构建监听地址
-    let ip = format!("{}:{}", conf.app.get_listen_host(), conf.app.get_listen_port());
+    let ip = format!(
+        "{}:{}",
+        conf.app.get_listen_host(),
+        conf.app.get_listen_port()
+    );
     log::info!("Soma server starting at {}", ip);
 
     // 启动 HTTP 服务，使用闭包构建 App 实例
@@ -142,13 +147,12 @@ async fn main() -> std::io::Result<()> {
                     )
                     // API 路由：所有 /api/v1/* 请求统一由 router::api_handler 分发
                     .service(
-                        web::resource("/{cls}")
-                            .route(web::to(soma_server::router::api_handler)),
+                        web::resource("/{cls}").route(web::to(soma_server::router::api_handler)),
                     )
                     .service(
                         web::resource("/{cls}/{tail:.*}")
                             .route(web::to(soma_server::router::api_handler)),
-                    )
+                    ),
             )
     })
     .bind(ip)?

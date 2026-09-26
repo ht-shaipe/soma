@@ -4,10 +4,10 @@
 //! 使用 generateContent 接口，response_modalities=["AUDIO"]，
 //! 返回 Linear PCM（24kHz, 16bit, mono）音频数据。
 
-use async_trait::async_trait;
-use soma_core::error::SomaError;
 use crate::edge_tts::{generate_subtitle_cues_from_text, get_audio_duration};
 use crate::provider::{SomaTtsProvider, TtsResult};
+use async_trait::async_trait;
+use soma_core::error::SomaError;
 use std::path::Path;
 
 pub struct GeminiTts {
@@ -20,8 +20,16 @@ impl GeminiTts {
     pub fn new(api_key: &str, base_url: &str, model_name: &str) -> Self {
         Self {
             api_key: api_key.to_string(),
-            base_url: if base_url.is_empty() { "https://generativelanguage.googleapis.com".into() } else { base_url.into() },
-            model_name: if model_name.is_empty() { "gemini-2.5-flash-preview-tts".into() } else { model_name.into() },
+            base_url: if base_url.is_empty() {
+                "https://generativelanguage.googleapis.com".into()
+            } else {
+                base_url.into()
+            },
+            model_name: if model_name.is_empty() {
+                "gemini-2.5-flash-preview-tts".into()
+            } else {
+                model_name.into()
+            },
         }
     }
 }
@@ -39,8 +47,8 @@ impl SomaTtsProvider for GeminiTts {
             return Err(SomaError::Tts("Gemini API key not set".into()));
         }
 
-        let voice_name = crate::voices::extract_gemini_voice(voice)
-            .unwrap_or_else(|| voice.to_string());
+        let voice_name =
+            crate::voices::extract_gemini_voice(voice).unwrap_or_else(|| voice.to_string());
 
         let url = format!(
             "{}/v1beta/models/{}:generateContent?key={}",
@@ -74,10 +82,15 @@ impl SomaTtsProvider for GeminiTts {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(SomaError::Tts(format!("Gemini TTS failed: {} - {}", status, body)));
+            return Err(SomaError::Tts(format!(
+                "Gemini TTS failed: {} - {}",
+                status, body
+            )));
         }
 
-        let resp_json: serde_json::Value = resp.json().await
+        let resp_json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| SomaError::Tts(format!("Gemini TTS parse response failed: {}", e)))?;
 
         let audio_b64 = resp_json
@@ -130,12 +143,18 @@ fn convert_pcm_to_mp3(pcm_path: &str, mp3_path: &str, sample_rate: u32) -> Resul
     let result = std::process::Command::new("ffmpeg")
         .args([
             "-y",
-            "-f", "s16le",
-            "-ar", &sample_rate.to_string(),
-            "-ac", "1",
-            "-i", pcm_path,
-            "-c:a", "libmp3lame",
-            "-q:a", "4",
+            "-f",
+            "s16le",
+            "-ar",
+            &sample_rate.to_string(),
+            "-ac",
+            "1",
+            "-i",
+            pcm_path,
+            "-c:a",
+            "libmp3lame",
+            "-q:a",
+            "4",
             mp3_path,
         ])
         .output()

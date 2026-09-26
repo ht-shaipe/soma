@@ -1,3 +1,4 @@
+use crate::ffmpeg::Ffmpeg;
 /// 视频合成编排模块
 ///
 /// 提供 [`VideoComposer`] 结构体，负责视频合成的高层编排逻辑：
@@ -6,7 +7,6 @@
 /// - 根据配置获取背景音乐文件
 use soma_core::error::SomaError;
 use soma_core::models::VideoAspect;
-use crate::ffmpeg::Ffmpeg;
 
 /// 视频合成编排器
 ///
@@ -58,7 +58,9 @@ impl VideoComposer {
         let (target_w, target_h) = video_aspect.to_resolution();
         let required_duration = audio_duration + 0.1;
 
-        let output_dir = std::path::Path::new(output_path).parent().unwrap_or(std::path::Path::new("."));
+        let output_dir = std::path::Path::new(output_path)
+            .parent()
+            .unwrap_or(std::path::Path::new("."));
         std::fs::create_dir_all(output_dir).map_err(SomaError::Io)?;
 
         let mut segments: Vec<(String, f64)> = Vec::new();
@@ -67,17 +69,32 @@ impl VideoComposer {
             if accumulated >= required_duration {
                 break;
             }
-            let clip_dur = self.ffmpeg.get_video_duration(video_path).unwrap_or(max_clip_duration as f64);
+            let clip_dur = self
+                .ffmpeg
+                .get_video_duration(video_path)
+                .unwrap_or(max_clip_duration as f64);
             let mut start: f64 = 0.0;
             let mut seg_idx: usize = 0;
             while start < clip_dur && accumulated < required_duration {
                 let remaining = required_duration - accumulated;
-                let seg_dur = (max_clip_duration as f64).min(clip_dur - start).min(remaining);
+                let seg_dur = (max_clip_duration as f64)
+                    .min(clip_dur - start)
+                    .min(remaining);
                 if seg_dur <= 0.0 {
                     break;
                 }
-                let clip_output = output_dir.join(format!("temp-seg-{}-{}.mp4", i, seg_idx)).to_string_lossy().to_string();
-                self.ffmpeg.clip_and_resize(video_path, &clip_output, target_w, target_h, start, seg_dur)?;
+                let clip_output = output_dir
+                    .join(format!("temp-seg-{}-{}.mp4", i, seg_idx))
+                    .to_string_lossy()
+                    .to_string();
+                self.ffmpeg.clip_and_resize(
+                    video_path,
+                    &clip_output,
+                    target_w,
+                    target_h,
+                    start,
+                    seg_dur,
+                )?;
                 segments.push((clip_output, seg_dur));
                 start += seg_dur;
                 accumulated += seg_dur;
@@ -106,7 +123,10 @@ impl VideoComposer {
         if transition_mode != "none" && !transition_mode.is_empty() {
             let mut transitioned = Vec::new();
             for (seg_i, (ref seg_path, seg_dur)) in segments.iter().enumerate() {
-                let trans_output = output_dir.join(format!("temp-trans-{}.mp4", seg_i)).to_string_lossy().to_string();
+                let trans_output = output_dir
+                    .join(format!("temp-trans-{}.mp4", seg_i))
+                    .to_string_lossy()
+                    .to_string();
                 let effective_transition = if transition_mode == "Shuffle" {
                     if seg_i == 0 {
                         "FadeIn".to_string()
@@ -118,7 +138,10 @@ impl VideoComposer {
                         let idx = rand::rng().random_range(0..trans.len());
                         trans[idx].to_string()
                     }
-                } else if transition_mode == "FadeIn" || transition_mode == "FadeOut" || transition_mode == "Dissolve" {
+                } else if transition_mode == "FadeIn"
+                    || transition_mode == "FadeOut"
+                    || transition_mode == "Dissolve"
+                {
                     if seg_i == 0 {
                         "FadeIn".to_string()
                     } else if seg_i == segments.len() - 1 {
@@ -129,7 +152,15 @@ impl VideoComposer {
                 } else {
                     transition_mode.to_string()
                 };
-                crate::effects::apply_transition(seg_path, &trans_output, &effective_transition, transition_duration, ffmpeg_path, "left", codec)?;
+                crate::effects::apply_transition(
+                    seg_path,
+                    &trans_output,
+                    &effective_transition,
+                    transition_duration,
+                    ffmpeg_path,
+                    "left",
+                    codec,
+                )?;
                 transitioned.push((trans_output, *seg_dur));
             }
             // 清理原始片段
@@ -187,7 +218,13 @@ impl VideoComposer {
         output_path: &str,
         params: &soma_core::models::VideoParams,
     ) -> Result<(), SomaError> {
-        self.ffmpeg.generate_video(combined_path, audio_path, subtitle_path, output_path, params)
+        self.ffmpeg.generate_video(
+            combined_path,
+            audio_path,
+            subtitle_path,
+            output_path,
+            params,
+        )
     }
 
     /// 获取背景音乐文件路径

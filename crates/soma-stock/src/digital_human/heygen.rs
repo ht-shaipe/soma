@@ -5,9 +5,9 @@
 //!
 //! HeyGen API 文档：https://developers.heygen.com/audio-to-video
 
+use super::{DhVideoGenParams, DhVideoGenStatus, DigitalHumanProvider};
 use async_trait::async_trait;
 use soma_core::error::SomaError;
-use super::{DigitalHumanProvider, DhVideoGenParams, DhVideoGenStatus};
 
 /// 从 HeyGen 查询响应文本解析任务状态
 ///
@@ -21,10 +21,7 @@ fn parse_status_from_response(resp_text: &str) -> Result<DhVideoGenStatus, SomaE
         .get("data")
         .ok_or_else(|| SomaError::VideoGen(format!("HeyGen 响应缺少 data: {}", resp_text)))?;
 
-    let status_str = data
-        .get("status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let status_str = data.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
     match status_str {
         "completed" | "success" => {
@@ -254,7 +251,6 @@ impl DigitalHumanProvider for HeyGenProvider {
 mod tests {
     use super::*;
 
-
     /// 测试构造函数去除 base_url 末尾斜杠
     #[test]
     fn test_new_trims_trailing_slash() {
@@ -264,7 +260,6 @@ mod tests {
         let provider2 = HeyGenProvider::new("key", "https://api.heygen.com///", "model");
         assert_eq!(provider2.base_url, "https://api.heygen.com");
     }
-
 
     /// 测试 parse_status_from_response 解析 completed 状态
     #[test]
@@ -278,7 +273,6 @@ mod tests {
             _ => panic!("期望 Success 状态"),
         }
     }
-
 
     /// 测试 parse_status_from_response 解析 failed 状态（带 failure_message）
     #[test]
@@ -334,7 +328,6 @@ mod tests {
         let result = parse_status_from_response(resp).unwrap();
         assert!(matches!(result, DhVideoGenStatus::Processing));
     }
-
 
     /// 测试 parse_status_from_response completed 状态但缺少 video_url 时返回错误
     #[test]
@@ -403,7 +396,9 @@ mod tests {
     async fn test_download_video_invalid_url() {
         let provider = HeyGenProvider::new("key", "https://api.heygen.com", "model");
         let save_path = format!("/tmp/soma_test_dl_{}.mp4", soma_core::utils::get_uuid());
-        let result = provider.download_video("http://download-test.invalid/video.mp4", &save_path).await;
+        let result = provider
+            .download_video("http://download-test.invalid/video.mp4", &save_path)
+            .await;
         assert!(result.is_err());
     }
 }

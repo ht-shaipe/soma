@@ -1,3 +1,5 @@
+use crate::Config;
+use actix_multipart::Multipart;
 /// 语音列表与预览 API 处理器
 ///
 /// - list: 返回各 TTS 引擎可用的语音列表
@@ -5,11 +7,9 @@
 /// - delete_cloned: 删除已克隆的语音
 /// - preview: 生成语音预览音频并返回
 use actix_web::{HttpRequest, HttpResponse};
-use actix_multipart::Multipart;
 use futures::StreamExt;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use crate::Config;
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
@@ -185,7 +185,8 @@ async fn list_voices(_param: &RequestParameter) -> Result<Value> {
 pub async fn preview_voice(req: HttpRequest) -> HttpResponse {
     let query = req.query_string();
     let voice_name = extract_query_param(query, "voice").unwrap_or_default();
-    let text = extract_query_param(query, "text").unwrap_or_else(|| "这是一段语音预览。".to_string());
+    let text =
+        extract_query_param(query, "text").unwrap_or_else(|| "这是一段语音预览。".to_string());
 
     if voice_name.is_empty() || voice_name == "no-voice" {
         return HttpResponse::BadRequest().body("voice parameter required");
@@ -199,7 +200,8 @@ pub async fn preview_voice(req: HttpRequest) -> HttpResponse {
 
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build() {
+        .build()
+    {
         Ok(r) => r,
         Err(_) => return HttpResponse::InternalServerError().body("runtime error"),
     };
@@ -208,76 +210,171 @@ pub async fn preview_voice(req: HttpRequest) -> HttpResponse {
     let result = if soma_tts::voices::is_siliconflow_voice(&voice_name) {
         let sf_key = conf.app.siliconflow.api_key.as_deref().unwrap_or("");
         let tts = soma_tts::siliconflow_tts::SiliconflowTts::new(sf_key);
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_elevenlabs_voice(&voice_name) {
         let el_key = conf.app.elevenlabs.api_key.as_deref().unwrap_or("");
-        let el_model = conf.app.elevenlabs.model_id.as_deref().unwrap_or("eleven_multilingual_v2");
+        let el_model = conf
+            .app
+            .elevenlabs
+            .model_id
+            .as_deref()
+            .unwrap_or("eleven_multilingual_v2");
         let tts = soma_tts::elevenlabs_tts::ElevenlabsTts::new(el_key, el_model);
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_mimo_voice(&voice_name) {
         let mimo_key = conf.app.app.mimo_api_key.as_deref().unwrap_or("");
         let tts = soma_tts::mimo_tts::MimoTts::new(mimo_key, "", "", "");
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_gemini_voice(&voice_name) {
         let gemini_key = conf.app.app.gemini_api_key.as_deref().unwrap_or("");
         let tts = soma_tts::gemini_tts::GeminiTts::new(gemini_key, "", "");
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_azure_voice(&voice_name) {
         let azure_key = conf.app.azure.speech_key.as_deref().unwrap_or("");
-        let azure_region = conf.app.azure.speech_region.as_deref().unwrap_or("eastasia");
+        let azure_region = conf
+            .app
+            .azure
+            .speech_region
+            .as_deref()
+            .unwrap_or("eastasia");
         let tts = soma_tts::azure_tts::AzureTts::new(azure_key, azure_region);
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_volcengine_voice(&voice_name) {
         let volc_appid = conf.app.volcengine.app_id.as_deref().unwrap_or("");
         let volc_token = conf.app.volcengine.access_token.as_deref().unwrap_or("");
-        let volc_cluster = conf.app.volcengine.cluster.as_deref().unwrap_or("volcano_tts");
-        let tts = soma_tts::volcengine_tts::VolcengineTts::new(volc_appid, volc_token, volc_cluster);
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        let volc_cluster = conf
+            .app
+            .volcengine
+            .cluster
+            .as_deref()
+            .unwrap_or("volcano_tts");
+        let tts =
+            soma_tts::volcengine_tts::VolcengineTts::new(volc_appid, volc_token, volc_cluster);
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_xfyun_voice(&voice_name) {
         let xfyun_appid = conf.app.xfyun.app_id.as_deref().unwrap_or("");
         let xfyun_key = conf.app.xfyun.api_key.as_deref().unwrap_or("");
         let xfyun_secret = conf.app.xfyun.api_secret.as_deref().unwrap_or("");
         let tts = soma_tts::xfyun_tts::XfyunTts::new(xfyun_appid, xfyun_key, xfyun_secret);
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else if soma_tts::voices::is_fishspeech_voice(&voice_name) {
         let tts = soma_tts::fishspeech_tts::FishspeechTts::from_config(&conf.app.fishspeech);
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     } else {
         let tts = soma_tts::edge_tts::EdgeTts::new(conf.app.get_edge_tts_timeout());
-        local.block_on(&rt, soma_tts::provider::SomaTtsProvider::synthesize(&tts, &text, &voice_name, 1.0, std::path::Path::new(&tmp_path)))
+        local.block_on(
+            &rt,
+            soma_tts::provider::SomaTtsProvider::synthesize(
+                &tts,
+                &text,
+                &voice_name,
+                1.0,
+                std::path::Path::new(&tmp_path),
+            ),
+        )
     };
 
     match result {
-        Ok(tts_result) => {
-            match std::fs::read(&tts_result.audio_file) {
-                Ok(bytes) => {
-                    let _ = std::fs::remove_file(&tts_result.audio_file);
-                    HttpResponse::Ok()
-                        .content_type("audio/mpeg")
-                        .body(bytes)
-                }
-                Err(_) => HttpResponse::InternalServerError().body("read audio failed"),
+        Ok(tts_result) => match std::fs::read(&tts_result.audio_file) {
+            Ok(bytes) => {
+                let _ = std::fs::remove_file(&tts_result.audio_file);
+                HttpResponse::Ok().content_type("audio/mpeg").body(bytes)
             }
-        }
+            Err(_) => HttpResponse::InternalServerError().body("read audio failed"),
+        },
         Err(e) => HttpResponse::InternalServerError().body(format!("TTS failed: {:?}", e)),
     }
 }
 
 fn extract_query_param(query: &str, key: &str) -> Option<String> {
-    url_decode(
-        query.split('&')
-            .find_map(|pair| {
-                let (k, v) = pair.split_once('=')?;
-                
-                
-                if k == key { Some(v) } else { None }
-            })?
-    )
+    url_decode(query.split('&').find_map(|pair| {
+        let (k, v) = pair.split_once('=')?;
+
+        if k == key {
+            Some(v)
+        } else {
+            None
+        }
+    })?)
 }
 
 fn url_decode(s: &str) -> Option<String> {
     let bytes: Vec<u8> = s.as_bytes().to_vec();
-    let decoded = percent_encoding::percent_decode(&bytes).decode_utf8().ok()?;
+    let decoded = percent_encoding::percent_decode(&bytes)
+        .decode_utf8()
+        .ok()?;
     Some(decoded.to_string())
 }
 
@@ -297,7 +394,8 @@ pub async fn preview_subtitle(req: HttpRequest) -> HttpResponse {
 
     // 字幕预览不显示 Fish-Speech 情感标签
     let plain_text = soma_tts::fishspeech_tts::strip_emotion_tags(&text);
-    let cues = soma_tts::edge_tts::generate_subtitle_cues_from_text(&plain_text, estimated_duration);
+    let cues =
+        soma_tts::edge_tts::generate_subtitle_cues_from_text(&plain_text, estimated_duration);
     let json = serde_json::to_string(&cues).unwrap_or_else(|_| "[]".to_string());
     HttpResponse::Ok()
         .content_type("application/json")
@@ -343,33 +441,55 @@ async fn delete_cloned_voice(param: &RequestParameter) -> Result<Value> {
     // 获取对应引擎的认证配置
     let conf = Config::get();
     let auth = match voice.engine {
-        soma_tts::voice_clone::CloneEngine::Elevenlabs => {
-            soma_tts::voice_clone::CloneAuth {
-                api_key: conf.app.elevenlabs.api_key.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
-        soma_tts::voice_clone::CloneEngine::Siliconflow => {
-            soma_tts::voice_clone::CloneAuth {
-                api_key: conf.app.siliconflow.api_key.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
-        soma_tts::voice_clone::CloneEngine::Volcengine => {
-            soma_tts::voice_clone::CloneAuth {
-                app_id: conf.app.volcengine.app_id.as_deref().unwrap_or("").to_string(),
-                access_token: conf.app.volcengine.access_token.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
-        soma_tts::voice_clone::CloneEngine::Xfyun => {
-            soma_tts::voice_clone::CloneAuth {
-                app_id: conf.app.xfyun.app_id.as_deref().unwrap_or("").to_string(),
-                api_key: conf.app.xfyun.api_key.as_deref().unwrap_or("").to_string(),
-                api_secret: conf.app.xfyun.api_secret.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
+        soma_tts::voice_clone::CloneEngine::Elevenlabs => soma_tts::voice_clone::CloneAuth {
+            api_key: conf
+                .app
+                .elevenlabs
+                .api_key
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
+        soma_tts::voice_clone::CloneEngine::Siliconflow => soma_tts::voice_clone::CloneAuth {
+            api_key: conf
+                .app
+                .siliconflow
+                .api_key
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
+        soma_tts::voice_clone::CloneEngine::Volcengine => soma_tts::voice_clone::CloneAuth {
+            app_id: conf
+                .app
+                .volcengine
+                .app_id
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            access_token: conf
+                .app
+                .volcengine
+                .access_token
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
+        soma_tts::voice_clone::CloneEngine::Xfyun => soma_tts::voice_clone::CloneAuth {
+            app_id: conf.app.xfyun.app_id.as_deref().unwrap_or("").to_string(),
+            api_key: conf.app.xfyun.api_key.as_deref().unwrap_or("").to_string(),
+            api_secret: conf
+                .app
+                .xfyun
+                .api_secret
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
     };
 
     // 尝试远端删除（失败不阻塞本地删除）
@@ -442,33 +562,55 @@ pub async fn clone_voice(mut payload: Multipart) -> HttpResponse {
 
     let conf = Config::get();
     let auth = match engine {
-        soma_tts::voice_clone::CloneEngine::Elevenlabs => {
-            soma_tts::voice_clone::CloneAuth {
-                api_key: conf.app.elevenlabs.api_key.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
-        soma_tts::voice_clone::CloneEngine::Siliconflow => {
-            soma_tts::voice_clone::CloneAuth {
-                api_key: conf.app.siliconflow.api_key.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
-        soma_tts::voice_clone::CloneEngine::Volcengine => {
-            soma_tts::voice_clone::CloneAuth {
-                app_id: conf.app.volcengine.app_id.as_deref().unwrap_or("").to_string(),
-                access_token: conf.app.volcengine.access_token.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
-        soma_tts::voice_clone::CloneEngine::Xfyun => {
-            soma_tts::voice_clone::CloneAuth {
-                app_id: conf.app.xfyun.app_id.as_deref().unwrap_or("").to_string(),
-                api_key: conf.app.xfyun.api_key.as_deref().unwrap_or("").to_string(),
-                api_secret: conf.app.xfyun.api_secret.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }
-        }
+        soma_tts::voice_clone::CloneEngine::Elevenlabs => soma_tts::voice_clone::CloneAuth {
+            api_key: conf
+                .app
+                .elevenlabs
+                .api_key
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
+        soma_tts::voice_clone::CloneEngine::Siliconflow => soma_tts::voice_clone::CloneAuth {
+            api_key: conf
+                .app
+                .siliconflow
+                .api_key
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
+        soma_tts::voice_clone::CloneEngine::Volcengine => soma_tts::voice_clone::CloneAuth {
+            app_id: conf
+                .app
+                .volcengine
+                .app_id
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            access_token: conf
+                .app
+                .volcengine
+                .access_token
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
+        soma_tts::voice_clone::CloneEngine::Xfyun => soma_tts::voice_clone::CloneAuth {
+            app_id: conf.app.xfyun.app_id.as_deref().unwrap_or("").to_string(),
+            api_key: conf.app.xfyun.api_key.as_deref().unwrap_or("").to_string(),
+            api_secret: conf
+                .app
+                .xfyun
+                .api_secret
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
+            ..Default::default()
+        },
     };
 
     // 调用引擎克隆 API

@@ -3,10 +3,10 @@
 //! 通过 HTTP API 调用 HeyGem/Duix.Avatar 的 Fish-Speech 声音克隆服务。
 //! 端口 18180，接口 POST /v1/invoke
 
-use std::path::Path;
+use crate::provider::{SomaTtsProvider, TtsResult};
 use soma_core::config::HeyGemConfig;
 use soma_core::error::SomaError;
-use crate::provider::{SomaTtsProvider, TtsResult};
+use std::path::Path;
 
 pub struct HeyGemTts {
     config: HeyGemConfig,
@@ -16,7 +16,12 @@ pub struct HeyGemTts {
 }
 
 impl HeyGemTts {
-    pub fn new(config: HeyGemConfig, reference_audio: &str, reference_text: &str, speaker_id: &str) -> Self {
+    pub fn new(
+        config: HeyGemConfig,
+        reference_audio: &str,
+        reference_text: &str,
+        speaker_id: &str,
+    ) -> Self {
         Self {
             config,
             reference_audio: reference_audio.to_string(),
@@ -24,7 +29,6 @@ impl HeyGemTts {
             speaker_id: speaker_id.to_string(),
         }
     }
-
 }
 
 #[async_trait::async_trait(?Send)]
@@ -61,7 +65,11 @@ impl SomaTtsProvider for HeyGemTts {
             "reference_text": self.reference_text,
         });
 
-        log::info!("HeyGem TTS 请求: url={}, text_len={}", url, text.chars().count());
+        log::info!(
+            "HeyGem TTS 请求: url={}, text_len={}",
+            url,
+            text.chars().count()
+        );
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(self.config.get_timeout()))
@@ -72,17 +80,14 @@ impl SomaTtsProvider for HeyGemTts {
         let mut last_err = None;
 
         for attempt in 1..=max_retries {
-            let resp = client
-                .post(&url)
-                .json(&body)
-                .send()
-                .await;
+            let resp = client.post(&url).json(&body).send().await;
 
             match resp {
                 Ok(r) if r.status().is_success() => {
-                    let bytes = r.bytes().await.map_err(|e| {
-                        SomaError::Tts(format!("读取响应失败: {}", e))
-                    })?;
+                    let bytes = r
+                        .bytes()
+                        .await
+                        .map_err(|e| SomaError::Tts(format!("读取响应失败: {}", e)))?;
 
                     if let Some(parent) = output_path.parent() {
                         std::fs::create_dir_all(parent).map_err(SomaError::Io)?;

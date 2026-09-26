@@ -3,8 +3,8 @@
 //! 生成抖音 Web API 的 a_bogus 签名参数。
 //! 基于 SM3 哈希 + RC4 加密 + UA/时间戳/参数序列化。
 
-use super::sm3::sm3_hex;
 use super::rc4::rc4;
+use super::sm3::sm3_hex;
 
 /// 生成 a_bogus 签名
 ///

@@ -1,3 +1,4 @@
+use crate::Config;
 /// 配置 API 处理器
 ///
 /// 处理前端设置页的配置读写请求：
@@ -5,7 +6,6 @@
 /// - "save" → 保存配置到文件
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use crate::Config;
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
@@ -208,7 +208,10 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
             let provider = app.llm_provider.as_deref().unwrap_or("openai");
             if provider == "cloudflare" {
                 app.cloudflare_account_id = Some(account_id.to_string());
-                app.openai_base_url = Some(format!("https://api.cloudflare.com/client/v4/accounts/{}", account_id));
+                app.openai_base_url = Some(format!(
+                    "https://api.cloudflare.com/client/v4/accounts/{}",
+                    account_id
+                ));
             }
         }
     }
@@ -390,32 +393,136 @@ async fn save_config(param: &RequestParameter) -> Result<Value> {
 fn get_current_model(app: &soma_core::config::AppSection) -> String {
     let provider = app.llm_provider.as_deref().unwrap_or("openai");
     match provider {
-        "openai" => app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "deepseek" => app.deepseek_model_name.as_deref().unwrap_or("deepseek-chat").to_string(),
-        "qwen" => app.qwen_model_name.as_deref().unwrap_or("qwen-turbo").to_string(),
-        "gemini" => app.gemini_model_name.as_deref().unwrap_or("gemini-pro").to_string(),
-        "moonshot" => app.moonshot_model_name.as_deref().unwrap_or("moonshot-v1-8k").to_string(),
-        "azure" => app.azure_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "ollama" => app.ollama_model_name.as_deref().unwrap_or("llama3").to_string(),
-        "groq" => app.groq_model_name.as_deref().unwrap_or("llama3-8b-8192").to_string(),
-        "grok" => app.grok_model_name.as_deref().unwrap_or("grok-beta").to_string(),
-        "minimax" => app.minimax_model_name.as_deref().unwrap_or("abab6.5s-chat").to_string(),
-        "mimo" => app.mimo_model_name.as_deref().unwrap_or("mimo-chat").to_string(),
-        "doubao" => app.doubao_model_name.as_deref().unwrap_or("doubao-pro-32k").to_string(),
-        "zhipu" => app.zhipu_model_name.as_deref().unwrap_or("glm-4-flash").to_string(),
-        "wenxin" => app.wenxin_model_name.as_deref().unwrap_or("ernie-4.0-8k").to_string(),
-        "xunfei" => app.xunfei_model_name.as_deref().unwrap_or("generalv3.5").to_string(),
-        "hunyuan" => app.hunyuan_model_name.as_deref().unwrap_or("hunyuan-turbo").to_string(),
-        "oneapi" => app.oneapi_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "aihubmix" => app.aihubmix_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "evolink" => app.evolink_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "aiml" | "aimlapi" => app.aimlapi_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "modelscope" => app.modelscope_model_name.as_deref().unwrap_or("qwen-turbo").to_string(),
-        "pollinations" => app.pollinations_model_name.as_deref().unwrap_or("openai").to_string(),
-        "g4f" => app.g4f_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        "cloudflare" => app.openai_model_name.as_deref().unwrap_or("@cf/meta/llama-3-8b-instruct").to_string(),
-        "litellm" => app.litellm_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
-        _ => app.openai_model_name.as_deref().unwrap_or("gpt-4o-mini").to_string(),
+        "openai" => app
+            .openai_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "deepseek" => app
+            .deepseek_model_name
+            .as_deref()
+            .unwrap_or("deepseek-chat")
+            .to_string(),
+        "qwen" => app
+            .qwen_model_name
+            .as_deref()
+            .unwrap_or("qwen-turbo")
+            .to_string(),
+        "gemini" => app
+            .gemini_model_name
+            .as_deref()
+            .unwrap_or("gemini-pro")
+            .to_string(),
+        "moonshot" => app
+            .moonshot_model_name
+            .as_deref()
+            .unwrap_or("moonshot-v1-8k")
+            .to_string(),
+        "azure" => app
+            .azure_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "ollama" => app
+            .ollama_model_name
+            .as_deref()
+            .unwrap_or("llama3")
+            .to_string(),
+        "groq" => app
+            .groq_model_name
+            .as_deref()
+            .unwrap_or("llama3-8b-8192")
+            .to_string(),
+        "grok" => app
+            .grok_model_name
+            .as_deref()
+            .unwrap_or("grok-beta")
+            .to_string(),
+        "minimax" => app
+            .minimax_model_name
+            .as_deref()
+            .unwrap_or("abab6.5s-chat")
+            .to_string(),
+        "mimo" => app
+            .mimo_model_name
+            .as_deref()
+            .unwrap_or("mimo-chat")
+            .to_string(),
+        "doubao" => app
+            .doubao_model_name
+            .as_deref()
+            .unwrap_or("doubao-pro-32k")
+            .to_string(),
+        "zhipu" => app
+            .zhipu_model_name
+            .as_deref()
+            .unwrap_or("glm-4-flash")
+            .to_string(),
+        "wenxin" => app
+            .wenxin_model_name
+            .as_deref()
+            .unwrap_or("ernie-4.0-8k")
+            .to_string(),
+        "xunfei" => app
+            .xunfei_model_name
+            .as_deref()
+            .unwrap_or("generalv3.5")
+            .to_string(),
+        "hunyuan" => app
+            .hunyuan_model_name
+            .as_deref()
+            .unwrap_or("hunyuan-turbo")
+            .to_string(),
+        "oneapi" => app
+            .oneapi_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "aihubmix" => app
+            .aihubmix_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "evolink" => app
+            .evolink_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "aiml" | "aimlapi" => app
+            .aimlapi_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "modelscope" => app
+            .modelscope_model_name
+            .as_deref()
+            .unwrap_or("qwen-turbo")
+            .to_string(),
+        "pollinations" => app
+            .pollinations_model_name
+            .as_deref()
+            .unwrap_or("openai")
+            .to_string(),
+        "g4f" => app
+            .g4f_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        "cloudflare" => app
+            .openai_model_name
+            .as_deref()
+            .unwrap_or("@cf/meta/llama-3-8b-instruct")
+            .to_string(),
+        "litellm" => app
+            .litellm_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
+        _ => app
+            .openai_model_name
+            .as_deref()
+            .unwrap_or("gpt-4o-mini")
+            .to_string(),
     }
 }
 
@@ -442,7 +549,11 @@ fn get_current_api_key(app: &soma_core::config::AppSection) -> String {
         "evolink" => app.evolink_api_key.as_deref().unwrap_or("").to_string(),
         "aiml" | "aimlapi" => app.aimlapi_api_key.as_deref().unwrap_or("").to_string(),
         "modelscope" => app.modelscope_api_key.as_deref().unwrap_or("").to_string(),
-        "pollinations" => app.pollinations_api_key.as_deref().unwrap_or("").to_string(),
+        "pollinations" => app
+            .pollinations_api_key
+            .as_deref()
+            .unwrap_or("")
+            .to_string(),
         "g4f" => "".to_string(),
         "cloudflare" => app.openai_api_key.as_deref().unwrap_or("").to_string(),
         "litellm" => app.oneapi_api_key.as_deref().unwrap_or("").to_string(),
@@ -453,31 +564,119 @@ fn get_current_api_key(app: &soma_core::config::AppSection) -> String {
 fn get_current_base_url(app: &soma_core::config::AppSection) -> String {
     let provider = app.llm_provider.as_deref().unwrap_or("openai");
     match provider {
-        "openai" => app.openai_base_url.as_deref().unwrap_or("https://api.openai.com/v1").to_string(),
-        "deepseek" => app.deepseek_base_url.as_deref().unwrap_or("https://api.deepseek.com/v1").to_string(),
-        "qwen" => app.qwen_base_url.as_deref().unwrap_or("https://dashscope.aliyuncs.com/compatible-mode/v1").to_string(),
-        "moonshot" => app.moonshot_base_url.as_deref().unwrap_or("https://api.moonshot.cn/v1").to_string(),
+        "openai" => app
+            .openai_base_url
+            .as_deref()
+            .unwrap_or("https://api.openai.com/v1")
+            .to_string(),
+        "deepseek" => app
+            .deepseek_base_url
+            .as_deref()
+            .unwrap_or("https://api.deepseek.com/v1")
+            .to_string(),
+        "qwen" => app
+            .qwen_base_url
+            .as_deref()
+            .unwrap_or("https://dashscope.aliyuncs.com/compatible-mode/v1")
+            .to_string(),
+        "moonshot" => app
+            .moonshot_base_url
+            .as_deref()
+            .unwrap_or("https://api.moonshot.cn/v1")
+            .to_string(),
         "azure" => app.azure_base_url.as_deref().unwrap_or("").to_string(),
-        "ollama" => app.ollama_base_url.as_deref().unwrap_or("http://localhost:11434/v1").to_string(),
-        "groq" => app.groq_base_url.as_deref().unwrap_or("https://api.groq.com/openai/v1").to_string(),
-        "grok" => app.grok_base_url.as_deref().unwrap_or("https://api.x.ai/v1").to_string(),
-        "minimax" => app.minimax_base_url.as_deref().unwrap_or("https://api.minimax.chat/v1").to_string(),
-        "mimo" => app.mimo_base_url.as_deref().unwrap_or("https://api.mimo.com/v1").to_string(),
-        "doubao" => app.doubao_base_url.as_deref().unwrap_or("https://ark.cn-beijing.volces.com/api/v3").to_string(),
-        "zhipu" => app.zhipu_base_url.as_deref().unwrap_or("https://open.bigmodel.cn/api/paas/v4").to_string(),
-        "wenxin" => app.wenxin_base_url.as_deref().unwrap_or("https://aip.baidubce.com").to_string(),
-        "xunfei" => app.xunfei_base_url.as_deref().unwrap_or("https://spark-api.xf-yun.com/v1").to_string(),
-        "hunyuan" => app.hunyuan_base_url.as_deref().unwrap_or("https://hunyuan.tencentcloudapi.com").to_string(),
-        "oneapi" => app.oneapi_base_url.as_deref().unwrap_or("http://localhost:3000/v1").to_string(),
-        "aihubmix" => app.aihubmix_base_url.as_deref().unwrap_or("https://api.aihubmix.com/v1").to_string(),
-        "evolink" => app.evolink_base_url.as_deref().unwrap_or("https://api.evolink.com/v1").to_string(),
-        "aiml" | "aimlapi" => app.aimlapi_base_url.as_deref().unwrap_or("https://api.aimlapi.com/v1").to_string(),
-        "modelscope" => app.modelscope_base_url.as_deref().unwrap_or("https://dashscope.aliyuncs.com/compatible-mode/v1").to_string(),
-        "pollinations" => app.pollinations_base_url.as_deref().unwrap_or("https://text.pollinations.ai").to_string(),
+        "ollama" => app
+            .ollama_base_url
+            .as_deref()
+            .unwrap_or("http://localhost:11434/v1")
+            .to_string(),
+        "groq" => app
+            .groq_base_url
+            .as_deref()
+            .unwrap_or("https://api.groq.com/openai/v1")
+            .to_string(),
+        "grok" => app
+            .grok_base_url
+            .as_deref()
+            .unwrap_or("https://api.x.ai/v1")
+            .to_string(),
+        "minimax" => app
+            .minimax_base_url
+            .as_deref()
+            .unwrap_or("https://api.minimax.chat/v1")
+            .to_string(),
+        "mimo" => app
+            .mimo_base_url
+            .as_deref()
+            .unwrap_or("https://api.mimo.com/v1")
+            .to_string(),
+        "doubao" => app
+            .doubao_base_url
+            .as_deref()
+            .unwrap_or("https://ark.cn-beijing.volces.com/api/v3")
+            .to_string(),
+        "zhipu" => app
+            .zhipu_base_url
+            .as_deref()
+            .unwrap_or("https://open.bigmodel.cn/api/paas/v4")
+            .to_string(),
+        "wenxin" => app
+            .wenxin_base_url
+            .as_deref()
+            .unwrap_or("https://aip.baidubce.com")
+            .to_string(),
+        "xunfei" => app
+            .xunfei_base_url
+            .as_deref()
+            .unwrap_or("https://spark-api.xf-yun.com/v1")
+            .to_string(),
+        "hunyuan" => app
+            .hunyuan_base_url
+            .as_deref()
+            .unwrap_or("https://hunyuan.tencentcloudapi.com")
+            .to_string(),
+        "oneapi" => app
+            .oneapi_base_url
+            .as_deref()
+            .unwrap_or("http://localhost:3000/v1")
+            .to_string(),
+        "aihubmix" => app
+            .aihubmix_base_url
+            .as_deref()
+            .unwrap_or("https://api.aihubmix.com/v1")
+            .to_string(),
+        "evolink" => app
+            .evolink_base_url
+            .as_deref()
+            .unwrap_or("https://api.evolink.com/v1")
+            .to_string(),
+        "aiml" | "aimlapi" => app
+            .aimlapi_base_url
+            .as_deref()
+            .unwrap_or("https://api.aimlapi.com/v1")
+            .to_string(),
+        "modelscope" => app
+            .modelscope_base_url
+            .as_deref()
+            .unwrap_or("https://dashscope.aliyuncs.com/compatible-mode/v1")
+            .to_string(),
+        "pollinations" => app
+            .pollinations_base_url
+            .as_deref()
+            .unwrap_or("https://text.pollinations.ai")
+            .to_string(),
         "g4f" => "".to_string(),
-        "cloudflare" => app.openai_base_url.as_deref().unwrap_or("https://api.cloudflare.com/client/v4/accounts").to_string(),
+        "cloudflare" => app
+            .openai_base_url
+            .as_deref()
+            .unwrap_or("https://api.cloudflare.com/client/v4/accounts")
+            .to_string(),
         "litellm" => "http://localhost:4000".to_string(),
-        _ => app.openai_base_url.as_deref().unwrap_or("https://api.openai.com/v1").to_string(),
+        _ => app
+            .openai_base_url
+            .as_deref()
+            .unwrap_or("https://api.openai.com/v1")
+            .to_string(),
     }
 }
 

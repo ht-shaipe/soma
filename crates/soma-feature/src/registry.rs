@@ -106,10 +106,7 @@ impl FeatureRegistry {
             .clone()
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(get_uuid);
-        let work_dir = self
-            .storage_root()
-            .join(&req.feature_id)
-            .join(&run_id);
+        let work_dir = self.storage_root().join(&req.feature_id).join(&run_id);
         std::fs::create_dir_all(&work_dir)?;
 
         let input = FeatureInput {
@@ -204,9 +201,7 @@ impl FeatureRegistry {
     }
 
     fn lock_features(&self) -> std::sync::RwLockReadGuard<'_, BTreeMap<String, Arc<dyn Feature>>> {
-        self.features
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
+        self.features.read().unwrap_or_else(|e| e.into_inner())
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::Config;
 /// LLM API 处理器
 ///
 /// 处理与大语言模型相关的四类 API 请求：
@@ -7,7 +8,6 @@
 /// - intent: 需求理解（解析用户意图为结构化参数）
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use crate::Config;
 
 /// 脚本模块请求分发
 ///
@@ -94,15 +94,36 @@ async fn generate_script(param: &RequestParameter) -> Result<Value> {
     });
 
     let script = crate::service::llm::generate_script(
-        &req_provider, &subject, &intent, &language, paragraph_number, &prompt, &system_prompt, &conf,
-    ).await.map_err(|e| error!("脚本生成失败: {:?}", e))?;
+        &req_provider,
+        &subject,
+        &intent,
+        &language,
+        paragraph_number,
+        &prompt,
+        &system_prompt,
+        &conf,
+    )
+    .await
+    .map_err(|e| error!("脚本生成失败: {:?}", e))?;
 
     let (script_text, terms_text) = if let Some(pos) = script.find("===KEYWORDS===") {
         let (s, k) = script.split_at(pos);
-        (s.trim().to_string(), k.trim_start_matches('=').trim_start_matches("KEYWORDS").trim().to_string())
+        (
+            s.trim().to_string(),
+            k.trim_start_matches('=')
+                .trim_start_matches("KEYWORDS")
+                .trim()
+                .to_string(),
+        )
     } else if let Some(pos) = script.find("===关键词===") {
         let (s, k) = script.split_at(pos);
-        (s.trim().to_string(), k.trim_start_matches('=').trim_start_matches("关键词").trim().to_string())
+        (
+            s.trim().to_string(),
+            k.trim_start_matches('=')
+                .trim_start_matches("关键词")
+                .trim()
+                .to_string(),
+        )
     } else {
         (script, String::new())
     };
@@ -110,7 +131,8 @@ async fn generate_script(param: &RequestParameter) -> Result<Value> {
     let terms: Vec<String> = if terms_text.is_empty() {
         vec![]
     } else {
-        terms_text.split(&[',', '\u{FF0C}', '\n'][..])
+        terms_text
+            .split(&[',', '\u{FF0C}', '\n'][..])
             .map(|t| t.trim().to_string())
             .filter(|t| !t.is_empty())
             .take(5)
@@ -137,9 +159,10 @@ async fn generate_terms(param: &RequestParameter) -> Result<Value> {
     let amount = param.value.get_i32("amount", 5) as usize;
     let req_provider = param.value.get_def_string("provider", provider);
 
-    let terms = crate::service::llm::generate_terms(
-        &req_provider, &subject, &script, amount, &conf,
-    ).await.map_err(|e| error!("关键词提取失败: {:?}", e))?;
+    let terms =
+        crate::service::llm::generate_terms(&req_provider, &subject, &script, amount, &conf)
+            .await
+            .map_err(|e| error!("关键词提取失败: {:?}", e))?;
 
     Ok(value!({
         "terms": terms.iter().map(|t| value!(t.clone())).collect::<Vec<Value>>(),
@@ -162,19 +185,33 @@ async fn generate_social(param: &RequestParameter) -> Result<Value> {
     let req_provider = param.value.get_def_string("provider", provider);
 
     let metadata = crate::service::llm::generate_social_metadata(
-        &req_provider, &subject, &script, &platform, &conf,
-    ).await.map_err(|e| error!("社交元数据生成失败: {:?}", e))?;
+        &req_provider,
+        &subject,
+        &script,
+        &platform,
+        &conf,
+    )
+    .await
+    .map_err(|e| error!("社交元数据生成失败: {:?}", e))?;
 
     // 从 LLM 返回的 JSON 中安全提取各字段
-    let title = metadata.get("title").and_then(|v| v.as_str()).unwrap_or(&subject);
-    let desc = metadata.get("description").and_then(|v| v.as_str()).unwrap_or("");
-    let tags: Vec<serde_json::Value> = metadata.get("tags")
+    let title = metadata
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&subject);
+    let desc = metadata
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let tags: Vec<serde_json::Value> = metadata
+        .get("tags")
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
 
     // 将 JSON 标签转为字符串列表
-    let tag_strings: Vec<String> = tags.iter()
+    let tag_strings: Vec<String> = tags
+        .iter()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
 
@@ -199,8 +236,14 @@ async fn generate_intent(param: &RequestParameter) -> Result<Value> {
     }
 
     let intent = crate::service::llm::generate_intent(
-        &req_provider, &subject, &language, &aspect_ratio, &conf,
-    ).await.map_err(|e| error!("意图解析失败: {:?}", e))?;
+        &req_provider,
+        &subject,
+        &language,
+        &aspect_ratio,
+        &conf,
+    )
+    .await
+    .map_err(|e| error!("意图解析失败: {:?}", e))?;
 
     Ok(tube::Value::from_serialize(&intent).unwrap_or(tube::Value::Null))
 }
@@ -228,8 +271,15 @@ async fn generate_storyboard_api(param: &RequestParameter) -> Result<Value> {
     }
 
     let scenes = crate::service::llm::generate_storyboard(
-        &req_provider, &subject, &script, clip_duration, &intent, &conf,
-    ).await.map_err(|e| error!("分镜脚本生成失败: {:?}", e))?;
+        &req_provider,
+        &subject,
+        &script,
+        clip_duration,
+        &intent,
+        &conf,
+    )
+    .await
+    .map_err(|e| error!("分镜脚本生成失败: {:?}", e))?;
 
     Ok(tube::Value::from_serialize(&scenes).unwrap_or(tube::Value::Null))
 }

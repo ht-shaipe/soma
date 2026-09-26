@@ -3,10 +3,10 @@
 //! 基于火山引擎语音合成 API 进行 TTS 合成和语音克隆。
 //! API 文档：https://www.volcengine.com/docs/6561
 
-use async_trait::async_trait;
-use soma_core::error::SomaError;
 use crate::edge_tts::{generate_subtitle_cues_from_text, get_audio_duration};
 use crate::provider::{SomaTtsProvider, TtsResult};
+use async_trait::async_trait;
+use soma_core::error::SomaError;
 use std::path::Path;
 
 /// 火山引擎 TTS 语音合成器
@@ -24,7 +24,11 @@ impl VolcengineTts {
         Self {
             app_id: app_id.to_string(),
             access_token: access_token.to_string(),
-            cluster: if cluster.is_empty() { "volcano_tts".into() } else { cluster.into() },
+            cluster: if cluster.is_empty() {
+                "volcano_tts".into()
+            } else {
+                cluster.into()
+            },
         }
     }
 }
@@ -39,10 +43,13 @@ impl SomaTtsProvider for VolcengineTts {
         output_path: &Path,
     ) -> Result<TtsResult, SomaError> {
         if self.app_id.is_empty() || self.access_token.is_empty() {
-            return Err(SomaError::Tts("火山引擎 App ID 或 Access Token 未设置".into()));
+            return Err(SomaError::Tts(
+                "火山引擎 App ID 或 Access Token 未设置".into(),
+            ));
         }
 
-        let voice_id = crate::voices::extract_volcengine_voice(voice).unwrap_or_else(|| voice.to_string());
+        let voice_id =
+            crate::voices::extract_volcengine_voice(voice).unwrap_or_else(|| voice.to_string());
         let reqid = uuid::Uuid::new_v4().to_string();
 
         let payload = serde_json::json!({
@@ -78,7 +85,10 @@ impl SomaTtsProvider for VolcengineTts {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(SomaError::Tts(format!("火山引擎 TTS 失败: {} - {}", status, body)));
+            return Err(SomaError::Tts(format!(
+                "火山引擎 TTS 失败: {} - {}",
+                status, body
+            )));
         }
 
         let resp_json: serde_json::Value = resp
@@ -88,8 +98,14 @@ impl SomaTtsProvider for VolcengineTts {
 
         let code = resp_json.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
         if code != 3000 {
-            let message = resp_json.get("message").and_then(|v| v.as_str()).unwrap_or("unknown");
-            return Err(SomaError::Tts(format!("火山引擎 TTS 错误: code={}, message={}", code, message)));
+            let message = resp_json
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            return Err(SomaError::Tts(format!(
+                "火山引擎 TTS 错误: code={}, message={}",
+                code, message
+            )));
         }
 
         let data_b64 = resp_json
@@ -97,10 +113,9 @@ impl SomaTtsProvider for VolcengineTts {
             .and_then(|v| v.as_str())
             .ok_or_else(|| SomaError::Tts("火山引擎响应缺少音频数据".into()))?;
 
-        let audio_bytes = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            data_b64,
-        ).map_err(|e| SomaError::Tts(format!("Base64 解码失败: {}", e)))?;
+        let audio_bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, data_b64)
+                .map_err(|e| SomaError::Tts(format!("Base64 解码失败: {}", e)))?;
 
         if let Some(parent) = output_path.parent() {
             std::fs::create_dir_all(parent).map_err(SomaError::Io)?;

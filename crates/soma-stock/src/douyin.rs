@@ -39,12 +39,16 @@ impl DouyinClient {
             .user_agent(DEFAULT_UA);
 
         if let Some(p) = proxy {
-            builder = builder
-                .proxy(reqwest::Proxy::all(&p).map_err(|e| SomaError::Stock(format!("代理配置无效: {}", e)))?);
+            builder = builder.proxy(
+                reqwest::Proxy::all(&p)
+                    .map_err(|e| SomaError::Stock(format!("代理配置无效: {}", e)))?,
+            );
         }
 
         Ok(Self {
-            client: builder.build().map_err(|e| SomaError::Stock(format!("HTTP 客户端创建失败: {}", e)))?,
+            client: builder
+                .build()
+                .map_err(|e| SomaError::Stock(format!("HTTP 客户端创建失败: {}", e)))?,
             cookie,
             ua: DEFAULT_UA.to_string(),
         })
@@ -57,11 +61,12 @@ impl DouyinClient {
     pub async fn video_detail(&self, aweme_id: &str) -> Result<serde_json::Value, SomaError> {
         let params = format!("aweme_id={}&device_platform=webapp&aid=6383&channel=channel_pc_web&pc_client_type=1&version_code=170400&version_name=17.4.0&cookie_enabled=true&platform=PC&downlink=10", aweme_id);
 
-        let body = self.signed_get("/aweme/v1/web/aweme/detail/", &params).await?;
-        let detail = body
-            .get("aweme_detail")
-            .cloned()
-            .ok_or_else(|| SomaError::Stock("接口未返回视频详情（Cookie 失效或视频不存在）".to_string()))?;
+        let body = self
+            .signed_get("/aweme/v1/web/aweme/detail/", &params)
+            .await?;
+        let detail = body.get("aweme_detail").cloned().ok_or_else(|| {
+            SomaError::Stock("接口未返回视频详情（Cookie 失效或视频不存在）".to_string())
+        })?;
         Ok(detail)
     }
 
@@ -83,20 +88,30 @@ impl DouyinClient {
             sec_user_id, count, max_cursor
         );
 
-        let body = self.signed_get("/aweme/v1/web/aweme/post/", &params).await?;
+        let body = self
+            .signed_get("/aweme/v1/web/aweme/post/", &params)
+            .await?;
         if body.get("aweme_list").is_none() {
-            return Err(SomaError::Stock("接口未返回作品列表（Cookie 失效或用户不存在）".to_string()));
+            return Err(SomaError::Stock(
+                "接口未返回作品列表（Cookie 失效或用户不存在）".to_string(),
+            ));
         }
         Ok(body)
     }
 
     /// 发起带签名的 GET 请求
     async fn signed_get(&self, path: &str, params: &str) -> Result<serde_json::Value, SomaError> {
-        let ts = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| SomaError::Stock(e.to_string()))?.as_millis() as u64;
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| SomaError::Stock(e.to_string()))?
+            .as_millis() as u64;
         let a_bogus = generate_abogus(params, &self.ua, ts);
         let ms_token = generate_mstoken();
 
-        let url = format!("{}{}?{}&a_bogus={}&msToken={}", BASE_URL, path, params, a_bogus, ms_token);
+        let url = format!(
+            "{}{}?{}&a_bogus={}&msToken={}",
+            BASE_URL, path, params, a_bogus, ms_token
+        );
 
         let mut req = self
             .client
@@ -114,7 +129,10 @@ impl DouyinClient {
             .map_err(|e| SomaError::Http(format!("抖音接口请求失败: {}", e)))?;
 
         if !resp.status().is_success() {
-            return Err(SomaError::Stock(format!("抖音接口返回 HTTP {}", resp.status())));
+            return Err(SomaError::Stock(format!(
+                "抖音接口返回 HTTP {}",
+                resp.status()
+            )));
         }
 
         resp.json()
@@ -158,7 +176,10 @@ pub fn extract_sec_uid(input: &str) -> Option<String> {
 
     // 裸 sec_uid 直接返回
     if input.starts_with("MS4wLjABAAAA") {
-        let uid: String = input.chars().take_while(|c| *c != '?' && *c != '/').collect();
+        let uid: String = input
+            .chars()
+            .take_while(|c| *c != '?' && *c != '/')
+            .collect();
         if !uid.is_empty() {
             return Some(uid);
         }
@@ -168,7 +189,10 @@ pub fn extract_sec_uid(input: &str) -> Option<String> {
         let rest = &input[pos + "/user/".len()..];
         // sec_uid 以 "MS4wLjABAAAA" 开头
         if rest.starts_with("MS4wLjABAAAA") {
-            let uid: String = rest.chars().take_while(|c| *c != '?' && *c != '/').collect();
+            let uid: String = rest
+                .chars()
+                .take_while(|c| *c != '?' && *c != '/')
+                .collect();
             if !uid.is_empty() {
                 return Some(uid);
             }
@@ -192,7 +216,10 @@ mod tests {
             extract_aweme_id("https://www.iesdouyin.com/share/video/7341234567890123456/?mid=1"),
             Some("7341234567890123456".to_string())
         );
-        assert_eq!(extract_aweme_id("7341234567890123456"), Some("7341234567890123456".to_string()));
+        assert_eq!(
+            extract_aweme_id("7341234567890123456"),
+            Some("7341234567890123456".to_string())
+        );
         assert_eq!(extract_aweme_id("https://www.douyin.com/discover"), None);
     }
 
@@ -202,8 +229,14 @@ mod tests {
             extract_sec_uid("https://www.douyin.com/user/MS4wLjABAAAAabcdefg123"),
             Some("MS4wLjABAAAAabcdefg123".to_string())
         );
-        assert_eq!(extract_sec_uid("https://www.douyin.com/user/MS4wLjABAAAAabc?from=info"), Some("MS4wLjABAAAAabc".to_string()));
-        assert_eq!(extract_sec_uid("MS4wLjABAAAAxyz"), Some("MS4wLjABAAAAxyz".to_string()));
+        assert_eq!(
+            extract_sec_uid("https://www.douyin.com/user/MS4wLjABAAAAabc?from=info"),
+            Some("MS4wLjABAAAAabc".to_string())
+        );
+        assert_eq!(
+            extract_sec_uid("MS4wLjABAAAAxyz"),
+            Some("MS4wLjABAAAAxyz".to_string())
+        );
         assert_eq!(extract_sec_uid("https://www.douyin.com/video/123"), None);
     }
 }

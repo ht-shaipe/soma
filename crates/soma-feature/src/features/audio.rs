@@ -58,14 +58,13 @@ impl TypedFeature for AudioConcatFeature {
             return Err(SomaError::Config("音频文件列表为空".into()));
         }
         let conf = ctx.config();
-        let ffmpeg = soma_video::Ffmpeg::new(
-            &conf.get_ffmpeg_binary(),
-            2,
-            conf.get_video_codec(),
-        );
+        let ffmpeg = soma_video::Ffmpeg::new(&conf.get_ffmpeg_binary(), 2, conf.get_video_codec());
         let output_path = match input.output_path {
             Some(ref p) if !p.is_empty() => p.clone(),
-            _ => ctx.artifact_path("merged.mp3").to_string_lossy().to_string(),
+            _ => ctx
+                .artifact_path("merged.mp3")
+                .to_string_lossy()
+                .to_string(),
         };
         if let Some(parent) = std::path::Path::new(&output_path).parent() {
             std::fs::create_dir_all(parent).map_err(SomaError::Io)?;

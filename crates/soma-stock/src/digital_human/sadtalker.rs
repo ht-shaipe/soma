@@ -5,11 +5,11 @@
 //!
 //! 与 HeyGen 的区别：本地推理（非 HTTP API）、内存任务状态表、Semaphore 串行控制。
 
+use super::{DhVideoGenParams, DhVideoGenStatus, DigitalHumanProvider};
 use async_trait::async_trait;
 use soma_core::config::SadTalkerConfig;
 use soma_core::error::SomaError;
 use soma_core::utils::validate_local_path;
-use super::{DigitalHumanProvider, DhVideoGenParams, DhVideoGenStatus};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -245,17 +245,36 @@ impl SadTalkerProvider {
 
         let mut cmd = tokio::process::Command::new(&python);
         cmd.arg(&script)
-            .arg("--portrait").arg(&params.portrait_path)
-            .arg("--audio").arg(&params.audio_path)
-            .arg("--outfile").arg(output_path)
-            .arg("--checkpoint_dir").arg(model_path)
-            .arg("--device").arg(device)
-            .arg("--still").arg(if self.config.get_still_mode() { "true" } else { "false" })
-            .arg("--full").arg(if self.config.get_full_enhancer() { "true" } else { "false" })
-            .arg("--size").arg(self.config.get_size().to_string())
-            .arg("--pose_style").arg(self.config.get_pose_style().to_string())
-            .arg("--exp_scale").arg(self.config.get_exp_scale().to_string())
-            .arg("--batch_size").arg(self.config.get_batch_size().to_string());
+            .arg("--portrait")
+            .arg(&params.portrait_path)
+            .arg("--audio")
+            .arg(&params.audio_path)
+            .arg("--outfile")
+            .arg(output_path)
+            .arg("--checkpoint_dir")
+            .arg(model_path)
+            .arg("--device")
+            .arg(device)
+            .arg("--still")
+            .arg(if self.config.get_still_mode() {
+                "true"
+            } else {
+                "false"
+            })
+            .arg("--full")
+            .arg(if self.config.get_full_enhancer() {
+                "true"
+            } else {
+                "false"
+            })
+            .arg("--size")
+            .arg(self.config.get_size().to_string())
+            .arg("--pose_style")
+            .arg(self.config.get_pose_style().to_string())
+            .arg("--exp_scale")
+            .arg(self.config.get_exp_scale().to_string())
+            .arg("--batch_size")
+            .arg(self.config.get_batch_size().to_string());
 
         if !env_path.is_empty() {
             cmd.current_dir(env_path);
@@ -288,8 +307,9 @@ impl SadTalkerProvider {
                     )));
                 }
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                let json: serde_json::Value = serde_json::from_str(&stdout)
-                    .map_err(|e| SomaError::VideoGen(format!("解析推理输出失败: {} (stdout: {})", e, stdout)))?;
+                let json: serde_json::Value = serde_json::from_str(&stdout).map_err(|e| {
+                    SomaError::VideoGen(format!("解析推理输出失败: {} (stdout: {})", e, stdout))
+                })?;
 
                 let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if status == "success" {
@@ -299,19 +319,31 @@ impl SadTalkerProvider {
                         .unwrap_or(output_path);
                     if !PathBuf::from(video_path).exists() {
                         return Err(SomaError::VideoGen(format!(
-                            "推理输出文件不存在: {}", video_path
+                            "推理输出文件不存在: {}",
+                            video_path
                         )));
                     }
-                    log!("SadTalker 推理成功: task_id={}, video={}", task_id, video_path);
+                    log!(
+                        "SadTalker 推理成功: task_id={}, video={}",
+                        task_id,
+                        video_path
+                    );
                     Ok(video_path.to_string())
                 } else {
-                    let error = json.get("error").and_then(|v| v.as_str()).unwrap_or("未知错误");
-                    Err(SomaError::VideoGen(format!("SadTalker 推理失败: {}", error)))
+                    let error = json
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("未知错误");
+                    Err(SomaError::VideoGen(format!(
+                        "SadTalker 推理失败: {}",
+                        error
+                    )))
                 }
             }
             Ok(Err(e)) => Err(SomaError::VideoGen(format!("等待子进程失败: {}", e))),
             Err(_) => Err(SomaError::VideoGen(format!(
-                "SadTalker 推理超时（{}秒）", self.config.get_timeout()
+                "SadTalker 推理超时（{}秒）",
+                self.config.get_timeout()
             ))),
         }
     }
@@ -343,8 +375,7 @@ impl DigitalHumanProvider for SadTalkerProvider {
         let task_id = soma_core::utils::get_uuid();
         self.insert_task(&task_id).await;
 
-        let temp_dir = soma_core::utils::storage_dir("tasks", true)
-            .join(&task_id);
+        let temp_dir = soma_core::utils::storage_dir("tasks", true).join(&task_id);
         let _ = tokio::fs::create_dir_all(&temp_dir).await;
         let output_path = temp_dir.join("portrait_video.mp4");
         let output_str = output_path.to_string_lossy().to_string();
@@ -353,15 +384,24 @@ impl DigitalHumanProvider for SadTalkerProvider {
         let mut last_error = String::new();
 
         for attempt in 1..=max_retries {
-            log!("SadTalker 推理尝试 {}/{}: task_id={}", attempt, max_retries, task_id);
+            log!(
+                "SadTalker 推理尝试 {}/{}: task_id={}",
+                attempt,
+                max_retries,
+                task_id
+            );
 
             let result = self
-                .run_inference(&task_id, &DhVideoGenParams {
-                    portrait_path: params.portrait_path.clone(),
-                    audio_path: params.audio_path.clone(),
-                    aspect_ratio: "auto".to_string(),
-                    model: None,
-                }, &output_str)
+                .run_inference(
+                    &task_id,
+                    &DhVideoGenParams {
+                        portrait_path: params.portrait_path.clone(),
+                        audio_path: params.audio_path.clone(),
+                        aspect_ratio: "auto".to_string(),
+                        model: None,
+                    },
+                    &output_str,
+                )
                 .await;
 
             match result {
@@ -372,13 +412,22 @@ impl DigitalHumanProvider for SadTalkerProvider {
                 }
                 Err(e) => {
                     last_error = format!("{:?}", e);
-                    log!("SadTalker 推理失败 (尝试 {}): task_id={}, error={}", attempt, task_id, last_error);
+                    log!(
+                        "SadTalker 推理失败 (尝试 {}): task_id={}, error={}",
+                        attempt,
+                        task_id,
+                        last_error
+                    );
                 }
             }
         }
 
         self.update_task_failed(&task_id, &last_error).await;
-        log!("SadTalker 任务最终失败: task_id={}, error={}", task_id, last_error);
+        log!(
+            "SadTalker 任务最终失败: task_id={}, error={}",
+            task_id,
+            last_error
+        );
 
         Ok(task_id)
     }
@@ -392,7 +441,10 @@ impl DigitalHumanProvider for SadTalkerProvider {
                     video_url: state.video_path.clone().unwrap_or_default(),
                 }),
                 SadTalkerRunStatus::Failed => Ok(DhVideoGenStatus::Failed {
-                    message: state.error.clone().unwrap_or_else(|| "未知错误".to_string()),
+                    message: state
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "未知错误".to_string()),
                 }),
             },
             None => Err(SomaError::VideoGen(format!("任务不存在: {}", task_id))),

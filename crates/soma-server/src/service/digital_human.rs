@@ -6,15 +6,15 @@
 //! 与 `pipeline` 模块的区别：输入为单张人像照片 + 一段文案，
 //! 输出为口播视频（人物开口说话，口型与配音同步），不经过 LLM 文案改写。
 
+use crate::state;
+use crate::Config;
 use soma_core::error::SomaError;
-use soma_core::models::{TaskStatus, VideoParams, DigitalHumanParams};
+use soma_core::models::{DigitalHumanParams, TaskStatus, VideoParams};
 use soma_feature::context::FeatureContext;
 use soma_feature::descriptor::{FeatureKind, FeatureMeta};
 use soma_feature::envelope::ArtifactKind;
 use soma_feature::feature::TypedFeature;
 use soma_feature::progress::ProgressReporter;
-use crate::state;
-use crate::Config;
 
 /// 将数字人参数转换为视频参数，用于复用 TTS 和视频合成能力
 pub fn dh_params_to_video_params(params: &DigitalHumanParams) -> VideoParams {
@@ -70,7 +70,6 @@ pub fn dh_params_to_video_params(params: &DigitalHumanParams) -> VideoParams {
     }
 }
 
-
 /// 数字人口播视频生成流水线主入口
 ///
 /// 三阶段顺序执行：
@@ -82,7 +81,9 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
 
     log::info!(
         "数字人任务开始: task_id={}, portrait={}, text_len={}",
-        task_id, params.portrait_image, params.narration_text.chars().count()
+        task_id,
+        params.portrait_image,
+        params.narration_text.chars().count()
     );
 
     state::update_dh_task(task_id, Some(TaskStatus::Processing.as_i32()), Some(0));
@@ -91,57 +92,85 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
     let provider = conf.app.digital_human.get_provider();
 
     let portrait_path = resolve_portrait_source(params, &conf).map_err(|e| {
-        state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-            state: Some(TaskStatus::Failed.as_i32()),
-            error_message: Some(format!("{:?}", e)),
-            ..Default::default()
-        });
+        state::update_dh_task_data(
+            task_id,
+            &state::DhTaskUpdateData {
+                state: Some(TaskStatus::Failed.as_i32()),
+                error_message: Some(format!("{:?}", e)),
+                ..Default::default()
+            },
+        );
         e
     })?;
     // 记录模型来源（供任务详情展示）
     if provider == "heygem" {
         if let Some(mid) = params.get_merchant_id() {
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                merchant_id: Some(mid.to_string()),
-                ..Default::default()
-            });
+            state::update_dh_task_data(
+                task_id,
+                &state::DhTaskUpdateData {
+                    merchant_id: Some(mid.to_string()),
+                    ..Default::default()
+                },
+            );
         }
     } else if provider == "live2d" {
         let lid = params
             .get_live2d_model_id()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| conf.app.digital_human.live2d.get_default_model().to_string());
-        if !lid.is_empty() {
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                live2d_model_id: Some(lid),
-                ..Default::default()
+            .unwrap_or_else(|| {
+                conf.app
+                    .digital_human
+                    .live2d
+                    .get_default_model()
+                    .to_string()
             });
+        if !lid.is_empty() {
+            state::update_dh_task_data(
+                task_id,
+                &state::DhTaskUpdateData {
+                    live2d_model_id: Some(lid),
+                    ..Default::default()
+                },
+            );
         }
     }
 
     if provider == "echomimic_v3" || provider == "heygem" || provider == "live2d" {
         match crate::service::segment_dh_video::run_segment_flow(
-            task_id, params, &portrait_path, &params.narration_text, &conf,
+            task_id,
+            params,
+            &portrait_path,
+            &params.narration_text,
+            &conf,
         ) {
             Ok(outcome) => {
-                log::info!("数字人任务完成: task_id={}, final={}", task_id, task_dir.join("final.mp4").display());
+                log::info!(
+                    "数字人任务完成: task_id={}, final={}",
+                    task_id,
+                    task_dir.join("final.mp4").display()
+                );
                 let _ = outcome;
                 return Ok(());
             }
             Err(e) => {
                 let msg = format!("{:?}", e);
-                state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                    state: Some(TaskStatus::Failed.as_i32()),
-                    error_message: Some(msg.clone()),
-                    ..Default::default()
-                });
+                state::update_dh_task_data(
+                    task_id,
+                    &state::DhTaskUpdateData {
+                        state: Some(TaskStatus::Failed.as_i32()),
+                        error_message: Some(msg.clone()),
+                        ..Default::default()
+                    },
+                );
                 return Err(e);
             }
         }
     }
 
-
-    let portrait_video_path = task_dir.join("portrait_video.mp4").to_string_lossy().to_string();
+    let portrait_video_path = task_dir
+        .join("portrait_video.mp4")
+        .to_string_lossy()
+        .to_string();
     let final_video_path = task_dir.join("final.mp4").to_string_lossy().to_string();
 
     let video_params = dh_params_to_video_params(params);
@@ -167,17 +196,22 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
     let audio_duration = soma_video::Ffmpeg::new(
         &conf.app.get_ffmpeg_binary(),
         video_params.get_n_threads(),
-        video_params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()),
+        video_params
+            .get_video_encoder()
+            .unwrap_or_else(|| conf.app.get_video_codec()),
     )
     .get_audio_duration(&audio_file)
     .unwrap_or(0.0);
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        audio_file: Some(audio_file.clone()),
-        audio_duration: Some(audio_duration),
-        progress: Some(30),
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            audio_file: Some(audio_file.clone()),
+            audio_duration: Some(audio_duration),
+            progress: Some(30),
+            ..Default::default()
+        },
+    );
 
     // 阶段2：口播视频生成（30~90%）
     let portrait_video_path = if let Some(ref t) = existing {
@@ -187,46 +221,90 @@ pub fn run_task(task_id: &str, params: &DigitalHumanParams) -> Result<(), SomaEr
                 pv.clone()
             } else {
                 generate_portrait_video_stage(
-                    task_id, params, &portrait_path, &audio_file, &portrait_video_path, &conf, None,
+                    task_id,
+                    params,
+                    &portrait_path,
+                    &audio_file,
+                    &portrait_video_path,
+                    &conf,
+                    None,
                 )?
             }
         } else {
             generate_portrait_video_stage(
-                task_id, params, &portrait_path, &audio_file, &portrait_video_path, &conf, None,
+                task_id,
+                params,
+                &portrait_path,
+                &audio_file,
+                &portrait_video_path,
+                &conf,
+                None,
             )?
         }
     } else {
         generate_portrait_video_stage(
-            task_id, params, &portrait_path, &audio_file, &portrait_video_path, &conf, None,
+            task_id,
+            params,
+            &portrait_path,
+            &audio_file,
+            &portrait_video_path,
+            &conf,
+            None,
         )?
     };
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        portrait_video_path: Some(portrait_video_path.clone()),
-        progress: Some(90),
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            portrait_video_path: Some(portrait_video_path.clone()),
+            progress: Some(90),
+            ..Default::default()
+        },
+    );
 
     // 阶段3：字幕与背景音乐合成（90~100%）
     let subtitle_path = if params.subtitle_enabled.unwrap_or(false) {
-        generate_subtitle_stage(task_id, &video_params, &params.narration_text, &audio_file, &conf)?
+        generate_subtitle_stage(
+            task_id,
+            &video_params,
+            &params.narration_text,
+            &audio_file,
+            &conf,
+        )?
     } else {
         String::new()
     };
 
     compose_final_video_stage(
-        task_id, &video_params, &portrait_video_path, &audio_file, &subtitle_path, &final_video_path, &conf,
+        task_id,
+        &video_params,
+        &portrait_video_path,
+        &audio_file,
+        &subtitle_path,
+        &final_video_path,
+        &conf,
     )?;
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        state: Some(TaskStatus::Completed.as_i32()),
-        progress: Some(100),
-        final_video_path: Some(final_video_path.clone()),
-        subtitle_path: if subtitle_path.is_empty() { None } else { Some(subtitle_path) },
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            state: Some(TaskStatus::Completed.as_i32()),
+            progress: Some(100),
+            final_video_path: Some(final_video_path.clone()),
+            subtitle_path: if subtitle_path.is_empty() {
+                None
+            } else {
+                Some(subtitle_path)
+            },
+            ..Default::default()
+        },
+    );
 
-    log::info!("数字人任务完成: task_id={}, final={}", task_id, final_video_path);
+    log::info!(
+        "数字人任务完成: task_id={}, final={}",
+        task_id,
+        final_video_path
+    );
     Ok(())
 }
 
@@ -243,25 +321,35 @@ fn generate_audio_stage(
     let text = params.narration_text.trim();
     if text.is_empty() {
         let msg = "文案不能为空".to_string();
-        state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-            state: Some(TaskStatus::Failed.as_i32()),
-            error_message: Some(msg.clone()),
-            ..Default::default()
-        });
+        state::update_dh_task_data(
+            task_id,
+            &state::DhTaskUpdateData {
+                state: Some(TaskStatus::Failed.as_i32()),
+                error_message: Some(msg.clone()),
+                ..Default::default()
+            },
+        );
         return Err(SomaError::Tts(msg));
     }
 
     let (audio_file, audio_duration) =
         crate::service::pipeline::generate_audio(task_id, video_params, text, conf)?;
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        audio_file: Some(audio_file.clone()),
-        audio_duration: Some(audio_duration),
-        progress: Some(30),
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            audio_file: Some(audio_file.clone()),
+            audio_duration: Some(audio_duration),
+            progress: Some(30),
+            ..Default::default()
+        },
+    );
 
-    log::info!("数字人任务阶段1完成: task_id={}, audio={}", task_id, audio_file);
+    log::info!(
+        "数字人任务阶段1完成: task_id={}, audio={}",
+        task_id,
+        audio_file
+    );
     Ok(audio_file)
 }
 
@@ -279,7 +367,11 @@ pub fn generate_portrait_video_stage(
         Some(idx) => format!("segment={}", idx),
         None => "segment=whole".to_string(),
     };
-    log::info!("数字人任务阶段2（口播视频生成）: task_id={}, {}", task_id, seg_label);
+    log::info!(
+        "数字人任务阶段2（口播视频生成）: task_id={}, {}",
+        task_id,
+        seg_label
+    );
     state::update_dh_task(task_id, None, Some(50));
 
     let aspect_str = match params.get_video_aspect() {
@@ -305,32 +397,49 @@ pub fn generate_portrait_video_stage(
     let poll_interval = dh_conf.get_poll_interval();
 
     let status = block_on_async(soma_stock::digital_human::poll_until_done(
-        &*provider, &third_task_id, timeout, poll_interval,
+        &*provider,
+        &third_task_id,
+        timeout,
+        poll_interval,
     ))??;
 
     match status {
         soma_stock::digital_human::DhVideoGenStatus::Success { video_url } => {
-            log::info!("数字人任务第三方完成: task_id={}, video_url={}", task_id, video_url);
+            log::info!(
+                "数字人任务第三方完成: task_id={}, video_url={}",
+                task_id,
+                video_url
+            );
             block_on_async(provider.download_video(&video_url, save_path))??;
-            log::info!("数字人任务阶段2完成: task_id={}, saved={}", task_id, save_path);
+            log::info!(
+                "数字人任务阶段2完成: task_id={}, saved={}",
+                task_id,
+                save_path
+            );
             Ok(save_path.to_string())
         }
         soma_stock::digital_human::DhVideoGenStatus::Failed { message } => {
             let msg = format!("口播视频生成失败: {}", message);
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(msg.clone()),
-                ..Default::default()
-            });
+            state::update_dh_task_data(
+                task_id,
+                &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(msg.clone()),
+                    ..Default::default()
+                },
+            );
             Err(SomaError::VideoGen(msg))
         }
         soma_stock::digital_human::DhVideoGenStatus::Processing => {
             let msg = "视频生成超时，请重试".to_string();
-            state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(msg.clone()),
-                ..Default::default()
-            });
+            state::update_dh_task_data(
+                task_id,
+                &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(msg.clone()),
+                    ..Default::default()
+                },
+            );
             Err(SomaError::VideoGen(msg))
         }
     }
@@ -353,7 +462,8 @@ pub fn generate_subtitle_stage(
     if subtitle_provider == "whisper" {
         let ws = &conf.app.whisper;
         soma_tts::subtitle::generate_whisper_subtitle(
-            audio_file, &subtitle_path,
+            audio_file,
+            &subtitle_path,
             ws.model_size.as_deref().unwrap_or("base"),
             ws.device.as_deref().unwrap_or("cpu"),
             ws.compute_type.as_deref().unwrap_or("int8"),
@@ -366,7 +476,9 @@ pub fn generate_subtitle_stage(
         let ffmpeg = soma_video::Ffmpeg::new(
             &conf.app.get_ffmpeg_binary(),
             video_params.get_n_threads(),
-            video_params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()),
+            video_params
+                .get_video_encoder()
+                .unwrap_or_else(|| conf.app.get_video_codec()),
         );
         let audio_dur = ffmpeg.get_audio_duration(audio_file)?;
         // 数字人文案可能包含 Fish-Speech 情感标签，字幕中不应显示
@@ -375,10 +487,13 @@ pub fn generate_subtitle_stage(
         soma_tts::subtitle::create_subtitle_file(&cues, &subtitle_path)?;
     }
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        subtitle_path: Some(subtitle_path.clone()),
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            subtitle_path: Some(subtitle_path.clone()),
+            ..Default::default()
+        },
+    );
 
     Ok(subtitle_path)
 }
@@ -399,7 +514,9 @@ pub fn compose_final_video_stage(
     let ffmpeg = soma_video::Ffmpeg::new(
         &conf.app.get_ffmpeg_binary(),
         video_params.get_n_threads(),
-        video_params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()),
+        video_params
+            .get_video_encoder()
+            .unwrap_or_else(|| conf.app.get_video_codec()),
     );
     let composer = soma_video::VideoComposer::new(ffmpeg);
 
@@ -413,9 +530,19 @@ pub fn compose_final_video_stage(
         final_params.bgm_file = Some(bgm_file);
     }
 
-    composer.generate_video(portrait_video_path, audio_file, subtitle_path, final_path, &final_params)?;
+    composer.generate_video(
+        portrait_video_path,
+        audio_file,
+        subtitle_path,
+        final_path,
+        &final_params,
+    )?;
 
-    log::info!("数字人任务阶段3完成: task_id={}, final={}", task_id, final_path);
+    log::info!(
+        "数字人任务阶段3完成: task_id={}, final={}",
+        task_id,
+        final_path
+    );
     Ok(())
 }
 
@@ -445,11 +572,13 @@ mod tests {
     /// 测试基本参数转换：subject/script/aspect/portrait
     #[test]
     fn test_dh_params_to_video_params_basic() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "test.jpg",
             "narration_text": "测试文案",
             "video_aspect": "16:9"
-        }"#);
+        }"#,
+        );
         let vp = dh_params_to_video_params(&params);
         assert_eq!(vp.video_subject, "digital_human");
         assert_eq!(vp.video_script, "测试文案");
@@ -461,14 +590,16 @@ mod tests {
     /// 测试参数转换：voice 相关字段
     #[test]
     fn test_dh_params_to_video_params_voice_fields() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x",
             "voice_name": "zh-CN-XiaoxiaoNeural",
             "voice_rate": 1.5,
             "voice_volume": 0.8,
             "video_language": "zh-CN"
-        }"#);
+        }"#,
+        );
         let vp = dh_params_to_video_params(&params);
         assert_eq!(vp.voice_name, Some("zh-CN-XiaoxiaoNeural".to_string()));
         assert_eq!(vp.voice_rate, Some(1.5));
@@ -479,13 +610,15 @@ mod tests {
     /// 测试参数转换：bgm 相关字段
     #[test]
     fn test_dh_params_to_video_params_bgm_fields() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x",
             "bgm_type": "random",
             "bgm_file": "/path/to/bgm.mp3",
             "bgm_volume": 0.5
-        }"#);
+        }"#,
+        );
         let vp = dh_params_to_video_params(&params);
         assert_eq!(vp.bgm_type, Some("random".to_string()));
         assert_eq!(vp.bgm_file, Some("/path/to/bgm.mp3".to_string()));
@@ -495,7 +628,8 @@ mod tests {
     /// 测试参数转换：字幕相关字段
     #[test]
     fn test_dh_params_to_video_params_subtitle_fields() {
-        let params = make_params(r##"{
+        let params = make_params(
+            r##"{
             "portrait_image": "p.jpg",
             "narration_text": "x",
             "subtitle_enabled": true,
@@ -506,7 +640,8 @@ mod tests {
             "text_fore_color": "#FFFFFF",
             "stroke_color": "#000000",
             "stroke_width": 2.0
-        }"##);
+        }"##,
+        );
         let vp = dh_params_to_video_params(&params);
         assert_eq!(vp.subtitle_enabled, Some(true));
         assert_eq!(vp.subtitle_position, Some("bottom".to_string()));
@@ -521,12 +656,14 @@ mod tests {
     /// 测试参数转换：编码器与线程数
     #[test]
     fn test_dh_params_to_video_params_encoder_threads() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x",
             "video_encoder": "libx264",
             "n_threads": 4
-        }"#);
+        }"#,
+        );
         let vp = dh_params_to_video_params(&params);
         assert_eq!(vp.video_encoder, Some("libx264".to_string()));
         assert_eq!(vp.n_threads, Some(4));
@@ -535,10 +672,12 @@ mod tests {
     /// 测试参数转换：默认值（仅必填字段）
     #[test]
     fn test_dh_params_to_video_params_minimal() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "min.jpg",
             "narration_text": "最小文案"
-        }"#);
+        }"#,
+        );
         let vp = dh_params_to_video_params(&params);
         assert_eq!(vp.video_subject, "digital_human");
         assert_eq!(vp.video_script, "最小文案");
@@ -550,50 +689,56 @@ mod tests {
         assert!(vp.subtitle_enabled.is_none());
     }
 
-
     /// 测试 DigitalHumanParams::get_video_aspect 默认竖屏
     #[test]
     fn test_dh_params_default_aspect() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x"
-        }"#);
+        }"#,
+        );
         assert_eq!(params.get_video_aspect(), VideoAspect::Portrait);
     }
 
     /// 测试 DigitalHumanParams::get_video_aspect 横屏
     #[test]
     fn test_dh_params_landscape_aspect() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x",
             "video_aspect": "16:9"
-        }"#);
+        }"#,
+        );
         assert_eq!(params.get_video_aspect(), VideoAspect::Landscape);
     }
 
     /// 测试 DigitalHumanParams::get_tts_provider 默认 edge
     #[test]
     fn test_dh_params_default_tts_provider() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x"
-        }"#);
+        }"#,
+        );
         assert_eq!(params.get_tts_provider(), "edge");
     }
 
     /// 测试 DigitalHumanParams::get_tts_provider 自定义
     #[test]
     fn test_dh_params_custom_tts_provider() {
-        let params = make_params(r#"{
+        let params = make_params(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "x",
             "tts_provider": "azure"
-        }"#);
+        }"#,
+        );
         assert_eq!(params.get_tts_provider(), "azure");
     }
 }
-
 
 // ============ digitalhuman.video 功能点（纳入统一功能点注册表） ============
 
@@ -672,17 +817,19 @@ impl TypedFeature for DigitalHumanVideoFeature {
                 })
             }
             Err(e) => {
-                state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
-                    state: Some(TaskStatus::Failed.as_i32()),
-                    error_message: Some(format!("{:?}", e)),
-                    ..Default::default()
-                });
+                state::update_dh_task_data(
+                    &task_id,
+                    &state::DhTaskUpdateData {
+                        state: Some(TaskStatus::Failed.as_i32()),
+                        error_message: Some(format!("{:?}", e)),
+                        ..Default::default()
+                    },
+                );
                 Err(e)
             }
         }
     }
 }
-
 
 // ============ 人像来源解析（供 run_task 与独立功能点复用） ============
 
@@ -698,13 +845,12 @@ pub fn resolve_portrait_source(
     let provider = conf.app.digital_human.get_provider();
     match provider {
         "heygem" => {
-            let merchant_id = params
-                .get_merchant_id()
-                .ok_or_else(|| SomaError::Config("HeyGem 数字人需要商户标识（merchant_id）".into()))?;
+            let merchant_id = params.get_merchant_id().ok_or_else(|| {
+                SomaError::Config("HeyGem 数字人需要商户标识（merchant_id）".into())
+            })?;
             let hg_conf = &conf.app.digital_human.heygem;
-            let asset_store = crate::service::heygem_merchant::MerchantAssetStore::new(
-                hg_conf.get_assets_dir(),
-            );
+            let asset_store =
+                crate::service::heygem_merchant::MerchantAssetStore::new(hg_conf.get_assets_dir());
             if !asset_store.check_ready(merchant_id)? {
                 return Err(SomaError::VideoGen(format!(
                     "商户 {merchant_id} 模型未就绪，请先完成模型训练"
@@ -727,9 +873,8 @@ pub fn resolve_portrait_source(
                         "未指定 Live2D 模型，请配置 default_model 或在任务参数中指定 live2d_model_id".into(),
                     )
                 })?;
-            let model_store = crate::service::live2d_model::Live2DModelStore::new(
-                l2d_conf.get_models_dir(),
-            );
+            let model_store =
+                crate::service::live2d_model::Live2DModelStore::new(l2d_conf.get_models_dir());
             if !model_store.check_model_ready(&model_id)? {
                 return Err(SomaError::VideoGen(format!(
                     "Live2D 模型 {model_id} 不存在或未就绪"
@@ -802,11 +947,14 @@ impl TypedFeature for DigitalHumanPortraitFeature {
         state::create_dh_task_entry(&task_id, input.params.clone());
 
         let fail = |e: &SomaError| {
-            state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
-                state: Some(TaskStatus::Failed.as_i32()),
-                error_message: Some(format!("{:?}", e)),
-                ..Default::default()
-            });
+            state::update_dh_task_data(
+                &task_id,
+                &state::DhTaskUpdateData {
+                    state: Some(TaskStatus::Failed.as_i32()),
+                    error_message: Some(format!("{:?}", e)),
+                    ..Default::default()
+                },
+            );
         };
 
         let portrait_path = match resolve_portrait_source(&input.params, &conf) {
@@ -835,12 +983,15 @@ impl TypedFeature for DigitalHumanPortraitFeature {
         ) {
             Ok(video) => {
                 ctx.add_artifact("portrait_video.mp4", &video, ArtifactKind::Video);
-                state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
-                    portrait_video_path: Some(video.clone()),
-                    audio_file: Some(input.audio_file.clone()),
-                    progress: Some(90),
-                    ..Default::default()
-                });
+                state::update_dh_task_data(
+                    &task_id,
+                    &state::DhTaskUpdateData {
+                        portrait_video_path: Some(video.clone()),
+                        audio_file: Some(input.audio_file.clone()),
+                        progress: Some(90),
+                        ..Default::default()
+                    },
+                );
                 Ok(DhPortraitOutput {
                     portrait_video: video,
                     provider,
@@ -917,6 +1068,8 @@ impl TypedFeature for DigitalHumanComposeFeature {
             &conf,
         )?;
         ctx.add_artifact("final.mp4", &final_path, ArtifactKind::Video);
-        Ok(DhComposeOutput { final_video: final_path })
+        Ok(DhComposeOutput {
+            final_video: final_path,
+        })
     }
 }

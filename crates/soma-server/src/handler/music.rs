@@ -6,9 +6,9 @@
 use actix_multipart::Multipart;
 use actix_web::HttpResponse;
 use futures::StreamExt;
+use soma_core::utils;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_core::utils;
 
 /// 音乐模块请求分发
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
@@ -35,12 +35,24 @@ async fn list_musics(_param: &RequestParameter) -> Result<Value> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         if ext != "mp3" && ext != "wav" && ext != "aac" && ext != "ogg" {
             continue;
         }
-        let name = path.file_stem().and_then(|n| n.to_str()).unwrap_or("").to_string();
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let name = path
+            .file_stem()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         let size = path.metadata().map(|m| m.len()).unwrap_or(0);
         items.push(value!({
             "name": name,

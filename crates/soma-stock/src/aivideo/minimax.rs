@@ -2,11 +2,13 @@
 //!
 //! 委托 ai-llm-kit 的 MinimaxMultiModal 实现，Soma 侧仅做类型转换。
 
-use async_trait::async_trait;
-use ai_llm_kit::multi_modal::{LlmMultiModalService, MultiModalGenerationExt, VideoGenerationParams, download_video_common};
-use ai_llm_kit::minimax::MiniMax;
-use soma_core::error::SomaError;
 use super::{AiVideoProvider, VideoGenParams, VideoGenStatus};
+use ai_llm_kit::minimax::MiniMax;
+use ai_llm_kit::multi_modal::{
+    download_video_common, LlmMultiModalService, MultiModalGenerationExt, VideoGenerationParams,
+};
+use async_trait::async_trait;
+use soma_core::error::SomaError;
 
 pub struct MinimaxVideo {
     multi_modal: Box<dyn LlmMultiModalService>,
@@ -37,28 +39,41 @@ impl AiVideoProvider for MinimaxVideo {
             aspect_ratio: Some(params.aspect_ratio.clone()),
             prompt_optimizer: Some(true),
         };
-        let result = self.multi_modal.generate_video(&mm_params).await
+        let result = self
+            .multi_modal
+            .generate_video(&mm_params)
+            .await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
         if result.task_id.is_empty() {
-            return Err(SomaError::VideoGen("MiniMax返回空任务ID，可能被限流或参数错误".into()));
+            return Err(SomaError::VideoGen(
+                "MiniMax返回空任务ID，可能被限流或参数错误".into(),
+            ));
         }
         Ok(result.task_id)
     }
 
     async fn query_task(&self, task_id: &str) -> Result<VideoGenStatus, SomaError> {
-        let result = self.multi_modal.query_video_task(task_id).await
+        let result = self
+            .multi_modal
+            .query_video_task(task_id)
+            .await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))?;
         if result.is_success() {
-            Ok(VideoGenStatus::Success { video_urls: result.video_urls })
+            Ok(VideoGenStatus::Success {
+                video_urls: result.video_urls,
+            })
         } else if result.is_failed() {
-            Ok(VideoGenStatus::Failed { message: result.task_status })
+            Ok(VideoGenStatus::Failed {
+                message: result.task_status,
+            })
         } else {
             Ok(VideoGenStatus::Processing)
         }
     }
 
     async fn download_video(&self, url: &str, save_path: &str) -> Result<String, SomaError> {
-        download_video_common(url, save_path).await
+        download_video_common(url, save_path)
+            .await
             .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))
     }
 }

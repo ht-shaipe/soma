@@ -307,7 +307,10 @@ pub fn import_csv(content: &str) -> Vec<ExportRow> {
         }
         let mut row = ExportRow::new();
         for (i, val) in rec.iter().enumerate() {
-            let key = headers.get(i).cloned().unwrap_or_else(|| format!("col_{}", i));
+            let key = headers
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("col_{}", i));
             row = row.add(&key, val);
         }
         rows.push(row);
@@ -323,17 +326,34 @@ mod tests {
     #[test]
     fn test_csv_roundtrip() {
         let mut exporter = DataExporter::new();
-        exporter.add_row(ExportRow::new().add("name", "soma").add("desc", "video, generator"));
-        exporter.add_row(ExportRow::new().add("name", "quote\"d").add("desc", "line\nbreak"));
+        exporter.add_row(
+            ExportRow::new()
+                .add("name", "soma")
+                .add("desc", "video, generator"),
+        );
+        exporter.add_row(
+            ExportRow::new()
+                .add("name", "quote\"d")
+                .add("desc", "line\nbreak"),
+        );
 
         let csv = exporter.to_csv();
 
         let rows = import_csv(&csv);
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].fields[0], ("name".to_string(), "soma".to_string()));
-        assert_eq!(rows[0].fields[1], ("desc".to_string(), "video, generator".to_string()));
-        assert_eq!(rows[1].fields[0], ("name".to_string(), "quote\"d".to_string()));
-        assert_eq!(rows[1].fields[1], ("desc".to_string(), "line\nbreak".to_string()));
+        assert_eq!(
+            rows[0].fields[1],
+            ("desc".to_string(), "video, generator".to_string())
+        );
+        assert_eq!(
+            rows[1].fields[0],
+            ("name".to_string(), "quote\"d".to_string())
+        );
+        assert_eq!(
+            rows[1].fields[1],
+            ("desc".to_string(), "line\nbreak".to_string())
+        );
     }
 
     #[test]

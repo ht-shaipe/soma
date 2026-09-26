@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 pub mod config;
 /// 错误类型模块，定义统一的 SomaError 枚举
 pub mod error;
+/// 数据导出模块，支持 CSV / JSON / JSONL 格式
+pub mod export;
 /// 敏感词过滤模块，提供敏感词库加载与文本命中检查
 pub mod filter;
 /// 数据模型模块，定义任务状态、视频参数、字幕等核心数据结构
@@ -20,8 +22,6 @@ pub mod notify;
 pub mod signing;
 /// 字幕高级处理模块，支持翻译/校正/合并/格式转换
 pub mod subtitle;
-/// 数据导出模块，支持 CSV / JSON / JSONL 格式
-pub mod export;
 /// 工具函数模块，提供路径处理、字符串分割、SRT 生成等通用工具
 pub mod utils;
 

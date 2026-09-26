@@ -5,11 +5,11 @@
 //!
 //! 流程：切句 → 循环(每句TTS+口播) → FFmpeg concat → 叠字幕
 
-use std::path::Path;
-use soma_core::error::SomaError;
-use soma_core::models::{DigitalHumanParams, VideoParams};
 use crate::state;
 use crate::Config;
+use soma_core::error::SomaError;
+use soma_core::models::{DigitalHumanParams, VideoParams};
+use std::path::Path;
 
 pub const SINGLE_GEN_FRAME_LIMIT: u32 = 150;
 pub const SINGLE_GEN_DURATION_LIMIT: f64 = 6.0;
@@ -59,7 +59,10 @@ pub fn split_long_segment(text: &str, max_chars: usize) -> Vec<String> {
             start += 1;
         }
     }
-    result.into_iter().filter(|s| !s.trim().is_empty()).collect()
+    result
+        .into_iter()
+        .filter(|s| !s.trim().is_empty())
+        .collect()
 }
 
 /// 将文案按标点和字符数切分为多个短句
@@ -106,42 +109,71 @@ pub fn run_segment_flow(
     let n = segments.len() as u32;
     log::info!("分段生成: task_id={}, segments={}", task_id, n);
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        segment_count: Some(n),
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            segment_count: Some(n),
+            ..Default::default()
+        },
+    );
 
     let video_params = build_video_params(params);
     let ffmpeg = soma_video::Ffmpeg::new(
         &conf.app.get_ffmpeg_binary(),
         video_params.get_n_threads(),
-        video_params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()),
+        video_params
+            .get_video_encoder()
+            .unwrap_or_else(|| conf.app.get_video_codec()),
     );
 
     let audio_mp3 = task_dir.join("audio.mp3").to_string_lossy().to_string();
-    let portrait_video_mp4 = task_dir.join("portrait_video.mp4").to_string_lossy().to_string();
+    let portrait_video_mp4 = task_dir
+        .join("portrait_video.mp4")
+        .to_string_lossy()
+        .to_string();
     let final_mp4 = task_dir.join("final.mp4").to_string_lossy().to_string();
 
     if n == 1 {
         let (af, dur) = crate::service::pipeline::generate_audio_to(
-            task_id, &video_params, &segments[0], &audio_mp3, conf,
+            task_id,
+            &video_params,
+            &segments[0],
+            &audio_mp3,
+            conf,
         )?;
         if dur <= SINGLE_GEN_DURATION_LIMIT {
             log::info!("快速路径: task_id={}, dur={:.2}s", task_id, dur);
             crate::service::digital_human::generate_portrait_video_stage(
-                task_id, params, portrait_path, &af, &portrait_video_mp4, conf, None,
+                task_id,
+                params,
+                portrait_path,
+                &af,
+                &portrait_video_mp4,
+                conf,
+                None,
             )?;
 
             let subtitle_path = if params.subtitle_enabled.unwrap_or(false) {
                 crate::service::digital_human::generate_subtitle_stage(
-                    task_id, &video_params, narration_text, &af, conf,
-                ).unwrap_or_default()
+                    task_id,
+                    &video_params,
+                    narration_text,
+                    &af,
+                    conf,
+                )
+                .unwrap_or_default()
             } else {
                 String::new()
             };
 
             crate::service::digital_human::compose_final_video_stage(
-                task_id, &video_params, &portrait_video_mp4, &af, &subtitle_path, &final_mp4, conf,
+                task_id,
+                &video_params,
+                &portrait_video_mp4,
+                &af,
+                &subtitle_path,
+                &final_mp4,
+                conf,
             )?;
 
             return Ok(SegmentOutcome {
@@ -161,7 +193,10 @@ pub fn run_segment_flow(
         let progress = 10 + (40 - 10) * i as u32 / n;
         state::update_dh_task(task_id, None, Some(progress));
 
-        let seg_mp3 = task_dir.join(format!("segment_{}.mp3", idx)).to_string_lossy().to_string();
+        let seg_mp3 = task_dir
+            .join(format!("segment_{}.mp3", idx))
+            .to_string_lossy()
+            .to_string();
         let dur = generate_segment_audio(task_id, &video_params, seg_text, idx, &seg_mp3, conf)?;
         seg_audios.push(seg_mp3);
         seg_durations.push(dur);
@@ -176,25 +211,36 @@ pub fn run_segment_flow(
         let progress = 40 + (85 - 40) * i as u32 / n;
         state::update_dh_task(task_id, None, Some(progress));
 
-        let seg_mp4 = task_dir.join(format!("portrait_{}.mp4", idx)).to_string_lossy().to_string();
+        let seg_mp4 = task_dir
+            .join(format!("portrait_{}.mp4", idx))
+            .to_string_lossy()
+            .to_string();
         let dur = seg_durations[i];
 
         generate_segment_video(
-            task_id, params, portrait_path, &seg_audios[i], &seg_mp4,
-            idx, dur, conf,
+            task_id,
+            params,
+            portrait_path,
+            &seg_audios[i],
+            &seg_mp4,
+            idx,
+            dur,
+            conf,
         )?;
 
         total_dur += dur;
         seg_videos.push(seg_mp4.clone());
 
-        state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-            current_segment: Some(idx as u32),
-            segment_audio_files: Some(seg_audios[..=i].to_vec()),
-            segment_video_files: Some(seg_videos.clone()),
-            ..Default::default()
-        });
+        state::update_dh_task_data(
+            task_id,
+            &state::DhTaskUpdateData {
+                current_segment: Some(idx as u32),
+                segment_audio_files: Some(seg_audios[..=i].to_vec()),
+                segment_video_files: Some(seg_videos.clone()),
+                ..Default::default()
+            },
+        );
     }
-
 
     state::update_dh_task(task_id, None, Some(85));
     concat_portrait_segments(&seg_videos, &portrait_video_mp4, &ffmpeg)?;
@@ -205,28 +251,51 @@ pub fn run_segment_flow(
 
     let subtitle_path = if params.subtitle_enabled.unwrap_or(false) {
         crate::service::digital_human::generate_subtitle_stage(
-            task_id, &video_params, narration_text, &audio_mp3, conf,
-        ).unwrap_or_default()
+            task_id,
+            &video_params,
+            narration_text,
+            &audio_mp3,
+            conf,
+        )
+        .unwrap_or_default()
     } else {
         String::new()
     };
 
     crate::service::digital_human::compose_final_video_stage(
-        task_id, &video_params, &portrait_video_mp4, &audio_mp3, &subtitle_path, &final_mp4, conf,
+        task_id,
+        &video_params,
+        &portrait_video_mp4,
+        &audio_mp3,
+        &subtitle_path,
+        &final_mp4,
+        conf,
     )?;
 
-    state::update_dh_task_data(task_id, &state::DhTaskUpdateData {
-        portrait_video_path: Some(portrait_video_mp4.clone()),
-        audio_file: Some(audio_mp3.clone()),
-        audio_duration: Some(audio_duration),
-        final_video_path: Some(final_mp4.clone()),
-        state: Some(soma_core::models::TaskStatus::Completed.as_i32()),
-        progress: Some(100),
-        subtitle_path: if subtitle_path.is_empty() { None } else { Some(subtitle_path) },
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        task_id,
+        &state::DhTaskUpdateData {
+            portrait_video_path: Some(portrait_video_mp4.clone()),
+            audio_file: Some(audio_mp3.clone()),
+            audio_duration: Some(audio_duration),
+            final_video_path: Some(final_mp4.clone()),
+            state: Some(soma_core::models::TaskStatus::Completed.as_i32()),
+            progress: Some(100),
+            subtitle_path: if subtitle_path.is_empty() {
+                None
+            } else {
+                Some(subtitle_path)
+            },
+            ..Default::default()
+        },
+    );
 
-    log::info!("分段生成完成: task_id={}, segments={}, dur={:.2}s", task_id, n, audio_duration);
+    log::info!(
+        "分段生成完成: task_id={}, segments={}, dur={:.2}s",
+        task_id,
+        n,
+        audio_duration
+    );
 
     Ok(SegmentOutcome {
         portrait_video_path: portrait_video_mp4,
@@ -248,7 +317,9 @@ fn generate_segment_audio(
     let ffmpeg = soma_video::Ffmpeg::new(
         &conf.app.get_ffmpeg_binary(),
         video_params.get_n_threads(),
-        video_params.get_video_encoder().unwrap_or_else(|| conf.app.get_video_codec()),
+        video_params
+            .get_video_encoder()
+            .unwrap_or_else(|| conf.app.get_video_codec()),
     );
 
     if Path::new(seg_mp3).exists() {
@@ -259,9 +330,9 @@ fn generate_segment_audio(
         }
     }
 
-    let (_, mut dur) = crate::service::pipeline::generate_audio_to(
-        task_id, video_params, seg_text, seg_mp3, conf,
-    ).map_err(|e| SomaError::Tts(format!("TTS 合成失败（分段 {}）: {}", index, e)))?;
+    let (_, mut dur) =
+        crate::service::pipeline::generate_audio_to(task_id, video_params, seg_text, seg_mp3, conf)
+            .map_err(|e| SomaError::Tts(format!("TTS 合成失败（分段 {}）: {}", index, e)))?;
 
     if dur > SINGLE_GEN_DURATION_LIMIT && seg_text.chars().count() > 2 {
         log::warn!("分段 {} 音频 {:.2}s 超限，二次切分重生成", index, dur);
@@ -269,10 +340,25 @@ fn generate_segment_audio(
         let mut sub_audios: Vec<String> = Vec::new();
         let mut sub_dur = 0.0f64;
         for (j, sub) in sub_texts.iter().enumerate() {
-            let sub_mp3 = task_dir.join(format!("segment_{}_{}.mp3", index, j + 1)).to_string_lossy().to_string();
+            let sub_mp3 = task_dir
+                .join(format!("segment_{}_{}.mp3", index, j + 1))
+                .to_string_lossy()
+                .to_string();
             let (_, d) = crate::service::pipeline::generate_audio_to(
-                task_id, video_params, sub, &sub_mp3, conf,
-            ).map_err(|e| SomaError::Tts(format!("TTS 二次切分失败（分段 {}-{}）: {}", index, j + 1, e)))?;
+                task_id,
+                video_params,
+                sub,
+                &sub_mp3,
+                conf,
+            )
+            .map_err(|e| {
+                SomaError::Tts(format!(
+                    "TTS 二次切分失败（分段 {}-{}）: {}",
+                    index,
+                    j + 1,
+                    e
+                ))
+            })?;
             sub_audios.push(sub_mp3);
             sub_dur += d;
         }
@@ -301,30 +387,58 @@ fn generate_segment_video(
     let ffmpeg = soma_video::Ffmpeg::new(
         &conf.app.get_ffmpeg_binary(),
         params.n_threads.unwrap_or(4),
-        params.video_encoder.as_deref().unwrap_or_else(|| conf.app.get_video_codec()),
+        params
+            .video_encoder
+            .as_deref()
+            .unwrap_or_else(|| conf.app.get_video_codec()),
     );
 
     if !Path::new(seg_mp4).exists() {
-        let _preview: String = std::fs::read_to_string(seg_mp3).unwrap_or_default().chars().take(50).collect();
+        let _preview: String = std::fs::read_to_string(seg_mp3)
+            .unwrap_or_default()
+            .chars()
+            .take(50)
+            .collect();
         log::info!("口播分段 {} 开始: task_id={}", index, task_id);
 
         crate::service::digital_human::generate_portrait_video_stage(
-            task_id, params, portrait_path, seg_mp3, seg_mp4, conf, Some(index),
-        ).map_err(|e| SomaError::VideoGen(format!("口播视频生成失败（分段 {}）: {}", index, e)))?;
+            task_id,
+            params,
+            portrait_path,
+            seg_mp3,
+            seg_mp4,
+            conf,
+            Some(index),
+        )
+        .map_err(|e| SomaError::VideoGen(format!("口播视频生成失败（分段 {}）: {}", index, e)))?;
     }
 
     let video_dur = ffmpeg.get_video_duration(seg_mp4).unwrap_or(0.0);
     let provider = conf.app.digital_human.get_provider();
     if provider != "live2d" && video_dur < dur {
         let pad = dur - video_dur;
-        log::info!("分段 {} 补冻结帧: video={:.2}s audio={:.2}s pad={:.2}s", index, video_dur, dur, pad);
-        let padded_mp4 = task_dir.join(format!("portrait_{}_padded.mp4", index)).to_string_lossy().to_string();
+        log::info!(
+            "分段 {} 补冻结帧: video={:.2}s audio={:.2}s pad={:.2}s",
+            index,
+            video_dur,
+            dur,
+            pad
+        );
+        let padded_mp4 = task_dir
+            .join(format!("portrait_{}_padded.mp4", index))
+            .to_string_lossy()
+            .to_string();
         let result = std::process::Command::new(conf.app.get_ffmpeg_binary())
             .args([
-                "-y", "-i", seg_mp4,
-                "-vf", &format!("tpad=stop_mode=clone:stop_duration={:.3}", pad),
-                "-c:v", conf.app.get_video_codec(),
-                "-pix_fmt", "yuv420p",
+                "-y",
+                "-i",
+                seg_mp4,
+                "-vf",
+                &format!("tpad=stop_mode=clone:stop_duration={:.3}", pad),
+                "-c:v",
+                conf.app.get_video_codec(),
+                "-pix_fmt",
+                "yuv420p",
                 "-an",
                 &padded_mp4,
             ])
@@ -337,7 +451,12 @@ fn generate_segment_video(
         }
     }
 
-    log::info!("口播分段 {} 完成: task_id={}, dur={:.2}s", index, task_id, dur);
+    log::info!(
+        "口播分段 {} 完成: task_id={}, dur={:.2}s",
+        index,
+        task_id,
+        dur
+    );
     Ok(())
 }
 
@@ -349,7 +468,8 @@ fn concat_portrait_segments(
     for (i, seg) in segments.iter().enumerate() {
         if !Path::new(seg).exists() {
             return Err(SomaError::VideoGen(format!(
-                "分段 {} 口播视频文件缺失，无法拼接", i + 1
+                "分段 {} 口播视频文件缺失，无法拼接",
+                i + 1
             )));
         }
     }
@@ -361,7 +481,11 @@ fn concat_portrait_segments(
         expected += ffmpeg.get_video_duration(seg).unwrap_or(0.0);
     }
     if (actual - expected).abs() > CONCAT_DURATION_TOLERANCE {
-        log::warn!("拼接时长偏差: actual={:.2}s, expected={:.2}s", actual, expected);
+        log::warn!(
+            "拼接时长偏差: actual={:.2}s, expected={:.2}s",
+            actual,
+            expected
+        );
     }
     Ok(())
 }

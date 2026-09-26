@@ -11,9 +11,9 @@
 use async_trait::async_trait;
 use soma_core::error::SomaError;
 
-pub mod zhipu;
 pub mod kling;
 pub mod minimax;
+pub mod zhipu;
 
 pub use ai_llm_kit::multi_modal::aspect_to_size;
 
@@ -46,7 +46,8 @@ pub trait AiVideoProvider: Send + Sync {
 
 /// 通用视频下载（委托 ai-llm-kit）
 pub async fn download_video_common(url: &str, save_path: &str) -> Result<String, SomaError> {
-    ai_llm_kit::multi_modal::download_video_common(url, save_path).await
+    ai_llm_kit::multi_modal::download_video_common(url, save_path)
+        .await
         .map_err(|e| SomaError::VideoGen(format!("{:?}", e)))
 }
 
@@ -73,7 +74,10 @@ pub async fn poll_until_done(
         }
 
         if start.elapsed() >= timeout_dur {
-            return Err(SomaError::VideoGen(format!("AI视频生成超时（{}秒）", timeout)));
+            return Err(SomaError::VideoGen(format!(
+                "AI视频生成超时（{}秒）",
+                timeout
+            )));
         }
 
         let interval = if start.elapsed() < fast_phase { 3 } else { 8 };
@@ -82,17 +86,24 @@ pub async fn poll_until_done(
 }
 
 /// 根据提供商名称创建对应的 AI 视频生成实例
-pub fn create_provider(provider: &str, conf: &soma_core::config::AppConfig) -> Result<Box<dyn AiVideoProvider>, SomaError> {
+pub fn create_provider(
+    provider: &str,
+    conf: &soma_core::config::AppConfig,
+) -> Result<Box<dyn AiVideoProvider>, SomaError> {
     match provider {
         "cogvideox" => {
-            let api_key = conf.app.zhipu_video_api_key
+            let api_key = conf
+                .app
+                .zhipu_video_api_key
                 .as_deref()
                 .or(conf.app.zhipu_api_key.as_deref())
                 .unwrap_or("");
             if api_key.is_empty() {
                 return Err(SomaError::VideoGen("智谱视频生成 API Key 未配置".into()));
             }
-            let model = conf.app.zhipu_video_model
+            let model = conf
+                .app
+                .zhipu_video_model
                 .as_deref()
                 .unwrap_or("cogvideox-flash");
             Ok(Box::new(zhipu::ZhipuVideo::new(api_key, model)))
@@ -101,23 +112,34 @@ pub fn create_provider(provider: &str, conf: &soma_core::config::AppConfig) -> R
             let access_key = conf.app.kling_access_key.as_deref().unwrap_or("");
             let secret_key = conf.app.kling_secret_key.as_deref().unwrap_or("");
             if access_key.is_empty() || secret_key.is_empty() {
-                return Err(SomaError::VideoGen("可灵 Access Key / Secret Key 未配置".into()));
+                return Err(SomaError::VideoGen(
+                    "可灵 Access Key / Secret Key 未配置".into(),
+                ));
             }
-            let model = conf.app.kling_video_model
+            let model = conf
+                .app
+                .kling_video_model
                 .as_deref()
                 .unwrap_or("kling-v2-master");
-            Ok(Box::new(kling::KlingVideo::new(access_key, secret_key, model)))
+            Ok(Box::new(kling::KlingVideo::new(
+                access_key, secret_key, model,
+            )))
         }
         "minimax" => {
             let api_key = conf.app.minimax_video_api_key.as_deref().unwrap_or("");
             if api_key.is_empty() {
                 return Err(SomaError::VideoGen("MiniMax 视频 API Key 未配置".into()));
             }
-            let model = conf.app.minimax_video_model
+            let model = conf
+                .app
+                .minimax_video_model
                 .as_deref()
                 .unwrap_or("MiniMax-Hailuo-2.3");
             Ok(Box::new(minimax::MinimaxVideo::new(api_key, model)))
         }
-        _ => Err(SomaError::VideoGen(format!("不支持的AI视频生成提供商: {}", provider))),
+        _ => Err(SomaError::VideoGen(format!(
+            "不支持的AI视频生成提供商: {}",
+            provider
+        ))),
     }
 }

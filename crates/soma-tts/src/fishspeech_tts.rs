@@ -287,10 +287,7 @@ mod tests {
 
     #[test]
     fn test_strip_emotion_tags_basic() {
-        assert_eq!(
-            strip_emotion_tags("[whisper]你好[excited]世界"),
-            "你好世界"
-        );
+        assert_eq!(strip_emotion_tags("[whisper]你好[excited]世界"), "你好世界");
     }
 
     #[test]
@@ -328,7 +325,10 @@ mod tests {
 
     #[test]
     fn test_strip_emotion_tags_no_tags() {
-        assert_eq!(strip_emotion_tags("普通文本，没有标签。"), "普通文本，没有标签。");
+        assert_eq!(
+            strip_emotion_tags("普通文本，没有标签。"),
+            "普通文本，没有标签。"
+        );
     }
 
     #[test]

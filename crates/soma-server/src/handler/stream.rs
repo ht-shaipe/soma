@@ -1,3 +1,4 @@
+use crate::state;
 /// 视频流/下载 API 处理器
 ///
 /// 处理视频播放和下载相关的 API 请求：
@@ -5,7 +6,6 @@
 /// - "download" → 获取视频下载地址（当前与播放逻辑相同）
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use crate::state;
 
 /// 流媒体模块请求分发
 ///
@@ -57,7 +57,10 @@ async fn stream_video(param: &RequestParameter) -> Result<Value> {
 
     let storage_path = conf.app.get_storage_path();
     let relative_path = if video_path.starts_with(storage_path) {
-        video_path.strip_prefix(storage_path).unwrap_or(video_path).trim_start_matches('/')
+        video_path
+            .strip_prefix(storage_path)
+            .unwrap_or(video_path)
+            .trim_start_matches('/')
     } else {
         &video_filename
     };
@@ -65,7 +68,11 @@ async fn stream_video(param: &RequestParameter) -> Result<Value> {
     let url = if endpoint.is_empty() {
         format!("/storage/{}", relative_path)
     } else {
-        format!("{}/storage/{}", endpoint.trim_end_matches('/'), relative_path)
+        format!(
+            "{}/storage/{}",
+            endpoint.trim_end_matches('/'),
+            relative_path
+        )
     };
 
     Ok(value!({
@@ -107,7 +114,10 @@ async fn download_video(param: &RequestParameter) -> Result<Value> {
 
     let storage_path = conf.app.get_storage_path();
     let relative_path = if video_path.starts_with(storage_path) {
-        video_path.strip_prefix(storage_path).unwrap_or(video_path).trim_start_matches('/')
+        video_path
+            .strip_prefix(storage_path)
+            .unwrap_or(video_path)
+            .trim_start_matches('/')
     } else {
         &video_filename
     };
@@ -115,7 +125,11 @@ async fn download_video(param: &RequestParameter) -> Result<Value> {
     let url = if endpoint.is_empty() {
         format!("/storage/{}", relative_path)
     } else {
-        format!("{}/storage/{}", endpoint.trim_end_matches('/'), relative_path)
+        format!(
+            "{}/storage/{}",
+            endpoint.trim_end_matches('/'),
+            relative_path
+        )
     };
 
     Ok(value!({

@@ -203,7 +203,6 @@ fn main() {
         .expect("Soma 桌面应用启动失败");
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,7 +214,8 @@ mod tests {
         let mut param = RequestParameter::default();
         param.module = "features".to_string();
         param.method = "list".to_string();
-        param.value = tube_value::Value::from_serialize(serde_json::json!({})).unwrap_or(tube_value::Value::Null);
+        param.value = tube_value::Value::from_serialize(serde_json::json!({}))
+            .unwrap_or(tube_value::Value::Null);
         param.text = Some("{}".to_string());
 
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -223,12 +223,23 @@ mod tests {
             .build()
             .unwrap();
         let local = tokio::task::LocalSet::new();
-        let res = local.block_on(&rt, dispatch("features", &param)).expect("dispatch 失败");
+        let res = local
+            .block_on(&rt, dispatch("features", &param))
+            .expect("dispatch 失败");
         let json = serde_json::to_value(&res).expect("序列化失败");
         let list = json.as_array().expect("features/list 应返回数组");
         assert!(list.len() >= 24, "功能点数量应 ≥ 24，实际 {}", list.len());
-        let ids: Vec<&str> = list.iter().filter_map(|f| f.get("id").and_then(|v| v.as_str())).collect();
-        for expected in ["video.info", "video.transition", "digitalhuman.portrait", "llm.terms", "material.download"] {
+        let ids: Vec<&str> = list
+            .iter()
+            .filter_map(|f| f.get("id").and_then(|v| v.as_str()))
+            .collect();
+        for expected in [
+            "video.info",
+            "video.transition",
+            "digitalhuman.portrait",
+            "llm.terms",
+            "material.download",
+        ] {
             assert!(ids.contains(&expected), "缺少功能点 {expected}");
         }
     }
@@ -248,7 +259,11 @@ mod tests {
                 serde_json::json!({}),
             ))
             .expect("api 命令失败");
-        assert_eq!(envelope["code"], 200, "信封 code 应为 200: {}", envelope["message"]);
+        assert_eq!(
+            envelope["code"], 200,
+            "信封 code 应为 200: {}",
+            envelope["message"]
+        );
         let list = envelope["result"].as_array().expect("result 应为数组");
         assert!(list.len() >= 24, "功能点数量应 ≥ 24，实际 {}", list.len());
     }

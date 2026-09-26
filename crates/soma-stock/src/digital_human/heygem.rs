@@ -3,10 +3,10 @@
 //! 通过 HTTP API 调用 HeyGem Docker 服务生成口播视频。
 //! 端口 8383，接口 POST /easy/submit + GET /easy/query
 
+use super::{DhVideoGenParams, DhVideoGenStatus, DigitalHumanProvider};
 use async_trait::async_trait;
 use soma_core::config::HeyGemConfig;
 use soma_core::error::SomaError;
-use super::{DhVideoGenParams, DhVideoGenStatus, DigitalHumanProvider};
 
 pub struct HeyGemProvider {
     config: HeyGemConfig,
@@ -16,7 +16,6 @@ impl HeyGemProvider {
     pub fn new(config: HeyGemConfig) -> Self {
         Self { config }
     }
-
 }
 
 #[async_trait(?Send)]
@@ -54,10 +53,16 @@ impl DigitalHumanProvider for HeyGemProvider {
                     if status.is_client_error() {
                         let text = r.text().await.unwrap_or_default();
                         return Err(SomaError::VideoGen(format!(
-                            "视频合成请求参数错误: HTTP {} - {}", status, text
+                            "视频合成请求参数错误: HTTP {} - {}",
+                            status, text
                         )));
                     }
-                    log::warn!("HeyGem 视频合成重试 {}/{}: HTTP {}", attempt, max_retries, status);
+                    log::warn!(
+                        "HeyGem 视频合成重试 {}/{}: HTTP {}",
+                        attempt,
+                        max_retries,
+                        status
+                    );
                 }
                 Err(e) => {
                     if e.is_connect() {
@@ -77,21 +82,33 @@ impl DigitalHumanProvider for HeyGemProvider {
     }
 
     async fn query_task(&self, task_id: &str) -> Result<DhVideoGenStatus, SomaError> {
-        let url = format!("{}/easy/query?code={}", self.config.get_video_base_url(), task_id);
+        let url = format!(
+            "{}/easy/query?code={}",
+            self.config.get_video_base_url(),
+            task_id
+        );
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(|e| SomaError::VideoGen(format!("HTTP 客户端创建失败: {}", e)))?;
 
-        let resp = client.get(&url).send().await
+        let resp = client
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| SomaError::VideoGen(format!("查询失败: {}", e)))?;
 
         if !resp.status().is_success() {
-            return Err(SomaError::VideoGen(format!("查询失败: HTTP {}", resp.status())));
+            return Err(SomaError::VideoGen(format!(
+                "查询失败: HTTP {}",
+                resp.status()
+            )));
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| SomaError::VideoGen(format!("解析响应失败: {}", e)))?;
 
         let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
@@ -99,15 +116,27 @@ impl DigitalHumanProvider for HeyGemProvider {
 
         match status {
             "success" | "done" | "completed" => {
-                let video_url = json.get("video_url").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let video_url = json
+                    .get("video_url")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 Ok(DhVideoGenStatus::Success { video_url })
             }
             "failed" | "error" => {
-                let msg = json.get("message").and_then(|v| v.as_str()).unwrap_or("未知错误").to_string();
+                let msg = json
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("未知错误")
+                    .to_string();
                 Ok(DhVideoGenStatus::Failed { message: msg })
             }
             _ => {
-                log::info!("HeyGem 视频合成进度: code={}, progress={:.0}%", task_id, progress * 100.0);
+                log::info!(
+                    "HeyGem 视频合成进度: code={}, progress={:.0}%",
+                    task_id,
+                    progress * 100.0
+                );
                 Ok(DhVideoGenStatus::Processing)
             }
         }

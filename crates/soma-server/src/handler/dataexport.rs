@@ -74,15 +74,16 @@ async fn export_data(param: &RequestParameter) -> Result<Value> {
             return Err(error!("缺少 data 或 inputPath 参数"));
         }
 
-        let content = std::fs::read_to_string(&input_path)
-            .map_err(|e| error!("读取输入文件失败: {}", e))?;
+        let content =
+            std::fs::read_to_string(&input_path).map_err(|e| error!("读取输入文件失败: {}", e))?;
 
         let rows = if input_path.to_lowercase().ends_with(".jsonl") {
             export::import_jsonl(&content)
         } else if input_path.to_lowercase().ends_with(".csv") {
             export::import_csv(&content)
         } else {
-            export::import_json(&content).map_err(|_| error!("解析 JSON 失败，请确认输入文件是 JSON 数组格式"))?
+            export::import_json(&content)
+                .map_err(|_| error!("解析 JSON 失败，请确认输入文件是 JSON 数组格式"))?
         };
 
         if rows.is_empty() {
@@ -100,7 +101,12 @@ async fn export_data(param: &RequestParameter) -> Result<Value> {
     }
 
     // 格式：显式指定优先，否则按输出文件扩展名
-    let format = match param.value.get_def_string("format", "").to_lowercase().as_str() {
+    let format = match param
+        .value
+        .get_def_string("format", "")
+        .to_lowercase()
+        .as_str()
+    {
         "csv" => Some(ExportFormat::Csv),
         "json" => Some(ExportFormat::Json),
         "jsonl" => Some(ExportFormat::Jsonl),
@@ -108,8 +114,12 @@ async fn export_data(param: &RequestParameter) -> Result<Value> {
     };
 
     let count = match format {
-        Some(f) => exporter.export(&output_path, f).map_err(|e| error!("{}", e))?,
-        None => exporter.export_auto(&output_path).map_err(|e| error!("{}", e))?,
+        Some(f) => exporter
+            .export(&output_path, f)
+            .map_err(|e| error!("{}", e))?,
+        None => exporter
+            .export_auto(&output_path)
+            .map_err(|e| error!("{}", e))?,
     };
 
     Ok(value!({
@@ -156,15 +166,15 @@ async fn preview_data(param: &RequestParameter) -> Result<Value> {
 }
 
 fn load_rows(path: &str) -> Result<Vec<ExportRow>> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| error!("读取文件失败: {}", e))?;
+    let content = std::fs::read_to_string(path).map_err(|e| error!("读取文件失败: {}", e))?;
 
     if path.to_lowercase().ends_with(".jsonl") {
         Ok(export::import_jsonl(&content))
     } else if path.to_lowercase().ends_with(".csv") {
         Ok(export::import_csv(&content))
     } else {
-        export::import_json(&content).map_err(|_| error!("解析 JSON 失败，请确认文件是 JSON 数组格式"))
+        export::import_json(&content)
+            .map_err(|_| error!("解析 JSON 失败，请确认文件是 JSON 数组格式"))
     }
 }
 

@@ -2,9 +2,9 @@
 //!
 //! 支持 Bark / 钉钉 / Telegram 多渠道消息通知。
 
+use soma_core::notify::{self, NotifyChannel, NotifyMessage};
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_core::notify::{self, NotifyChannel, NotifyMessage};
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
@@ -54,15 +54,17 @@ async fn send_batch(param: &RequestParameter) -> Result<Value> {
 
     let channels_val = param.value.get("channels").and_then(|v| v.as_array());
     let channels: Vec<NotifyChannel> = if let Some(arr) = channels_val {
-        arr.iter().filter_map(|v| {
-            let channel = v.get("channel").and_then(|v| v.as_str())?;
-            let webhook = v.get("webhook").and_then(|v| v.as_str())?;
-            Some(NotifyChannel {
-                channel: channel.to_string(),
-                webhook: webhook.to_string(),
-                secret: v.get("secret").and_then(|v| v.as_str()),
+        arr.iter()
+            .filter_map(|v| {
+                let channel = v.get("channel").and_then(|v| v.as_str())?;
+                let webhook = v.get("webhook").and_then(|v| v.as_str())?;
+                Some(NotifyChannel {
+                    channel: channel.to_string(),
+                    webhook: webhook.to_string(),
+                    secret: v.get("secret").and_then(|v| v.as_str()),
+                })
             })
-        }).collect()
+            .collect()
     } else {
         return Err(error!("缺少 channels 参数"));
     };
@@ -75,13 +77,16 @@ async fn send_batch(param: &RequestParameter) -> Result<Value> {
     };
 
     let results = notify::send_batch(&channels, &msg).await;
-    let results_val: Vec<Value> = results.iter().map(|r| {
-        value!({
-            "success": r.success,
-            "channel": r.channel.clone(),
-            "message": r.message.clone(),
+    let results_val: Vec<Value> = results
+        .iter()
+        .map(|r| {
+            value!({
+                "success": r.success,
+                "channel": r.channel.clone(),
+                "message": r.message.clone(),
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(value!({
         "results": results_val,

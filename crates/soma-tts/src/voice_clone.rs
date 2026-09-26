@@ -115,15 +115,34 @@ pub async fn clone_voice(
         }
         CloneEngine::Volcengine => {
             if auth.app_id.is_empty() || auth.access_token.is_empty() {
-                return Err(SomaError::Tts("火山引擎 App ID 或 Access Token 未设置".into()));
+                return Err(SomaError::Tts(
+                    "火山引擎 App ID 或 Access Token 未设置".into(),
+                ));
             }
-            clone_volcengine(&auth.app_id, &auth.access_token, voice_name, audio_data, audio_filename).await
+            clone_volcengine(
+                &auth.app_id,
+                &auth.access_token,
+                voice_name,
+                audio_data,
+                audio_filename,
+            )
+            .await
         }
         CloneEngine::Xfyun => {
             if auth.app_id.is_empty() || auth.api_key.is_empty() || auth.api_secret.is_empty() {
-                return Err(SomaError::Tts("讯飞 App ID / API Key / API Secret 未设置".into()));
+                return Err(SomaError::Tts(
+                    "讯飞 App ID / API Key / API Secret 未设置".into(),
+                ));
             }
-            clone_xfyun(&auth.app_id, &auth.api_key, &auth.api_secret, voice_name, audio_data, audio_filename).await
+            clone_xfyun(
+                &auth.app_id,
+                &auth.api_key,
+                &auth.api_secret,
+                voice_name,
+                audio_data,
+                audio_filename,
+            )
+            .await
         }
     }
 }
@@ -335,10 +354,9 @@ async fn clone_volcengine(
             .await
             .map_err(|e| SomaError::Http(e.to_string()))?;
 
-        let q_json: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| SomaError::Tts(format!("parse volcengine query response failed: {}", e)))?;
+        let q_json: serde_json::Value = resp.json().await.map_err(|e| {
+            SomaError::Tts(format!("parse volcengine query response failed: {}", e))
+        })?;
 
         let status = q_json.get("status").and_then(|v| v.as_str()).unwrap_or("");
         if status == "success" || status == "Success" {
@@ -554,8 +572,8 @@ pub fn get_cloned_voice(id: &str) -> Result<Option<ClonedVoice>, SomaError> {
 
 /// 删除克隆声音的本地元数据和音频样本
 pub fn delete_cloned_voice_local(id: &str) -> Result<ClonedVoice, SomaError> {
-    let voice = get_cloned_voice(id)?
-        .ok_or_else(|| SomaError::Tts(format!("voice not found: {}", id)))?;
+    let voice =
+        get_cloned_voice(id)?.ok_or_else(|| SomaError::Tts(format!("voice not found: {}", id)))?;
 
     // 删除元数据文件
     let meta_path = voice_meta_path(id);

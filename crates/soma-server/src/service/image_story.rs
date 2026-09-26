@@ -1,3 +1,5 @@
+use crate::state;
+use crate::Config;
 /// 图片故事视频生成流水线
 ///
 /// 处理图片故事任务的执行逻辑：
@@ -5,17 +7,25 @@
 /// 2. 为每个场景调用AI视频生成
 /// 3. 合并所有视频片段
 use soma_core::error::SomaError;
-use soma_core::models::{TaskStatus, ImageStoryParams};
-use crate::state;
-use crate::Config;
+use soma_core::models::{ImageStoryParams, TaskStatus};
 
 /// 执行图片故事任务（同步入口，由 task.rs 在独立线程中调用）
 pub fn run_task(task_id: &str, params: &ImageStoryParams) -> Result<(), SomaError> {
     let conf = Config::get();
 
-    log::info!("图片故事任务 {} 开始执行，共 {} 个场景", task_id, params.scenes.len());
+    log::info!(
+        "图片故事任务 {} 开始执行，共 {} 个场景",
+        task_id,
+        params.scenes.len()
+    );
 
-    state::update_image_story_task_data(task_id, Some(TaskStatus::Processing.as_i32()), Some(0), None, None);
+    state::update_image_story_task_data(
+        task_id,
+        Some(TaskStatus::Processing.as_i32()),
+        Some(0),
+        None,
+        None,
+    );
 
     let task_dir = soma_core::utils::task_dir(task_id);
     std::fs::create_dir_all(&task_dir).map_err(SomaError::Io)?;
@@ -25,13 +35,21 @@ pub fn run_task(task_id: &str, params: &ImageStoryParams) -> Result<(), SomaErro
     let mut video_paths: Vec<String> = Vec::new();
 
     for (index, scene) in params.scenes.iter().enumerate() {
-        log::info!("图片故事任务 {} 处理场景 {}/{}", task_id, index + 1, total_scenes);
+        log::info!(
+            "图片故事任务 {} 处理场景 {}/{}",
+            task_id,
+            index + 1,
+            total_scenes
+        );
 
         let progress = ((index as u32 * 80) / total_scenes as u32) + 10;
         state::update_image_story_task_data(task_id, None, Some(progress), None, None);
 
         if !std::path::Path::new(&scene.image_path).exists() {
-            return Err(SomaError::VideoGen(format!("图片文件不存在: {}", scene.image_path)));
+            return Err(SomaError::VideoGen(format!(
+                "图片文件不存在: {}",
+                scene.image_path
+            )));
         }
 
         let video_path = generate_scene_video_sync(task_id, scene, params, &conf.app)?;
@@ -40,8 +58,15 @@ pub fn run_task(task_id: &str, params: &ImageStoryParams) -> Result<(), SomaErro
 
     state::update_image_story_task_data(task_id, None, Some(80), None, None);
 
-    log::info!("图片故事任务 {} 开始合并 {} 个视频片段", task_id, video_paths.len());
-    let output_path = task_dir.join("final_video.mp4").to_string_lossy().to_string();
+    log::info!(
+        "图片故事任务 {} 开始合并 {} 个视频片段",
+        task_id,
+        video_paths.len()
+    );
+    let output_path = task_dir
+        .join("final_video.mp4")
+        .to_string_lossy()
+        .to_string();
 
     merge_videos(&video_paths, &output_path, params)?;
 
@@ -65,7 +90,10 @@ fn generate_scene_video_sync(
     conf: &soma_core::config::AppConfig,
 ) -> Result<String, SomaError> {
     let task_dir = soma_core::utils::task_dir(task_id);
-    let output_path = task_dir.join(format!("scene_{}.mp4", scene.scene_id)).to_string_lossy().to_string();
+    let output_path = task_dir
+        .join(format!("scene_{}.mp4", scene.scene_id))
+        .to_string_lossy()
+        .to_string();
 
     let provider_name = params.get_ai_provider().to_string();
     let image_path = scene.image_path.clone();
@@ -93,12 +121,8 @@ fn generate_scene_video_sync(
 
         let ai_task_id = provider.create_task(&video_params).await?;
 
-        let status = soma_stock::aivideo::poll_until_done(
-            provider.as_ref(),
-            &ai_task_id,
-            300,
-            3,
-        ).await?;
+        let status =
+            soma_stock::aivideo::poll_until_done(provider.as_ref(), &ai_task_id, 300, 3).await?;
 
         match status {
             soma_stock::aivideo::VideoGenStatus::Success { video_urls } => {

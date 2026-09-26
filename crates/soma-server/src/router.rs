@@ -3,9 +3,7 @@
 /// 作为所有 /api/v1/* 请求的统一入口，根据请求中的 module 名称
 /// 将请求分发到对应的 handler 处理函数。
 use actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
-use tube_web::{
-    response::{get_error, get_success},
-};
+use tube_web::response::{get_error, get_success};
 
 /// API 请求统一处理函数
 ///
@@ -28,7 +26,10 @@ use tube_web::{
 /// - `payload`: 请求体
 ///
 /// 返回：成功返回业务数据，失败返回错误信息
-pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<HttpResponse, ActixError> {
+pub async fn api_handler(
+    req: HttpRequest,
+    payload: web::Payload,
+) -> Result<HttpResponse, ActixError> {
     let param = tube_web::parse_request(req, payload).await;
 
     // 根据 module 名称分发到对应 handler
@@ -58,7 +59,10 @@ pub async fn api_handler(req: HttpRequest, payload: web::Payload) -> Result<Http
         "jianying" => crate::handler::jianying::distribute(&param).await,
         "platform" => crate::handler::platform::distribute(&param).await,
         "dataexport" => crate::handler::dataexport::distribute(&param).await,
-        _ => Err(error!("请求方法{}.{}系统未提供。", param.module, param.method)),
+        _ => Err(error!(
+            "请求方法{}.{}系统未提供。",
+            param.module, param.method
+        )),
     };
 
     // 统一封装成功/失败响应

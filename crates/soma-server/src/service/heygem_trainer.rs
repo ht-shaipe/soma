@@ -3,10 +3,10 @@
 //! 编排"录制视频校验 → FFmpeg 分离静音视频与音频 → 调用训练接口 → 绑定资产"流程。
 //! 训练产出的 reference_audio 与 reference_text 用于后续 TTS 声音克隆。
 
-use std::path::PathBuf;
+use super::heygem_merchant::MerchantAssetStore;
 use soma_core::config::HeyGemConfig;
 use soma_core::error::SomaError;
-use super::heygem_merchant::MerchantAssetStore;
+use std::path::PathBuf;
 
 /// 训练结果
 #[derive(Debug, Clone)]
@@ -75,8 +75,17 @@ impl HeyGemTrainer {
         }
         let status = std::process::Command::new(ff)
             .args([
-                "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le", "-ar", "24000", "-ac",
-                "1", out_audio,
+                "-y",
+                "-i",
+                video_path,
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
+                out_audio,
             ])
             .status()
             .map_err(SomaError::Io)?;
@@ -122,10 +131,7 @@ impl HeyGemTrainer {
                         Ok(j) => j,
                         Err(e) => return Err(format!("解析训练响应失败: {}", e)),
                     };
-                    let ref_audio = match json
-                        .get("reference_audio")
-                        .and_then(|v| v.as_str())
-                    {
+                    let ref_audio = match json.get("reference_audio").and_then(|v| v.as_str()) {
                         Some(s) => s.to_string(),
                         None => return Err("训练响应缺少 reference_audio".to_string()),
                     };
@@ -139,7 +145,10 @@ impl HeyGemTrainer {
                     let status = r.status();
                     if status.is_client_error() {
                         let text = r.text().await.unwrap_or_default();
-                        Err(format!("CLIENT:训练请求参数错误: HTTP {} - {}", status, text))
+                        Err(format!(
+                            "CLIENT:训练请求参数错误: HTTP {} - {}",
+                            status, text
+                        ))
                     } else {
                         Err(format!("HTTP {}", status))
                     }
@@ -154,7 +163,9 @@ impl HeyGemTrainer {
                         ));
                     }
                     if msg.starts_with("CLIENT:") {
-                        return Err(SomaError::Tts(msg.trim_start_matches("CLIENT:").to_string()));
+                        return Err(SomaError::Tts(
+                            msg.trim_start_matches("CLIENT:").to_string(),
+                        ));
                     }
                     last_err = Some(msg);
                 }
@@ -193,10 +204,7 @@ impl HeyGemTrainer {
         soma_core::utils::validate_merchant_id(merchant_id)?;
 
         let existing = self.asset_store.get_asset(merchant_id).ok();
-        if existing.is_some()
-            && !self.config.get_auto_overwrite()
-            && !overwrite_confirm
-        {
+        if existing.is_some() && !self.config.get_auto_overwrite() && !overwrite_confirm {
             return Err(SomaError::Config(
                 "该商户已存在训练资产，请确认覆盖旧资产".into(),
             ));
@@ -206,8 +214,14 @@ impl HeyGemTrainer {
         let training_dir = dir.join("training");
         std::fs::create_dir_all(&training_dir).map_err(SomaError::Io)?;
 
-        let silent_path = training_dir.join("silent.mp4").to_string_lossy().to_string();
-        let audio_path = training_dir.join("train_audio.wav").to_string_lossy().to_string();
+        let silent_path = training_dir
+            .join("silent.mp4")
+            .to_string_lossy()
+            .to_string();
+        let audio_path = training_dir
+            .join("train_audio.wav")
+            .to_string_lossy()
+            .to_string();
 
         let cleanup = |err: SomaError| {
             let _ = std::fs::remove_dir_all(&training_dir);
@@ -220,9 +234,7 @@ impl HeyGemTrainer {
         self.split_silent_and_audio(train_video_path, &silent_path, &audio_path)
             .map_err(&cleanup)?;
 
-        let (ref_audio, ref_text) = self
-            .call_train_api(&audio_path)
-            .map_err(&cleanup)?;
+        let (ref_audio, ref_text) = self.call_train_api(&audio_path).map_err(&cleanup)?;
 
         self.asset_store
             .bind_asset(merchant_id, &silent_path, &ref_audio, &ref_text)

@@ -103,7 +103,11 @@ impl JianYingBuilder {
             draft: JianYingDraft {
                 id,
                 name: name.to_string(),
-                canvas: Canvas { width, height, ratio },
+                canvas: Canvas {
+                    width,
+                    height,
+                    ratio,
+                },
                 duration: 0,
                 materials: Materials {
                     videos: Vec::new(),
@@ -117,7 +121,14 @@ impl JianYingBuilder {
     }
 
     /// 添加视频素材
-    pub fn add_video(&mut self, path: &str, duration: u64, width: u64, height: u64, fps: f64) -> String {
+    pub fn add_video(
+        &mut self,
+        path: &str,
+        duration: u64,
+        width: u64,
+        height: u64,
+        fps: f64,
+    ) -> String {
         let id = uuid::Uuid::new_v4().to_string();
         self.draft.materials.videos.push(VideoMaterial {
             id: id.clone(),
@@ -230,8 +241,8 @@ impl JianYingBuilder {
             std::fs::create_dir_all(dir).map_err(|e| format!("创建目录失败: {}", e))?;
         }
 
-        let json = serde_json::to_string_pretty(&self.draft)
-            .map_err(|e| format!("序列化失败: {}", e))?;
+        let json =
+            serde_json::to_string_pretty(&self.draft).map_err(|e| format!("序列化失败: {}", e))?;
 
         let file_path = dir.join("draft_content.json");
         std::fs::write(&file_path, json).map_err(|e| format!("写入文件失败: {}", e))?;
@@ -244,20 +255,28 @@ impl JianYingBuilder {
 pub fn get_video_duration_us(path: &str) -> Result<u64, String> {
     let output = std::process::Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
             path,
         ])
         .output()
         .map_err(|e| format!("ffprobe 执行失败: {}", e))?;
 
     if !output.status.success() {
-        return Err(format!("ffprobe 失败: {}", String::from_utf8_lossy(&output.stderr)));
+        return Err(format!(
+            "ffprobe 失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
     let duration_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let seconds: f64 = duration_str.parse().map_err(|e| format!("解析时长失败: {}", e))?;
+    let seconds: f64 = duration_str
+        .parse()
+        .map_err(|e| format!("解析时长失败: {}", e))?;
     Ok((seconds * 1_000_000.0) as u64)
 }
 
@@ -265,17 +284,24 @@ pub fn get_video_duration_us(path: &str) -> Result<u64, String> {
 pub fn get_video_info(path: &str) -> Result<(u64, u64, f64), String> {
     let output = std::process::Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,r_frame_rate",
-            "-of", "csv=p=0",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height,r_frame_rate",
+            "-of",
+            "csv=p=0",
             path,
         ])
         .output()
         .map_err(|e| format!("ffprobe 执行失败: {}", e))?;
 
     if !output.status.success() {
-        return Err(format!("ffprobe 失败: {}", String::from_utf8_lossy(&output.stderr)));
+        return Err(format!(
+            "ffprobe 失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
     let info = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -325,7 +351,11 @@ pub fn create_draft_from_videos(
         let material_id = builder.add_video(path, duration_us, vw, vh, fps);
 
         // 在 track 中找到对应 track 并添加 segment
-        let track = builder.draft.tracks.iter_mut().find(|t| t.id == video_track_id);
+        let track = builder
+            .draft
+            .tracks
+            .iter_mut()
+            .find(|t| t.id == video_track_id);
         if let Some(track) = track {
             JianYingBuilder::add_segment(
                 track,

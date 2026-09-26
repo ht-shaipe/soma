@@ -129,34 +129,71 @@ pub async fn get_info(url: &str, proxy: Option<&str>) -> Result<VideoInfo, SomaE
     let v: serde_json::Value = serde_json::from_str(&json_str)
         .map_err(|e| SomaError::Stock(format!("解析 yt-dlp 输出失败: {}", e)))?;
 
-    let formats = v.get("formats")
+    let formats = v
+        .get("formats")
         .and_then(|f| f.as_array())
         .map(|arr| {
-            arr.iter().filter_map(|f| {
-                let format_id = f.get("format_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                if format_id.is_empty() {
-                    return None;
-                }
-                Some(FormatInfo {
-                    format_id,
-                    ext: f.get("ext").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    resolution: f.get("resolution").and_then(|v| v.as_str()).map(String::from),
-                    filesize: f.get("filesize").and_then(|v| v.as_u64()),
-                    has_video: f.get("vcodec").and_then(|v| v.as_str()).is_some_and(|s| s != "none"),
-                    has_audio: f.get("acodec").and_then(|v| v.as_str()).is_some_and(|s| s != "none"),
+            arr.iter()
+                .filter_map(|f| {
+                    let format_id = f
+                        .get("format_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if format_id.is_empty() {
+                        return None;
+                    }
+                    Some(FormatInfo {
+                        format_id,
+                        ext: f
+                            .get("ext")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        resolution: f
+                            .get("resolution")
+                            .and_then(|v| v.as_str())
+                            .map(String::from),
+                        filesize: f.get("filesize").and_then(|v| v.as_u64()),
+                        has_video: f
+                            .get("vcodec")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|s| s != "none"),
+                        has_audio: f
+                            .get("acodec")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|s| s != "none"),
+                    })
                 })
-            }).collect()
+                .collect()
         })
         .unwrap_or_default();
 
     Ok(VideoInfo {
-        id: v.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        title: v.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        id: v
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        title: v
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
         duration: v.get("duration").and_then(|v| v.as_f64()),
         uploader: v.get("uploader").and_then(|v| v.as_str()).map(String::from),
-        upload_date: v.get("upload_date").and_then(|v| v.as_str()).map(String::from),
-        description: v.get("description").and_then(|v| v.as_str()).map(String::from),
-        thumbnail: v.get("thumbnail").and_then(|v| v.as_str()).map(String::from),
+        upload_date: v
+            .get("upload_date")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        description: v
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        thumbnail: v
+            .get("thumbnail")
+            .and_then(|v| v.as_str())
+            .map(String::from),
         formats,
     })
 }
@@ -174,13 +211,16 @@ pub async fn download(params: &YtdlpParams) -> Result<String, SomaError> {
         std::fs::create_dir_all(save_dir).map_err(SomaError::Io)?;
     }
 
-    let template = params.output_template.clone()
+    let template = params
+        .output_template
+        .clone()
         .unwrap_or_else(|| "%(id)s.%(ext)s".to_string());
     let output_path = save_dir.join(&template);
 
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("--no-playlist")
-        .arg("-o").arg(output_path.to_string_lossy().to_string());
+        .arg("-o")
+        .arg(output_path.to_string_lossy().to_string());
 
     if params.skip_existing {
         cmd.arg("--no-overwrites");
@@ -200,7 +240,10 @@ pub async fn download(params: &YtdlpParams) -> Result<String, SomaError> {
             cmd.arg("--audio-quality").arg(q);
         }
     } else {
-        let fmt = params.format.clone().unwrap_or_else(|| "best[ext=mp4]/best".to_string());
+        let fmt = params
+            .format
+            .clone()
+            .unwrap_or_else(|| "best[ext=mp4]/best".to_string());
         cmd.arg("-f").arg(fmt);
     }
 
@@ -217,12 +260,14 @@ pub async fn download(params: &YtdlpParams) -> Result<String, SomaError> {
 
     // 从 stdout 解析实际下载的文件路径
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let downloaded_path = parse_downloaded_path(&stdout)
-        .unwrap_or_else(|| {
-            // 回退：根据模板猜测文件路径
-            let ext = if params.audio_only { "mp3" } else { "mp4" };
-            save_dir.join(format!("*.{}", ext)).to_string_lossy().to_string()
-        });
+    let downloaded_path = parse_downloaded_path(&stdout).unwrap_or_else(|| {
+        // 回退：根据模板猜测文件路径
+        let ext = if params.audio_only { "mp3" } else { "mp4" };
+        save_dir
+            .join(format!("*.{}", ext))
+            .to_string_lossy()
+            .to_string()
+    });
 
     Ok(downloaded_path)
 }
@@ -262,10 +307,14 @@ pub async fn download_batch(
 fn parse_downloaded_path(stdout: &str) -> Option<String> {
     for line in stdout.lines() {
         if line.contains("Destination:") {
-            return line.split("Destination:").nth(1).map(|s| s.trim().to_string());
+            return line
+                .split("Destination:")
+                .nth(1)
+                .map(|s| s.trim().to_string());
         }
         if line.contains("has already been downloaded") {
-            return line.split_whitespace()
+            return line
+                .split_whitespace()
                 .find(|w| w.contains('.') && !w.starts_with('['))
                 .map(String::from);
         }
@@ -280,9 +329,7 @@ fn parse_downloaded_path(stdout: &str) -> Option<String> {
 ///
 /// 支持从抖音、小红书、快手等平台的分享文本中提取链接
 pub fn extract_urls(text: &str) -> Vec<String> {
-    let url_regex = regex::Regex::new(
-        r#"https?://[^\s<>"]+"#
-    ).unwrap();
+    let url_regex = regex::Regex::new(r#"https?://[^\s<>"]+"#).unwrap();
     url_regex
         .find_iter(text)
         .map(|m| m.as_str().to_string())

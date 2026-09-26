@@ -3,20 +3,31 @@
 //! 中国国密标准 SM3，用于抖音 a_bogus 签名。
 
 const IV: [u32; 8] = [
-    0x7380166f, 0x49142869, 0x6445e8c3, 0x77e5f0ff,
-    0x6e6e6e6e, 0x8c8c8c8c, 0x9c9c9c9c, 0xbcdef0ff,
+    0x7380166f, 0x49142869, 0x6445e8c3, 0x77e5f0ff, 0x6e6e6e6e, 0x8c8c8c8c, 0x9c9c9c9c, 0xbcdef0ff,
 ];
 
 fn t(j: usize) -> u32 {
-    if j < 16 { 0x79cc4519 } else { 0x7a879d8a }
+    if j < 16 {
+        0x79cc4519
+    } else {
+        0x7a879d8a
+    }
 }
 
 fn ff(x: u32, y: u32, z: u32, j: usize) -> u32 {
-    if j < 16 { x ^ y ^ z } else { (x & y) | (x & z) | (y & z) }
+    if j < 16 {
+        x ^ y ^ z
+    } else {
+        (x & y) | (x & z) | (y & z)
+    }
 }
 
 fn gg(x: u32, y: u32, z: u32, j: usize) -> u32 {
-    if j < 16 { x ^ y ^ z } else { (x & y) | (!x & z) }
+    if j < 16 {
+        x ^ y ^ z
+    } else {
+        (x & y) | (!x & z)
+    }
 }
 
 fn p0(x: u32) -> u32 {
@@ -51,9 +62,7 @@ pub fn sm3(data: &[u8]) -> [u8; 32] {
             ]);
         }
         for i in 16..68 {
-            w[i] = p1(w[i - 16] ^ w[i - 9] ^ w[i - 2].rotate_left(15))
-                ^ w[i - 13]
-                ^ w[i - 6];
+            w[i] = p1(w[i - 16] ^ w[i - 9] ^ w[i - 2].rotate_left(15)) ^ w[i - 13] ^ w[i - 6];
         }
 
         let mut a = v[0];

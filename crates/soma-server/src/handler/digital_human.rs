@@ -4,10 +4,10 @@
 //! - digital_human 模块：create/draft/start
 //! - dh_tasks 模块：list/get/delete
 
+use crate::state;
+use soma_core::models::{DigitalHumanParams, TaskStatus};
 use tube::{Result, Value};
 use tube_web::RequestParameter;
-use soma_core::models::{DigitalHumanParams, TaskStatus};
-use crate::state;
 
 /// 数字人模块请求分发
 ///
@@ -52,8 +52,7 @@ fn validate_portrait(portrait_image: &str) -> Result<()> {
     if portrait_image.is_empty() {
         return Err(error!("缺少人像照片"));
     }
-    let portrait_path = soma_core::utils::storage_dir("portraits", false)
-        .join(portrait_image);
+    let portrait_path = soma_core::utils::storage_dir("portraits", false).join(portrait_image);
     if !portrait_path.exists() {
         return Err(error!("人像照片不存在，请重新上传"));
     }
@@ -81,10 +80,7 @@ fn check_sensitive_words(text: &str) -> Result<()> {
     let sw_path = conf.app.digital_human.get_sensitive_words_path();
     let result = soma_core::filter::check_text(text, sw_path);
     if result.hit {
-        log::warn!(
-            "文案敏感词命中: words={:?}",
-            result.words
-        );
+        log::warn!("文案敏感词命中: words={:?}", result.words);
         return Err(error!("文案包含敏感内容，请修改后重试"));
     }
     Ok(())
@@ -102,13 +98,14 @@ async fn create(param: &RequestParameter) -> Result<Value> {
 
     log::info!(
         "创建数字人任务: task_id={}, portrait={}, text_len={}",
-        task_id, params.portrait_image, params.narration_text.chars().count()
+        task_id,
+        params.portrait_image,
+        params.narration_text.chars().count()
     );
 
     state::create_dh_task_entry(&task_id, params.clone());
 
-    crate::task::add_dh_task(&task_id, &params)
-        .map_err(|e| error!("任务创建失败: {:?}", e))?;
+    crate::task::add_dh_task(&task_id, &params).map_err(|e| error!("任务创建失败: {:?}", e))?;
 
     Ok(value!({
         "taskId": task_id,
@@ -141,8 +138,7 @@ async fn start_task(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少参数: taskId"));
     }
 
-    let task = state::get_dh_task(&task_id)
-        .ok_or_else(|| error!("任务不存在"))?;
+    let task = state::get_dh_task(&task_id).ok_or_else(|| error!("任务不存在"))?;
 
     match TaskStatus::from_i32(task.state) {
         TaskStatus::Processing => {
@@ -157,17 +153,20 @@ async fn start_task(param: &RequestParameter) -> Result<Value> {
 
     log::info!("启动数字人任务: task_id={}", task_id);
 
-    state::update_dh_task_data(&task_id, &state::DhTaskUpdateData {
-        state: Some(TaskStatus::Processing.as_i32()),
-        progress: Some(0),
-        audio_file: None,
-        audio_duration: None,
-        subtitle_path: None,
-        portrait_video_path: None,
-        final_video_path: None,
-        error_message: None,
-        ..Default::default()
-    });
+    state::update_dh_task_data(
+        &task_id,
+        &state::DhTaskUpdateData {
+            state: Some(TaskStatus::Processing.as_i32()),
+            progress: Some(0),
+            audio_file: None,
+            audio_duration: None,
+            subtitle_path: None,
+            portrait_video_path: None,
+            final_video_path: None,
+            error_message: None,
+            ..Default::default()
+        },
+    );
 
     crate::task::add_dh_task(&task_id, &task.params)
         .map_err(|e| error!("任务启动失败: {:?}", e))?;
@@ -184,23 +183,26 @@ async fn list(param: &RequestParameter) -> Result<Value> {
 
     let (tasks, total) = state::get_all_dh_tasks(page, page_size);
 
-    let task_list: Vec<Value> = tasks.iter().map(|t| {
-        let params_json = Value::from_serialize(&t.params).unwrap_or(Value::Null);
-        value!({
-            "taskId": t.task_id.clone(),
-            "state": t.state,
-            "progress": t.progress,
-            "params": params_json,
-            "audioFile": t.audio_file.as_deref().unwrap_or(""),
-            "audioDuration": t.audio_duration.unwrap_or(0.0),
-            "subtitlePath": t.subtitle_path.as_deref().unwrap_or(""),
-            "portraitVideoPath": t.portrait_video_path.as_deref().unwrap_or(""),
-            "finalVideoPath": t.final_video_path.as_deref().unwrap_or(""),
-            "errorMessage": t.error_message.as_deref().unwrap_or(""),
-            "createdAt": t.created_at.to_rfc3339(),
-            "updatedAt": t.updated_at.to_rfc3339(),
+    let task_list: Vec<Value> = tasks
+        .iter()
+        .map(|t| {
+            let params_json = Value::from_serialize(&t.params).unwrap_or(Value::Null);
+            value!({
+                "taskId": t.task_id.clone(),
+                "state": t.state,
+                "progress": t.progress,
+                "params": params_json,
+                "audioFile": t.audio_file.as_deref().unwrap_or(""),
+                "audioDuration": t.audio_duration.unwrap_or(0.0),
+                "subtitlePath": t.subtitle_path.as_deref().unwrap_or(""),
+                "portraitVideoPath": t.portrait_video_path.as_deref().unwrap_or(""),
+                "finalVideoPath": t.final_video_path.as_deref().unwrap_or(""),
+                "errorMessage": t.error_message.as_deref().unwrap_or(""),
+                "createdAt": t.created_at.to_rfc3339(),
+                "updatedAt": t.updated_at.to_rfc3339(),
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(value!({
         "list": task_list,
@@ -217,8 +219,7 @@ async fn get(param: &RequestParameter) -> Result<Value> {
         return Err(error!("缺少参数: taskId"));
     }
 
-    let task = state::get_dh_task(&task_id)
-        .ok_or_else(|| error!("任务不存在"))?;
+    let task = state::get_dh_task(&task_id).ok_or_else(|| error!("任务不存在"))?;
 
     let params_json = Value::from_serialize(&task.params).unwrap_or(Value::Null);
 
@@ -333,7 +334,8 @@ mod tests {
 
     #[test]
     fn test_parse_params_from_text_valid() {
-        let param = make_param_with_text(r#"{"portrait_image":"test.jpg","narration_text":"文案"}"#);
+        let param =
+            make_param_with_text(r#"{"portrait_image":"test.jpg","narration_text":"文案"}"#);
         let result = parse_params(&param);
         assert!(result.is_ok());
         let params = result.unwrap();
@@ -357,7 +359,8 @@ mod tests {
 
     #[test]
     fn test_parse_params_from_value_valid() {
-        let param = make_param_with_value(r#"{"portrait_image":"v.jpg","narration_text":"值模式"}"#);
+        let param =
+            make_param_with_value(r#"{"portrait_image":"v.jpg","narration_text":"值模式"}"#);
         let result = parse_params(&param);
         assert!(result.is_ok());
         let params = result.unwrap();
@@ -367,13 +370,15 @@ mod tests {
 
     #[test]
     fn test_parse_params_with_optional_fields() {
-        let param = make_param_with_text(r#"{
+        let param = make_param_with_text(
+            r#"{
             "portrait_image": "p.jpg",
             "narration_text": "文案",
             "voice_name": "zh-CN-XiaoxiaoNeural",
             "video_aspect": "16:9",
             "subtitle_enabled": true
-        }"#);
+        }"#,
+        );
         let result = parse_params(&param).unwrap();
         assert_eq!(result.voice_name, Some("zh-CN-XiaoxiaoNeural".to_string()));
         assert_eq!(result.video_aspect, Some("16:9".to_string()));
@@ -430,7 +435,6 @@ mod tests {
         let text = "a".repeat(DH_NARRATION_TEXT_MAX_LEN + 1);
         assert!(validate_narration(&text).is_err());
     }
-
 
     // ===== check_sensitive_words 测试 =====
 
@@ -493,7 +497,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_draft_portrait_not_found() {
-        let param = make_param_with_text(r#"{"portrait_image":"nonexistent-12345.jpg","narration_text":"文案"}"#);
+        let param = make_param_with_text(
+            r#"{"portrait_image":"nonexistent-12345.jpg","narration_text":"文案"}"#,
+        );
         let result = create_draft(&param).await;
         assert!(result.is_err());
     }
@@ -522,7 +528,6 @@ mod tests {
         assert!(result.is_err());
         cleanup_portrait(&portrait);
     }
-
 
     // ===== start_task 测试（错误路径） =====
 
@@ -569,7 +574,8 @@ mod tests {
     #[tokio::test]
     async fn test_list_with_existing_tasks() {
         let portrait = create_temp_portrait();
-        let params: DigitalHumanParams = serde_json::from_str(&valid_params_json(&portrait)).unwrap();
+        let params: DigitalHumanParams =
+            serde_json::from_str(&valid_params_json(&portrait)).unwrap();
         let task_id1 = soma_core::utils::get_uuid();
         let task_id2 = soma_core::utils::get_uuid();
         state::create_dh_draft_task_entry(&task_id1, params.clone());
@@ -607,7 +613,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_existing_task() {
         let portrait = create_temp_portrait();
-        let params: DigitalHumanParams = serde_json::from_str(&valid_params_json(&portrait)).unwrap();
+        let params: DigitalHumanParams =
+            serde_json::from_str(&valid_params_json(&portrait)).unwrap();
         let task_id = soma_core::utils::get_uuid();
         state::create_dh_draft_task_entry(&task_id, params);
 
@@ -634,7 +641,8 @@ mod tests {
     #[tokio::test]
     async fn test_delete_success() {
         let portrait = create_temp_portrait();
-        let params: DigitalHumanParams = serde_json::from_str(&valid_params_json(&portrait)).unwrap();
+        let params: DigitalHumanParams =
+            serde_json::from_str(&valid_params_json(&portrait)).unwrap();
         let task_id = soma_core::utils::get_uuid();
         state::create_dh_draft_task_entry(&task_id, params);
 
