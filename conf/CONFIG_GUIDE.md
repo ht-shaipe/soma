@@ -326,6 +326,10 @@ minimax_video_model = "MiniMax-Hailuo-2.3"   # 可选 video-01 / T2V-01 / I2V-01
 - **FFmpeg**：视频合成核心依赖，需系统安装（`brew install ffmpeg` / `apt install ffmpeg`）
 - **Python 3.8+**（数字人本地引擎需要）：SadTalker / EchoMimicV3 / Live2D / 声音克隆均通过 `resource/*_runner.py` 推理脚本驱动
 - **Ollama**（可选）：本地 LLM，安装后 `ollama pull llama3` 下载模型
+- **yt-dlp**（可选，工具箱「视频下载」需要）：`pip install yt-dlp` 或 `brew install yt-dlp`，支持 YouTube / B站 / 抖音 / TikTok 等 1000+ 站点；未安装时其余功能不受影响
+- **edge-tts**（可选，Edge TTS 命令行）：`pip install edge-tts`（默认 TTS 引擎，建议安装）
+
+> 可通过 `POST /api/v1/system/preflight` 一键预检上述依赖与密钥配置（设置页顶部「环境状态」卡片即调用此端点）。
 
 ---
 

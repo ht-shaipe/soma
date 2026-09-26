@@ -2,6 +2,8 @@
 
 AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本撰写、配音、素材采集、字幕合成与视频拼接，一键生成成品视频；同时支持**数字人口播视频**：一张人像照片 + 一段文案，生成开口说话、口型同步的口播视频。
 
+支持两种运行形态：**Web 服务器模式**（Actix-Web，浏览器访问）与**桌面应用模式**（Tauri v2，0.1.2 新增），两种模式共用同一 Rust 业务层与 Vue 3 前端。
+
 ## 功能特性
 
 ### 短视频自动生成
@@ -16,6 +18,18 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 - **灵活配置**：多种画幅比例（16:9 / 9:16 / 1:1）、拼接模式、转场模式、字幕样式自定义
 - **任务管理**：异步任务队列（并发/排队上限可配）、进度跟踪、状态查询、SQLite 持久化（服务重启不丢任务）、支持任意步骤断点续跑
 - **社交发布**：通过 Upload-Post 一键发布至 TikTok、YouTube 等 12 个平台
+
+### 功能点工作台与工具箱（0.1.2 新增）
+
+- **功能点独立运行**：流水线各步骤全部拆分为可单独调用的功能点（24 个内置：LLM 六件套、TTS 合成、字幕生成、素材搜索/下载、AI 视频生成、视频 7 项原子能力、音频合并、数字人等），JSON Schema 驱动动态表单，产物按 `storage/features/{feature_id}/{run_id}/` 归档，历史可回查
+- **工具箱**：独立小工具集合，每个工具即开即用：
+  - **视频下载**：基于 yt-dlp，支持 YouTube / B站 / 抖音 / TikTok 等 1000+ 站点，可仅提取音频
+  - **字幕处理**：SRT/VTT 格式转换、多文件合并、LLM 翻译与校正
+  - **剪映草稿导出**：视频/音频文件 → 剪映（JianYing）草稿，可直接在剪映中打开继续编辑
+  - **通知推送**：Bark（iOS）/ 钉钉 / Telegram 消息推送
+  - **数据导出**：JSON 数据 → CSV / JSON / JSONL 文件（含带引号转义的 CSV 解析）
+  - **抖音直连**：a_bogus/msToken 签名直连抖音 Web API，查询视频详情与用户作品列表（需浏览器 Cookie）
+- **图片故事**：多张图片 + 文字描述 → 图片故事视频
 
 ### 数字人口播
 
@@ -37,13 +51,16 @@ AI 驱动的短视频自动生成工具 —— 输入主题，自动完成脚本
 
 | 层级 | 技术 |
 |------|------|
-| 后端 | Rust + Actix-Web 4 |
-| 前端 | Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue I18n（中英双语） |
-| 视频处理 | FFmpeg（拼接/转场/字幕/混音/水印） |
+| 后端 | Rust + Actix-Web 4（服务器模式） |
+| 桌面应用 | Tauri v2（内嵌 web/dist，invoke 分发与 HTTP 同构信封，0.1.2 新增） |
+| 前端 | Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue I18n（中英双语，HTTP/Tauri 双轨 Transport） |
+| 功能点框架 | soma-feature：Feature trait + 注册表 + schemars JSON Schema（24 个内置功能点） |
+| 视频处理 | FFmpeg（拼接/转场/字幕/混音/水印）+ 剪映草稿导出 + yt-dlp 下载 |
 | 语音合成 | Edge TTS / Azure / SiliconFlow / ElevenLabs / Gemini / MiMo / 火山引擎 / 讯飞 / Fish-Speech S2 / HeyGem / 声音克隆 |
 | AI 模型 | DeepSeek / OpenAI / Qwen / Gemini 等 25+ 提供商 |
 | 视频生成 | 智谱 CogVideoX / 快手可灵 Kling / MiniMax 海螺 |
 | 数字人 | HeyGen / SadTalker / EchoMimicV3-Flash / HeyGem / Live2D |
+| 平台直连 | 抖音 Web API（a_bogus / msToken 签名）、B站 wbi 签名、Bark/钉钉/Telegram 通知 |
 | 任务持久化 | SQLite（WAL 模式） |
 
 ## 项目结构
@@ -55,12 +72,14 @@ soma/
 │   ├── config.toml.example # 配置模板（含完整注释）
 │   └── CONFIG_GUIDE.md     # 完整配置指南（含 API Key 申请地址）
 ├── crates/                 # Rust 工作空间
-│   ├── soma-core/          # 核心模块（配置、模型、错误、敏感词过滤）
-│   ├── soma-tts/           # 语音合成（10 种引擎 + 声音克隆 + Whisper 字幕）
-│   ├── soma-stock/         # 素材采集（Pexels/Pixabay/Coverr）+ AI 视频生成（智谱/可灵/MiniMax）+ 数字人 Provider（5 种）
-│   ├── soma-video/         # 视频处理（FFmpeg 拼接/转场/字幕/混音/水印）
-│   └── soma-server/        # Web 服务（API 路由/任务队列/流水线/SQLite 持久化）
-├── docs/                   # 技术文档（Obsidian 知识库：方案调研、成本评估、实践文章）
+│   ├── soma-core/          # 核心模块（配置、模型、错误、签名算法、通知、字幕、数据导出）
+│   ├── soma-feature/       # 功能点框架（Feature trait + 注册表 + JSON Schema，24 个内置功能点）
+│   ├── soma-tts/           # 语音合成（11 种引擎 + 声音克隆）
+│   ├── soma-stock/         # 素材采集 + AI 视频生成 + 数字人 Provider（5 种）+ yt-dlp 下载 + 抖音直连
+│   ├── soma-video/         # 视频处理（FFmpeg 拼接/转场/字幕/混音/水印 + 剪映草稿导出）
+│   ├── soma-server/        # Web 服务（API 路由/任务队列/流水线/SQLite 持久化）
+│   └── soma-app/           # Tauri v2 桌面应用（内嵌前端，invoke 分发与 HTTP 同构）
+├── docs/                   # 技术文档（版本计划、方案调研、成本评估、实践文章）
 ├── resource/               # 静态资源与 Python 推理封装脚本
 │   ├── *_runner.py         # 数字人/声音克隆推理脚本（Rust 子进程/SSH 调用）
 │   ├── sensitive_words.txt # 数字人文案敏感词库
@@ -69,6 +88,7 @@ soma/
 ├── storage/                # 运行时存储（自动创建）
 │   ├── tasks.db            # SQLite 任务持久化
 │   ├── tasks/{task_id}/    # 每任务产物（音频/字幕/分段视频/成品）
+│   ├── features/{id}/{run_id}/  # 功能点独立运行产物（input.json/run_record.json）
 │   ├── portraits/          # 数字人人像照片
 │   └── songs/ fonts/ cache_videos/
 ├── web/                    # Vue 3 前端项目
@@ -85,8 +105,10 @@ soma/
 | **Rust** | Edition 2021 | [rustup.rs](https://rustup.rs) | `rustc --version` |
 | **Node.js** | 18+ | [nodejs.org](https://nodejs.org) | `node --version` |
 | **FFmpeg** | 4.0+ | `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Ubuntu) | `ffmpeg -version` |
+| yt-dlp（可选） | 2024+ | `pip install yt-dlp` 或 `brew install yt-dlp` | `yt-dlp --version` |
 
 > 数字人本地引擎额外依赖 Python 3.8+（SadTalker/EchoMimicV3/Live2D/声音克隆均通过 Python 推理脚本驱动）。
+> yt-dlp 仅工具箱「视频下载」需要（未安装时其余功能不受影响）。
 
 ### 第 2 步：获取项目
 
@@ -201,7 +223,7 @@ script_path = "resource/live2d_runner.py"
 
 ### 第 5 步：启动服务
 
-推荐使用 Makefile：
+**方式 A：Web 服务器模式**（推荐，支持远程访问）
 
 ```bash
 make install   # 安装前后端依赖
@@ -221,21 +243,31 @@ cd web && npm install && npm run dev
 看到以下输出即表示后端启动成功：
 
 ```
-[INFO] Soma v0.1.0 starting on 0.0.0.0:8090
-[INFO] Storage path: ./storage
+[INFO] Soma server starting at 0.0.0.0:8090
 ```
 
 后端 API 运行在 `http://localhost:8090`，前端运行在 `http://localhost:5273`（自动代理 `/api` 到后端）。
 
-**常用 make 命令**：`make dev`（开发）、`make build`（前后端 release 构建）、`make prod`（构建前端后启动后端，单进程托管）、`make test`、`make fmt`、`make lint`、`make clean`。
+**方式 B：桌面应用模式**（Tauri v2，0.1.2 新增）
+
+```bash
+make install-tauri    # 首次安装 Tauri CLI（cargo install tauri-cli）
+make build            # 构建前端（桌面端内嵌 web/dist）与后端
+make dev-tauri        # 启动桌面应用（debug 模式可用 make dev-tauri-debug）
+```
+
+桌面模式为独立窗口应用，无需启动后端服务与前端开发服务器：全部 API 经 Tauri invoke 在应用内分发，与 HTTP 同构（`{code, result, message}` 信封）。发布构建用 `make build-tauri`。
+
+**常用 make 命令**：`make dev`（开发）、`make build`（前后端 release 构建）、`make prod`（构建前端后启动后端，单进程托管）、`make dev-tauri` / `make build-tauri`（桌面应用）、`make test`、`make fmt`、`make lint`、`make clean`。
 
 ### 第 6 步：开始使用
 
-1. 浏览器打开 `http://localhost:5273`
-2. 按引导向导确认 API Key 已生效（也可在 **设置** 页面修改配置）
+1. 浏览器打开 `http://localhost:5273`（桌面模式直接使用应用窗口）
+2. 按引导向导确认 API Key 已生效（也可在 **设置** 页面修改配置，页面顶部「环境状态」卡片可一键预检 FFmpeg/密钥/存储）
 3. 生成短视频：进入创作向导，填写视频主题（如"介绍人工智能的发展历程"），选择语言、段落数、画幅比例等，点击生成
 4. 生成数字人口播：上传一张人像照片（Live2D 模式选择卡通模型），输入口播文案（≤1000 字），选择语音，点击生成
-5. 任务页面实时查看进度，完成后可预览/下载成品视频
+5. 单步功能：**功能点工作台** 中 24 个功能点可独立运行（如只做 TTS 合成、只生成字幕）；**工具箱** 提供视频下载/字幕处理/剪映草稿/通知推送/数据导出/抖音直连 6 个小工具
+6. 任务页面实时查看进度，完成后可预览/下载成品视频
 
 ### 生成视频的完整流水线
 
@@ -328,20 +360,20 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/soma-server /usr/local/bin/
+COPY --from=builder /app/target/release/soma /usr/local/bin/
 COPY --from=builder /app/conf /app/conf
 COPY --from=builder /app/resource /app/resource
 COPY --from=builder /app/web/dist /app/web/dist
 WORKDIR /app
 EXPOSE 8090
-CMD ["soma-server"]
+CMD ["soma"]
 ```
 
 > HeyGem 数字人引擎官方推荐 Docker 三容器部署（fun-asr + fish-speech-ziming + duix.avatar），详见 [conf/CONFIG_GUIDE.md](conf/CONFIG_GUIDE.md)。
 
 ## API 接口
 
-除少数显式端点外，所有接口通过 `POST /api/v1/{module}` 统一入口访问，请求体中携带 `module` 与 `method` 字段进行二级分发。
+除少数显式端点外，所有接口通过 `POST /api/v1/{module}/{method}` 统一入口访问。桌面模式下同构映射为 Tauri invoke（`invoke('api', {module, method, payload})`），返回相同形状的 `{code, result, message}` 信封。
 
 ### 显式端点
 
@@ -376,6 +408,23 @@ CMD ["soma-server"]
 | `stream` | play / download | 视频流播放 / 下载 |
 | `config` | get / save | 配置读写 |
 | `upload` | upload / status | Upload-Post 跨平台发布 |
+| `features` | list / run / history | 功能点统一入口（24 个内置功能点，含输入输出 JSON Schema；裸调用产物落 `storage/features/`） |
+| `image_story` | create / start / list / get / delete | 图片故事视频 |
+| `download` | check / info / download / batch / extract_urls | yt-dlp 视频下载（1000+ 站点） |
+| `subtitle` | parse / convert / merge / translate / correct | 字幕解析 / 格式转换 / 合并 / LLM 翻译 / 校正 |
+| `jianying` | create | 剪映草稿导出（视频/音频 → draft_content.json） |
+| `notify` | send / send_batch | 通知推送（Bark / 钉钉 / Telegram） |
+| `platform` | douyin_detail / douyin_posts | 抖音 Web API 直连（a_bogus 签名，需浏览器 Cookie） |
+| `dataexport` | export / import / preview | 数据导出（CSV / JSON / JSONL） |
+| `system` | preflight | 环境预检（FFmpeg / yt-dlp / edge-tts / 存储 / 密钥共 7 项） |
+
+> 请求示例（裸调用 TTS 功能点，真实可用）：
+> ```bash
+> curl -X POST http://localhost:8090/api/v1/features/run \
+>   -H 'Content-Type: application/json' \
+>   -d '{"module":"features","method":"run","featureId":"tts.synthesize","input":{"text":"你好，soma","voice_name":"zh-CN-XiaoxiaoNeural"}}'
+> ```
+> 返回产物路径 `storage/features/tts.synthesize/{run_id}/audio.mp3`，经 `/storage/*` 静态服务可直接下载。各功能点入参以 `features/list` 返回的 JSON Schema 为准。
 
 ## 常见问题
 
@@ -408,15 +457,26 @@ CMD ["soma-server"]
 2. 前端「声音克隆」面板上传参考音频，等待训练完成
 3. 生成任务时选择克隆音色
 
+### Q: 工具箱「视频下载」提示 yt-dlp 未安装？
+`pip install yt-dlp` 或 `brew install yt-dlp`，工具箱内点击「查询信息」前会自动检测（也可在设置页「环境状态」卡片一键预检）
+
+### Q: 抖音直连查询返回 403 或空数据？
+抖音接口需要有效登录 Cookie：浏览器登录抖音 → F12 复制完整 Cookie → 粘贴到工具箱「抖音直连」的 Cookie 输入框。Cookie 有时效性，失效后需重新获取。
+
+### Q: 功能点独立运行产物在哪里？
+`storage/features/{feature_id}/{run_id}/`（含 `input.json` 与 `run_record.json`），可在工作台「历史记录」抽屉中回查，音频/视频等产物可直接下载。
+
 ## 配置完整参考
 
-详见 [conf/CONFIG_GUIDE.md](conf/CONFIG_GUIDE.md) — 包含所有 25+ LLM 供应商、10 种 TTS 引擎、3 个素材库、3 个视频生成大模型、5 种数字人引擎、声音克隆的配置方法与 API Key 申请地址。
+详见 [conf/CONFIG_GUIDE.md](conf/CONFIG_GUIDE.md) — 包含所有 25+ LLM 供应商、11 种 TTS 引擎、3 个素材库、3 个视频生成大模型、5 种数字人引擎、声音克隆的配置方法与 API Key 申请地址。
 
 ## 技术文档
 
-[docs/](docs/) 目录为 Obsidian 知识库，包含数字人方案调研、成本评估与系列实践文章：
+[docs/](docs/) 目录为技术文档库，包含版本计划、方案调研、成本评估与系列实践文章：
 
 - [docs/README.md](docs/README.md) — 文档索引（调研 → 落地链路）
+- [0.1.2 升级计划](docs/0.1.2升级计划_功能点独立化与Tauri改造_2026-09-12.md) — 功能点独立化 + Tauri v2 桌面改造完整计划与 14 轮实施记录
+- [开源项目集成清单](docs/开源项目集成-非Rust功能清单_2026-09-22.md) — NarratoAI / creatorhub / MediaCrawler 等开源项目功能集成情况（已实现 vs 需 Python 微服务桥接）
 - 数字人开源自部署方案评估（选型：EchoMimicV3-Flash）
 - EchoMimicV3-Flash 成本评估（GPU 服务器测算）
 - 中国大陆 AI 视频生成 API 调研

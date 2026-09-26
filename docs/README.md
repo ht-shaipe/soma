@@ -1,6 +1,6 @@
 # Soma 技术文档索引
 
-> 本目录是 Obsidian 知识库，记录项目的技术调研、方案评估与落地实践。
+> 本目录记录项目的技术调研、方案评估与落地实践。
 > 文档遵循「调研 → 选型 → 落地 → 复盘」的演进链路，与代码模块一一对应。
 
 ## 文档地图
@@ -9,7 +9,7 @@
 
 | 文档 | 日期 | 主题 |
 |------|------|------|
-| [0.1.2升级计划_功能点独立化与Tauri改造_2026-09-12](0.1.2升级计划_功能点独立化与Tauri改造_2026-09-12.md) | 2026-09-12 | 0.1.2 版本完整计划：流水线步骤拆分为独立功能点 + Tauri v2 桌面应用改造（分支 `0.1.2`） |
+| [0.1.2升级计划_功能点独立化与Tauri改造_2026-09-12](0.1.2升级计划_功能点独立化与Tauri改造_2026-09-12.md) | 2026-09-12 | 0.1.2 版本完整计划：流水线步骤拆分为独立功能点（24 个）+ Tauri v2 桌面应用改造 + 14 轮实施记录（分支 `0.1.2`） |
 
 ### 方案调研与评估
 
@@ -18,6 +18,7 @@
 | [数字人开源自部署方案评估_2026-09-02](数字人开源自部署方案评估_2026-09-02.md) | 2026-09-02 | 「照片 + 文案 → 口播视频」开源方案选型，结论：主力选 EchoMimicV3-Flash（Apache 2.0，单张 4090 可跑） | `soma-stock/src/digital_human/` |
 | [EchoMimicV3-Flash成本评估_2026-09-03](EchoMimicV3-Flash成本评估_2026-09-03.md) | 2026-09-03 | GPU 服务器与推理成本测算 | — |
 | [china-ai-video-api-research](china-ai-video-api-research.md) | 2026-07 | 中国大陆 AI 视频生成 API 调研（智谱/可灵/通义万相/混元/百度 Vidu/MiniMax） | `soma-stock/src/aivideo/` |
+| [开源项目集成-非Rust功能清单_2026-09-22](开源项目集成-非Rust功能清单_2026-09-22.md) | 2026-09-22 | NarratoAI / creatorhub / MediaCrawler / reclip / yt-dlp 功能集成盘点：已用 Rust 实现（yt-dlp 下载/通知推送/签名算法/抖音直连/字幕处理/剪映草稿/数据导出）vs 需 Python 微服务桥接（Playwright/Gemini SDK/Whisper 等） | `soma-core/src/{signing,notify,subtitle,export}.rs`、`soma-stock/src/{ytdlp,douyin}.rs`、`soma-video/src/jianying.rs` |
 
 ### 实践系列文章（articles/）
 
@@ -35,6 +36,8 @@
 2026-06  立项调研（模型与API对接需求分析.md）→ 基础短视频流水线
 2026-07  接入 AI 原生视频生成（智谱/可灵/MiniMax）→ 流程重构为 6 步流水线 → 密钥治理
 2026-09  数字人口播：方案评估 → EchoMimicV3-Flash 落地 → HeyGem/声音克隆 → Live2D 卡通数字人（纯 CPU）
+2026-09  0.1.2：功能点独立化（24 个功能点 + features API）→ Tauri v2 桌面应用 → UI 重设计（Soma Studio）
+         → 开源项目集成（yt-dlp 下载/通知推送/签名算法/抖音直连/字幕处理/剪映草稿/数据导出 + 工具箱 UI）
 ```
 
 ## 相关入口
