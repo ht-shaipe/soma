@@ -4,8 +4,10 @@
 //! 前端经 [`api`] 通用命令调用与 HTTP 完全同构的接口（{code, result, message} 信封），
 //! Vue 前端零改动运行在浏览器（HTTP）与桌面（invoke）两种环境。
 //!
-//! 进度推送：任务进度仍以前端轮询（tasks/get）为主，
-//! event 推送（progress://{task_id}）在任务中心 UI 改造时启用。
+//! 0.1.2 M2.4：配置迁移至系统配置目录（app_config_dir），存储迁移至系统数据目录
+//! （app_data_dir/storage）；首次启动自动迁移项目内既有配置或初始化默认配置，
+//! 桌面 App 在全新机器上开箱可用。服务器模式（soma-server）不受影响，
+//! 仍使用项目相对的 conf/ 与 storage/。
 
 // 引入 tube 宏（error! 等）
 #[macro_use]
@@ -17,7 +19,9 @@ use tube_web::RequestParameter;
 
 /// 项目根目录解析（开发态可执行文件位于 {root}/target/debug/，向上三级即根目录）
 ///
-/// 可用环境变量 SOMA_ROOT 覆盖；打包发布（M3.4）后由资源目录约定替代。
+/// 可用环境变量 SOMA_ROOT 覆盖。仅项目模式（测试）使用；
+/// 桌面运行时一律走系统目录（M2.4），严格版解析见 [`resolve_project_root_checked`]。
+#[cfg(test)]
 fn resolve_project_root() -> std::path::PathBuf {
     if let Ok(root) = std::env::var("SOMA_ROOT") {
         return root.into();
@@ -29,26 +33,77 @@ fn resolve_project_root() -> std::path::PathBuf {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
 }
 
-/// 后端初始化：复刻服务端启动序列（配置 → 代理 → 队列 → 存储目录 → SQLite）
+/// 严格版项目根解析：要求根目录存在 conf/ 或 resource/ 标志。
 ///
-/// 与服务端唯一区别：不启动 HTTP 监听。配置/存储路径迁移到系统目录（M2.4）时，
-/// 仅需替换本函数中的根目录解析与 conf/storage 路径。
-fn init_backend() {
-    let root = resolve_project_root();
-    if let Ok(cwd) = std::env::current_dir() {
-        if cwd != root {
-            let _ = std::env::set_current_dir(&root);
+/// 全新机器（打包运行）返回 None，调用方按"无项目环境"处理，
+/// 相对路径资源（字体/歌曲/推理脚本）交由 M2.5 预检引导与 M3.4 资源打包解决。
+fn resolve_project_root_checked() -> Option<std::path::PathBuf> {
+    if let Ok(root) = std::env::var("SOMA_ROOT") {
+        let p = std::path::PathBuf::from(root);
+        return (p.join("conf").exists() || p.join("resource").exists()).then_some(p);
+    }
+    let exe = std::env::current_exe().ok()?;
+    let root = exe.ancestors().nth(3)?.to_path_buf();
+    (root.join("conf").exists() || root.join("resource").exists()).then_some(root)
+}
+
+/// 首启配置初始化/迁移（M2.4）：系统配置目录没有 config.toml 时依次尝试
+///
+/// ① 迁移项目内既有 `conf/config.toml`（开发机升级路径，保留用户密钥等全部配置）
+/// ② 复制项目内 `conf/config.toml.example` 模板
+/// ③ 写出出厂默认配置（AppConfig::default() 序列化）
+fn ensure_desktop_config(config_dir: &std::path::Path) -> std::path::PathBuf {
+    let _ = std::fs::create_dir_all(config_dir);
+    let conf_path = config_dir.join("config.toml");
+    if conf_path.exists() {
+        return conf_path;
+    }
+    let root = resolve_project_root_checked();
+    let legacy = root.as_ref().map(|r| r.join("conf/config.toml"));
+    let example = root.as_ref().map(|r| r.join("conf/config.toml.example"));
+    for candidate in [legacy, example].into_iter().flatten() {
+        if candidate.exists() {
+            match std::fs::copy(&candidate, &conf_path) {
+                Ok(_) => {
+                    eprintln!(
+                        "[soma] 首启迁移配置 {} → {}",
+                        candidate.display(),
+                        conf_path.display()
+                    );
+                    return conf_path;
+                }
+                Err(e) => eprintln!("[soma] 迁移配置失败 {candidate:?}: {e}"),
+            }
         }
     }
+    let default_toml = toml::to_string_pretty(&soma_core::config::AppConfig::default())
+        .unwrap_or_else(|_| "[app]\n".to_string());
+    if let Err(e) = std::fs::write(&conf_path, default_toml) {
+        eprintln!("[soma] 写出默认配置失败 {conf_path:?}: {e}");
+    } else {
+        eprintln!("[soma] 首启初始化默认配置 {}", conf_path.display());
+    }
+    conf_path
+}
 
-    let conf_path = tube_web::utils::get_abs_path("conf/config.toml");
-    let conf = match soma_server::Config::load(&conf_path) {
+/// 后端初始化公共序列（配置 → 代理 → 队列 → 存储目录 → SQLite）
+///
+/// 与服务端唯一区别：不启动 HTTP 监听。`storage_root` 为 Some 时强制
+/// `conf.app.storage_path` 指向该目录（桌面系统目录模式），并同步注入
+/// soma-core 路径覆盖层；为 None 时保持项目相对语义（服务器/测试模式）。
+fn init_backend_common(conf_path: &str, storage_root: Option<std::path::PathBuf>) {
+    soma_core::utils::set_storage_root(storage_root.clone());
+
+    let mut conf = match soma_server::Config::load(conf_path) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("配置加载失败 {conf_path}: {e:?}，使用默认配置");
             soma_server::Config::default()
         }
     };
+    if let Some(ref root) = storage_root {
+        conf.app.app.storage_path = Some(root.to_string_lossy().to_string());
+    }
     soma_server::Config::set(conf.clone());
 
     let proxy_map = conf.app.get_proxy_map();
@@ -75,6 +130,39 @@ fn init_backend() {
 
     let db_path = format!("{storage_path}/tasks.db");
     soma_server::state::init_sqlite_store(&db_path);
+}
+
+/// 项目模式初始化（仅测试使用）：保持项目相对路径（conf/ 与 storage/）；
+/// 桌面运行时一律走 [`init_backend_system`]（M2.4）
+#[cfg(test)]
+fn init_backend() {
+    let root = resolve_project_root();
+    if let Ok(cwd) = std::env::current_dir() {
+        if cwd != root {
+            let _ = std::env::set_current_dir(&root);
+        }
+    }
+
+    let conf_path = tube_web::utils::get_abs_path("conf/config.toml");
+    init_backend_common(&conf_path, None);
+}
+
+/// 桌面模式初始化（M2.4）：配置 → app_config_dir，存储 → app_data_dir/storage
+///
+/// 开发态仍尝试把工作目录切到项目根，保证 resource/ 相对路径
+/// （字体/歌曲/推理脚本）继续可用；全新机器无项目目录时静默跳过。
+fn init_backend_system(config_dir: &std::path::Path, data_dir: &std::path::Path) {
+    if let Some(root) = resolve_project_root_checked() {
+        if let Ok(cwd) = std::env::current_dir() {
+            if cwd != root {
+                let _ = std::env::set_current_dir(&root);
+            }
+        }
+    }
+
+    let conf_path = ensure_desktop_config(config_dir);
+    let storage_root = data_dir.join("storage");
+    init_backend_common(&conf_path.to_string_lossy(), Some(storage_root));
 }
 
 /// 示例命令：验证前端 → Rust 的 invoke 链路
@@ -194,10 +282,17 @@ async fn dispatch(module: &str, param: &RequestParameter) -> tube::Result<tube::
 }
 
 fn main() {
-    init_backend();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            use tauri::Manager;
+            // M2.4：后端初始化移入 setup 钩子，配置/存储落系统目录
+            // （macOS: ~/Library/Application Support/com.soma.desktop/）
+            let config_dir = app.path().app_config_dir().expect("解析系统配置目录失败");
+            let data_dir = app.path().app_data_dir().expect("解析系统数据目录失败");
+            init_backend_system(&config_dir, &data_dir);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![greet, api, upload_file])
         .run(tauri::generate_context!())
         .expect("Soma 桌面应用启动失败");
@@ -207,9 +302,14 @@ fn main() {
 mod tests {
     use super::*;
 
+    /// 初始化类测试共享进程级全局状态（工作目录 / 路径覆盖 / 配置缓存），
+    /// 用互斥锁串行化，避免并行互踩
+    static INIT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// 验证 features/list 的桌面分发链路：应返回全部功能点（含原子化新增）
     #[test]
     fn test_features_list_dispatch() {
+        let _guard = INIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         init_backend();
         let mut param = RequestParameter::default();
         param.module = "features".to_string();
@@ -247,6 +347,7 @@ mod tests {
     /// 验证真实 api 命令（线程 + oneshot 包装 + 信封）的完整路径
     #[test]
     fn test_api_command_envelope() {
+        let _guard = INIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         init_backend();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -274,6 +375,7 @@ mod tests {
     /// （各 handler 会返回自己的参数校验错误）。
     #[test]
     fn test_dispatch_covers_new_modules() {
+        let _guard = INIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         init_backend();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -313,6 +415,7 @@ mod tests {
     /// 桌面模式 dataexport/preview 端到端（纯本地，无外部依赖）
     #[test]
     fn test_dispatch_dataexport_preview() {
+        let _guard = INIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         init_backend();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -337,5 +440,67 @@ mod tests {
         let csv = json["csvPreview"].as_str().unwrap_or("");
         assert!(csv.contains("k,x"), "CSV 表头应含 k,x: {csv}");
         assert!(csv.contains("v,y"), "CSV 数据行应含 v,y: {csv}");
+    }
+
+    /// M2.4：桌面系统目录模式首启——配置自动初始化/迁移、存储落系统目录、分发链路可用
+    #[test]
+    fn test_system_mode_first_run() {
+        let _guard = INIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let base =
+            std::env::temp_dir().join(format!("soma-app-m24-{}", soma_core::utils::get_uuid()));
+        let config_dir = base.join("config");
+        let data_dir = base.join("data");
+
+        assert!(
+            !config_dir.join("config.toml").exists(),
+            "前置：系统配置目录应为空（临时目录）"
+        );
+        init_backend_system(&config_dir, &data_dir);
+
+        let conf_path = config_dir.join("config.toml");
+        assert!(
+            conf_path.exists(),
+            "首启应在系统配置目录产出 config.toml: {conf_path:?}"
+        );
+        assert!(
+            data_dir.join("storage/tasks.db").exists(),
+            "SQLite 应落在系统存储目录"
+        );
+        assert_eq!(
+            soma_core::utils::storage_dir("portraits", false),
+            data_dir.join("storage/portraits"),
+            "storage_dir 应被覆盖到系统目录"
+        );
+        assert_eq!(
+            soma_server::Config::get_conf_path(),
+            conf_path.to_string_lossy(),
+            "配置缓存应指向系统路径（设置页保存写回此处）"
+        );
+
+        // 分发链路在系统模式下可用
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let envelope = rt
+            .block_on(api(
+                "features".to_string(),
+                "list".to_string(),
+                serde_json::json!({}),
+            ))
+            .expect("api 命令失败");
+        assert_eq!(
+            envelope["code"], 200,
+            "系统模式 features/list 失败: {}",
+            envelope["message"]
+        );
+        assert!(
+            envelope["result"].as_array().is_some_and(|l| l.len() >= 24),
+            "系统模式应返回 ≥24 个功能点"
+        );
+
+        // 清理：恢复项目相对语义，避免影响后续断言全局状态的用例
+        soma_core::utils::set_storage_root(None);
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

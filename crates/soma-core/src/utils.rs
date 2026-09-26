@@ -25,13 +25,50 @@ pub fn root_dir() -> PathBuf {
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
+/// 存储根目录覆盖（M2.4 桌面模式）：由桌面宿主启动时注入系统数据目录，
+/// 服务器模式不注入，`storage_dir` 保持 `root_dir()/storage` 的项目相对语义。
+static STORAGE_ROOT_OVERRIDE: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// 资源根目录覆盖（M3.4 打包后指向随包分发的 resource 目录），语义同上。
+static RESOURCE_ROOT_OVERRIDE: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+fn lock_override(
+    lock: &std::sync::Mutex<Option<PathBuf>>,
+) -> std::sync::MutexGuard<'_, Option<PathBuf>> {
+    lock.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// 注入存储根目录覆盖（None 恢复项目相对语义）
+pub fn set_storage_root(root: Option<PathBuf>) {
+    *lock_override(&STORAGE_ROOT_OVERRIDE) = root;
+}
+
+/// 注入资源根目录覆盖（None 恢复项目相对语义）
+pub fn set_resource_root(root: Option<PathBuf>) {
+    *lock_override(&RESOURCE_ROOT_OVERRIDE) = root;
+}
+
+/// 获取存储根目录：覆盖优先，否则 `root_dir()/storage`
+fn storage_base() -> PathBuf {
+    lock_override(&STORAGE_ROOT_OVERRIDE)
+        .clone()
+        .unwrap_or_else(|| root_dir().join("storage"))
+}
+
+/// 获取资源根目录：覆盖优先，否则 `root_dir()/resource`
+fn resource_base() -> PathBuf {
+    lock_override(&RESOURCE_ROOT_OVERRIDE)
+        .clone()
+        .unwrap_or_else(|| root_dir().join("resource"))
+}
+
 /// 获取存储目录路径
 ///
 /// # 参数
 /// - `sub_dir`: 存储下的子目录名，空字符串表示 storage 根目录
 /// - `create`: 是否在目录不存在时自动创建
 pub fn storage_dir(sub_dir: &str, create: bool) -> PathBuf {
-    let d = root_dir().join("storage");
+    let d = storage_base();
     let d = if sub_dir.is_empty() {
         d
     } else {
@@ -61,7 +98,7 @@ pub fn tasks_dir() -> PathBuf {
 ///
 /// 与 storage_dir 不同，resource 目录不会自动创建
 pub fn resource_dir(sub_dir: &str) -> PathBuf {
-    let d = root_dir().join("resource");
+    let d = resource_base();
     if sub_dir.is_empty() {
         d
     } else {
@@ -352,5 +389,43 @@ pub fn task_file_to_uri(file: &str, endpoint: &str, task_base: &str) -> String {
         format!("/{}", uri)
     } else {
         format!("{}/{}", endpoint.trim_end_matches('/'), uri)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 路径覆盖层：注入后 storage_dir/resource_dir 指向系统目录，恢复后回到项目相对语义
+    #[test]
+    fn test_path_overrides() {
+        // 前置：确保无残留覆盖（测试进程内其它用例可能已设置）
+        set_storage_root(None);
+        set_resource_root(None);
+        let default_storage = storage_dir("", false);
+        assert!(
+            default_storage.ends_with("storage"),
+            "默认应为项目相对 storage: {default_storage:?}"
+        );
+
+        let sys = std::env::temp_dir().join(format!("soma-override-test-{}", get_uuid()));
+        set_storage_root(Some(sys.join("storage")));
+        set_resource_root(Some(sys.join("resource")));
+        assert_eq!(storage_dir("", false), sys.join("storage"));
+        assert_eq!(
+            storage_dir("portraits", false),
+            sys.join("storage/portraits")
+        );
+        assert_eq!(resource_dir("fonts"), sys.join("resource/fonts"));
+        // create=true 时在系统目录下真实建目录
+        let created = storage_dir("uploads", true);
+        assert!(created.is_dir(), "应已在覆盖目录下创建: {created:?}");
+
+        // 恢复项目相对语义
+        set_storage_root(None);
+        set_resource_root(None);
+        assert_eq!(storage_dir("", false), default_storage);
+
+        let _ = std::fs::remove_dir_all(&sys);
     }
 }
