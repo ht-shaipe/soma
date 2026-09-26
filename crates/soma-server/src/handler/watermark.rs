@@ -11,6 +11,14 @@ use base64::Engine;
 use soma_video::watermark;
 use std::path::PathBuf;
 use tube::{Result, Value};
+
+use crate::Config;
+
+/// 由全局配置构造 FFmpeg 二进制路径（跟随设置页 ffmpeg_path，M3.4 sidecar 前置）
+fn ffmpeg_binaries() -> watermark::FfmpegBinaries {
+    let conf = Config::get();
+    watermark::FfmpegBinaries::from_ffmpeg(&conf.app.get_ffmpeg_binary())
+}
 use tube_web::RequestParameter;
 
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
@@ -68,16 +76,18 @@ async fn detect(param: &RequestParameter) -> Result<Value> {
         soma_core::utils::storage_dir(&format!("watermark/{}", soma_core::utils::get_uuid()), true);
 
     // 检测为同步 ffmpeg 子进程调用，放入阻塞线程池
+    let bins = ffmpeg_binaries();
     actix_web::web::block(move || {
         let video = PathBuf::from(&video_path);
-        let mask = watermark::detect_from_video(&video, &opts, &work_dir)
+        let mask = watermark::detect_from_video(&video, &opts, &work_dir, &bins)
             .map_err(|e| error!("水印检测失败: {}", e))?;
 
         let mask_path = work_dir.join("mask.bmp");
         watermark::save_mask_bmp(&mask, &mask_path).map_err(|e| error!("蒙版保存失败: {}", e))?;
 
-        let (frame_png, mask_png) = watermark::write_previews(&video, &mask_path, &work_dir, 640)
-            .map_err(|e| error!("预览生成失败: {}", e))?;
+        let (frame_png, mask_png) =
+            watermark::write_previews(&video, &mask_path, &work_dir, 640, &bins)
+                .map_err(|e| error!("预览生成失败: {}", e))?;
         let frame_preview = png_data_url(&frame_png)?;
         let mask_preview = png_data_url(&mask_png)?;
 
@@ -124,6 +134,7 @@ async fn remove(param: &RequestParameter) -> Result<Value> {
     let started = std::time::Instant::now();
 
     // 去除为同步长任务（重编码可能耗时数分钟），放入阻塞线程池
+    let bins = ffmpeg_binaries();
     actix_web::web::block(move || {
         let video = PathBuf::from(&video_path);
         let work_dir = output_dir.join(soma_core::utils::get_uuid());
@@ -131,7 +142,7 @@ async fn remove(param: &RequestParameter) -> Result<Value> {
 
         // 蒙版：优先复用 detect 产物，否则自动检测
         let mask_file = if mask_path.is_empty() {
-            let mask = watermark::detect_from_video(&video, &opts, &work_dir)
+            let mask = watermark::detect_from_video(&video, &opts, &work_dir, &bins)
                 .map_err(|e| error!("自动检测水印失败: {}", e))?;
             let p = work_dir.join("mask.bmp");
             watermark::save_mask_bmp(&mask, &p).map_err(|e| error!("蒙版保存失败: {}", e))?;
@@ -150,8 +161,16 @@ async fn remove(param: &RequestParameter) -> Result<Value> {
             .unwrap_or_else(|| "video".to_string());
         let output_path = work_dir.join(format!("{}_cleaned.mp4", stem));
 
-        watermark::remove_watermark(&video, &mask_file, &output_path, &work_dir, &codec, crf)
-            .map_err(|e| error!("{}", e))?;
+        watermark::remove_watermark(
+            &video,
+            &mask_file,
+            &output_path,
+            &work_dir,
+            &codec,
+            crf,
+            &bins,
+        )
+        .map_err(|e| error!("{}", e))?;
 
         Ok(value!({
             "success": true,
