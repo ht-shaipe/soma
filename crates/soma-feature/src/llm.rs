@@ -1,4 +1,4 @@
-use ai_llm_kit::{LlmFactory, LlmProvider};
+use ai_llm_kit::{LlmFactory, LlmProvider, LlmService, OpenAICompatible};
 use soma_core::config::AppConfig;
 /// LLM（大语言模型）服务模块（功能点层共享实现）
 ///
@@ -49,7 +49,7 @@ pub async fn generate_script(
     conf: &AppConfig,
 ) -> Result<String, SomaError> {
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
-    let llm = LlmFactory::create(llm_provider, &api_key);
+    let llm = create_llm(provider, llm_provider, conf, &api_key);
 
     let intent_desc = format!(
         "主题：{}\n风格：{}\n情感基调：{}\n目标受众：{}\n时长建议：{}\n目标平台：{}",
@@ -156,7 +156,7 @@ pub async fn generate_terms(
     conf: &AppConfig,
 ) -> Result<Vec<String>, SomaError> {
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
-    let llm = LlmFactory::create(llm_provider, &api_key);
+    let llm = create_llm(provider, llm_provider, conf, &api_key);
 
     let sys_msg = format!(
         "你是一个视频素材搜索关键词提取专家。请从给定的视频脚本中提取{}个最适合搜索视频素材的关键词。\
@@ -209,7 +209,7 @@ pub async fn generate_narration(
     conf: &AppConfig,
 ) -> Result<String, SomaError> {
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
-    let llm = LlmFactory::create(llm_provider, &api_key);
+    let llm = create_llm(provider, llm_provider, conf, &api_key);
 
     let storyboard_hint = if let Some(scenes) = storyboard.as_array() {
         if !scenes.is_empty() {
@@ -321,7 +321,7 @@ pub async fn generate_intent(
     }
 
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
-    let llm = LlmFactory::create(llm_provider, &api_key);
+    let llm = create_llm(provider, llm_provider, conf, &api_key);
 
     let sys_msg = "你是一个短视频创意策划专家。请根据用户的简短描述，提炼出结构化的视频创作参数。\
                    以JSON格式输出，包含以下字段：\n\
@@ -383,7 +383,7 @@ pub async fn generate_storyboard(
     conf: &AppConfig,
 ) -> Result<Vec<StoryboardScene>, SomaError> {
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
-    let llm = LlmFactory::create(llm_provider, &api_key);
+    let llm = create_llm(provider, llm_provider, conf, &api_key);
 
     let style = intent.get("style").and_then(|v| v.as_str()).unwrap_or("");
     let mood = intent.get("mood").and_then(|v| v.as_str()).unwrap_or("");
@@ -601,7 +601,7 @@ pub async fn generate_social_metadata(
     conf: &AppConfig,
 ) -> Result<serde_json::Value, SomaError> {
     let (llm_provider, api_key, model_name) = get_provider_config(provider, conf)?;
-    let llm = LlmFactory::create(llm_provider, &api_key);
+    let llm = create_llm(provider, llm_provider, conf, &api_key);
 
     let spec = get_social_platform_spec(platform);
     let label = get_social_platform_label(platform);
@@ -774,6 +774,45 @@ fn clean_llm_output(text: &str) -> String {
 /// - `conf`: 全局配置引用
 ///
 /// 返回：(LlmProvider, api_key, model_name) 三元组，或配置错误
+/// 创建 LLM 客户端：openai 提供商支持 `openai_base_url` 自定义端点
+/// （本地网关 / 自建 OpenAI 兼容服务），其余走 kit 工厂固定映射
+fn create_llm(
+    provider: &str,
+    llm_provider: LlmProvider,
+    conf: &AppConfig,
+    api_key: &str,
+) -> Box<dyn LlmService> {
+    if provider == "openai" {
+        if let Some(base) = conf
+            .app
+            .openai_base_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            let (host, path) = split_openai_base(base);
+            return Box::new(OpenAICompatible::new(&host, &path, api_key));
+        }
+    }
+    LlmFactory::create(llm_provider, api_key)
+}
+
+/// 拆分 OpenAI 兼容 base_url 为 (host, api 版本前缀)；
+/// 无 `/v1` 时默认补 `/v1`，`/v1/xxx` 形式保留子路径
+fn split_openai_base(base: &str) -> (String, String) {
+    if let Some(idx) = base.find("/v1") {
+        let host = base[..idx].trim_end_matches('/').to_string();
+        let rest = base[idx + 3..].trim_end_matches('/').to_string();
+        if rest.is_empty() {
+            (host, "/v1".into())
+        } else {
+            (format!("{host}/v1"), format!("/{rest}"))
+        }
+    } else {
+        (base.trim_end_matches('/').to_string(), "/v1".into())
+    }
+}
+
 fn get_provider_config(
     provider: &str,
     conf: &AppConfig,
