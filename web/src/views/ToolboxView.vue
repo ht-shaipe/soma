@@ -37,13 +37,23 @@
       </div>
     </div>
 
-    <!-- 功能点分组 -->
+    <!-- 功能点分组（默认折叠：面向进阶用户的原子能力，搜索时自动展开） -->
     <div class="tb-section">
-      <div class="tb-section-head">
+      <div class="tb-section-head tb-feature-head" @click="toggleFeatures">
         <span class="tb-section-dot dot-feature" />
         <span class="tb-section-title">{{ $t('toolbox.section.features') }}</span>
         <span class="tb-section-count">{{ features.length }}</span>
+        <span class="tb-feature-toggle">
+          <span class="tb-feature-toggle-label">
+            {{ $t(featuresExpanded ? 'toolbox.features.collapse' : 'toolbox.features.expand') }}
+          </span>
+          <el-icon class="tb-feature-caret" :class="{ 'is-open': featuresExpanded }"><ArrowDown /></el-icon>
+        </span>
       </div>
+      <div v-if="!featuresVisible" class="tb-features-collapsed-hint">
+        {{ $t('toolbox.features.hint') }}
+      </div>
+      <template v-if="featuresVisible">
       <div v-for="group in featureGroups" :key="group.kind" class="wb-group">
         <div class="wb-group-head">
           <span class="wb-group-dot" :style="{ background: group.meta.color }" />
@@ -84,6 +94,7 @@
         :description="$t('toolbox.noMatch')"
         :image-size="72"
       />
+      </template>
     </div>
 
     <!-- 工具运行对话框 -->
@@ -437,7 +448,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Bell, DataAnalysis, Document, Download, Film, Link, MagicStick, Search, Refresh, FolderOpened, Delete } from '@element-plus/icons-vue'
+import { ArrowDown, Bell, DataAnalysis, Document, Download, Film, Link, MagicStick, Search, Refresh, FolderOpened, Delete } from '@element-plus/icons-vue'
 import api, { extractData } from '@/api'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
@@ -1092,6 +1103,16 @@ async function loadFeatures() {
   }
 }
 
+// ── 功能点区折叠（方案 B：默认收起，面向进阶用户；搜索时自动展开）──
+const FEATURE_EXPAND_KEY = 'toolbox-features-expanded'
+const featuresExpanded = ref(localStorage.getItem(FEATURE_EXPAND_KEY) === '1')
+const featuresVisible = computed(() => featuresExpanded.value || keyword.value.trim() !== '')
+
+function toggleFeatures() {
+  featuresExpanded.value = !featuresExpanded.value
+  localStorage.setItem(FEATURE_EXPAND_KEY, featuresExpanded.value ? '1' : '0')
+}
+
 const featureGroups = computed(() => {
   const k = keyword.value.trim().toLowerCase()
   const matched = features.value.filter((f) => {
@@ -1337,6 +1358,45 @@ async function copyText(text: string) {
   align-items: center;
   gap: 9px;
   margin-bottom: 14px;
+}
+
+/* 功能点区折叠开关（方案 B） */
+.tb-feature-head {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 10px;
+  transition: background 0.18s ease;
+}
+
+.tb-feature-head:hover {
+  background: var(--soma-glass);
+}
+
+.tb-feature-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--soma-text-dim);
+}
+
+.tb-feature-caret {
+  font-size: 13px;
+  transition: transform 0.22s ease;
+}
+
+.tb-feature-caret.is-open {
+  transform: rotate(180deg);
+}
+
+.tb-features-collapsed-hint {
+  font-size: 12.5px;
+  color: var(--soma-text-faint);
+  line-height: 1.6;
+  padding: 12px 16px;
+  border: 1px dashed var(--soma-line-strong);
+  border-radius: var(--soma-radius-sm);
 }
 
 .tb-section-dot {

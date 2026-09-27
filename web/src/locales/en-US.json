@@ -671,7 +671,12 @@
       "tools": "Featured Tools",
       "features": "Feature Points"
     },
-    "noMatch": "No matches"
+    "noMatch": "No matches",
+    "features": {
+      "expand": "Show features",
+      "collapse": "Collapse",
+      "hint": "Atomic capabilities for advanced users (scripts, TTS, subtitles, material & video tools) for fine-grained control and standalone runs. Expand to view all."
+    }
   },
   "envBanner": {
     "title": "Environment check: {names} not ready — core features may fail",
