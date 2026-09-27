@@ -226,7 +226,17 @@ script_path = "resource/live2d_runner.py"
 
 ### 第 5 步：启动服务
 
-**方式 A：Web 服务器模式**（推荐，支持远程访问）
+**方式 A：桌面应用**（推荐，双击即用）
+
+```bash
+make app   # 打包并安装到 /Applications/Soma.app（首次打开若提示未公证：右键 → 打开）
+```
+
+从启动台/聚焦搜索打开 **Soma** 即可。配置与产物存放在系统目录
+（macOS: `~/Library/Application Support/com.soma.desktop/`），LLM/密钥在应用内「系统设置」页配置；
+开发调试仍可用 `cargo run -p soma-app`（工作目录锁定项目根，含 resource 资源）。
+
+**方式 B：Web 服务器模式**（支持远程访问）
 
 ```bash
 make install   # 安装前后端依赖

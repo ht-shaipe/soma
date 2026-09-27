@@ -65,6 +65,16 @@ build-tauri: ## Build desktop app for distribution
 	@echo "$(COLOR_GREEN)>>> Building desktop app...$(COLOR_RESET)"
 	cargo tauri build
 
+## app: 打包桌面应用并安装到 /Applications（本地使用，未签名）
+.PHONY: app
+app: build-frontend ## Package desktop app and install to /Applications
+	@echo "$(COLOR_GREEN)>>> Packaging Soma.app...$(COLOR_RESET)"
+	cargo tauri build
+	@rm -rf /Applications/Soma.app
+	@cp -R target/release/bundle/macos/Soma.app /Applications/
+	@echo "$(COLOR_GREEN)>>> 已安装到 /Applications/Soma.app（启动台/聚焦搜索 Soma）$(COLOR_RESET)"
+	@echo "$(COLOR_YELLOW)提示：首次打开若提示未公证，右键 → 打开 即可$(COLOR_RESET)
+
 ## dev-tauri-debug: Start Tauri desktop app in debug mode (faster build)
 dev-tauri-debug: check-storage ## Start Tauri desktop app (debug mode)
 	@echo "$(COLOR_GREEN)>>> Starting Soma desktop app (debug)...$(COLOR_RESET)"

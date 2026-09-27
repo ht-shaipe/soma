@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Soma - AI 驱动的短视频自动生成工具。输入主题，自动完成脚本撰写、配音、素材采集、字幕合成与视频拼接，一键生成成品视频。">
+  <title>Soma · AI 短视频自动生成工具</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ========== Nav ========== -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#hero" class="nav-logo">
+      <span class="logo-mark">S</span>
+      <span class="logo-text">Soma</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#pipeline">流水线</a>
+      <a href="#feature-points">功能点</a>
+      <a href="#tech">技术栈</a>
+      <a href="#digital-human">数字人</a>
+      <a href="#start">快速上手</a>
+    </div>
+    <a href="#start" class="btn btn-primary btn-sm nav-cta">开始使用</a>
+    <button class="nav-burger" id="burger" aria-label="菜单">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ========== Hero ========== -->
+<section id="hero" class="hero">
+  <canvas id="particles" class="particles"></canvas>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="pulse-dot"></span>
+      v0.1.2 · Tauri v2 桌面应用已就绪
+    </div>
+    <h1 class="hero-title">
+      输入主题<span class="text-gradient">，一键生成</span><br>
+      成品短视频
+    </h1>
+    <p class="hero-sub">
+      AI 驱动的短视频自动生成工具 —— 自动完成脚本撰写、配音、素材采集、<br class="hide-mobile">
+      字幕合成与视频拼接。同时支持数字人口播视频与 24 个独立功能点。
+    </p>
+    <div class="hero-cta">
+      <a href="#start" class="btn btn-primary btn-lg">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        快速上手
+      </a>
+      <a href="#features" class="btn btn-ghost btn-lg">了解功能</a>
+    </div>
+    <div class="hero-code">
+      <div class="code-window">
+        <div class="code-bar">
+          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+          <span class="code-title">terminal</span>
+        </div>
+        <pre class="code-body"><code><span class="c-gray"># 克隆并启动</span>
+<span class="c-green">git</span> clone &lt;repo-url&gt; <span class="c-gray">&amp;&amp;</span> <span class="c-green">cd</span> soma
+cp conf/config.toml.example conf/config.toml
+make install <span class="c-gray">&amp;&amp;</span> make dev
+
+<span class="c-cyan">[INFO]</span> Soma server starting at 0.0.0.0:8090
+<span class="c-cyan">[INFO]</span> Frontend running at http://localhost:5273</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Stats ========== -->
+<section class="stats">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card reveal">
+        <div class="stat-num" data-target="33000" data-suffix="+">0</div>
+        <div class="stat-label">行 Rust 代码</div>
+      </div>
+      <div class="stat-card reveal">
+        <div class="stat-num" data-target="24" data-suffix="">0</div>
+        <div class="stat-label">内置功能点</div>
+      </div>
+      <div class="stat-card reveal">
+        <div class="stat-num" data-target="11" data-suffix="">0</div>
+        <div class="stat-label">种 TTS 引擎</div>
+      </div>
+      <div class="stat-card reveal">
+        <div class="stat-num" data-target="5" data-suffix="">0</div>
+        <div class="stat-label">种数字人引擎</div>
+      </div>
+      <div class="stat-card reveal">
+        <div class="stat-num" data-target="25" data-suffix="+">0</div>
+        <div class="stat-label">LLM 提供商</div>
+      </div>
+      <div class="stat-card reveal">
+        <div class="stat-num" data-target="72" data-suffix="">0</div>
+        <div class="stat-label">个测试用例</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Features ========== -->
+<section id="features" class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-tag">功能特性</span>
+      <h2 class="section-title">三大核心能力</h2>
+      <p class="section-desc">从 AI 脚本到成品视频，从工具箱到数字人口播，覆盖短视频创作全链路</p>
+    </div>
+
+    <div class="feature-cards">
+      <!-- Card 1: 短视频自动生成 -->
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            <polygon points="10 8 14 10 10 12 10 8" fill="currentColor"/>
+          </svg>
+        </div>
+        <h3>短视频自动生成</h3>
+        <p class="feature-summary">输入主题，6 步流水线自动产出成品视频</p>
+        <ul class="feature-list">
+          <li>AI 脚本生成（25+ LLM 提供商）</li>
+          <li>需求理解与分镜（意图 → 视觉提示词 → 镜头运动）</li>
+          <li>智能 TTS 合成（11 种引擎 + 声音克隆）</li>
+          <li>素材自动采集（Pexels / Pixabay / Coverr）</li>
+          <li>AI 视频生成（智谱 / 可灵 / MiniMax）</li>
+          <li>FFmpeg 合成（拼接 / 转场 / 字幕 / 混音 / 水印）</li>
+          <li>异步任务队列 + SQLite 持久化 + 断点续跑</li>
+          <li>社交发布（TikTok / YouTube 等 12 平台）</li>
+        </ul>
+      </div>
+
+      <!-- Card 2: 工具箱 -->
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </div>
+        <h3>工具箱</h3>
+        <p class="feature-summary">24 个功能点 + 7 个精选工具，即开即用</p>
+        <ul class="feature-list">
+          <li><strong>功能点</strong>：流水线各步拆分为独立调用，JSON Schema 驱动动态表单</li>
+          <li><strong>视频下载</strong>：yt-dlp，支持 1000+ 站点</li>
+          <li><strong>字幕处理</strong>：SRT/VTT 转换、合并、LLM 翻译校正</li>
+          <li><strong>剪映草稿导出</strong>：视频/音频 → 剪映可编辑草稿</li>
+          <li><strong>通知推送</strong>：Bark / 钉钉 / Telegram</li>
+          <li><strong>数据导出</strong>：JSON → CSV / JSON / JSONL</li>
+          <li><strong>视频去水印</strong>：多帧梯度分析自动检测 + FFmpeg 去除</li>
+          <li><strong>抖音直连</strong>：a_bogus 签名直连 Web API</li>
+          <li><strong>图片故事</strong>：多图 + 文字 → 图片故事视频</li>
+        </ul>
+      </div>
+
+      <!-- Card 3: 数字人口播 -->
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <h3>数字人口播</h3>
+        <p class="feature-summary">一张照片 + 一段文案 → 口型同步口播视频</p>
+        <ul class="feature-list">
+          <li><strong>HeyGen</strong>：云端 API，付费按量</li>
+          <li><strong>SadTalker</strong>：本地 CPU/GPU 推理，免费</li>
+          <li><strong>EchoMimicV3-Flash</strong>：本地 GPU（≥12G），免费</li>
+          <li><strong>HeyGem</strong>：Docker 三容器，免费</li>
+          <li><strong>Live2D</strong>：纯 CPU 卡通数字人，零成本</li>
+          <li>长文案自动分段（单段 ≤6 秒），逐段渲染后拼接</li>
+          <li>内置敏感词过滤，可自定义词库</li>
+          <li>Live2D 支持自定义模型上传</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Pipeline ========== -->
+<section id="pipeline" class="section section-alt">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-tag">流水线</span>
+      <h2 class="section-title">6 步自动流水线</h2>
+      <p class="section-desc">支持 stop_at 任意步骤暂停，已完成步骤自动跳过（断点续跑）</p>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipeline-step reveal" data-step="1">
+        <div class="step-node">
+          <span class="step-num">1</span>
+          <span class="step-icon">🧠</span>
+        </div>
+        <div class="step-body">
+          <h4>需求理解</h4>
+          <p>LLM 解析风格 / 情绪 / 受众 → 意图参数</p>
+        </div>
+      </div>
+      <div class="pipeline-arrow reveal">→</div>
+      <div class="pipeline-step reveal" data-step="2">
+        <div class="step-node">
+          <span class="step-num">2</span>
+          <span class="step-icon">✍️</span>
+        </div>
+        <div class="step-body">
+          <h4>文案创作</h4>
+          <p>AI 根据主题 + 意图撰写旁白脚本</p>
+        </div>
+      </div>
+      <div class="pipeline-arrow reveal">→</div>
+      <div class="pipeline-step reveal" data-step="3">
+        <div class="step-node">
+          <span class="step-num">3</span>
+          <span class="step-icon">🎬</span>
+        </div>
+        <div class="step-body">
+          <h4>分镜脚本</h4>
+          <p>场景 / 视觉提示词 / 关键词 / 镜头 / 转场</p>
+        </div>
+      </div>
+      <div class="pipeline-arrow reveal">→</div>
+      <div class="pipeline-step reveal" data-step="4">
+        <div class="step-node">
+          <span class="step-num">4</span>
+          <span class="step-icon">🎞️</span>
+        </div>
+        <div class="step-body">
+          <h4>素材生成</h4>
+          <p>素材库搜索 / AI 视频生成</p>
+        </div>
+      </div>
+      <div class="pipeline-arrow reveal">→</div>
+      <div class="pipeline-step reveal" data-step="5">
+        <div class="step-node">
+          <span class="step-num">5</span>
+          <span class="step-icon">🎙️</span>
+        </div>
+        <div class="step-body">
+          <h4>配音 + 字幕</h4>
+          <p>TTS 合成 → SRT 字幕</p>
+        </div>
+      </div>
+      <div class="pipeline-arrow reveal">→</div>
+      <div class="pipeline-step reveal" data-step="6">
+        <div class="step-node">
+          <span class="step-num">6</span>
+          <span class="step-icon">✨</span>
+        </div>
+        <div class="step-body">
+          <h4>视频合成</h4>
+          <p>素材 + 配音 + 字幕 + BGM + 转场 → 成品</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-result reveal">
+      <span class="result-icon">🎬</span>
+      <span class="result-text">成品视频</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Feature Points ========== -->
+<section id="feature-points" class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-tag">功能点</span>
+      <h2 class="section-title">24 个内置功能点</h2>
+      <p class="section-desc">流水线各步全部拆分为可独立调用的功能点，JSON Schema 驱动动态表单，产物按 run_id 归档</p>
+    </div>
+
+    <div class="fp-grid">
+      <div class="fp-group reveal">
+        <h4 class="fp-group-title"><span class="fp-tag tag-llm">LLM</span> 六件套</h4>
+        <div class="fp-items">
+          <div class="fp-item"><code>llm.intent</code><span>需求理解</span></div>
+          <div class="fp-item"><code>llm.script</code><span>文案生成</span></div>
+          <div class="fp-item"><code>llm.storyboard</code><span>分镜脚本</span></div>
+          <div class="fp-item"><code>llm.narration</code><span>旁白改写</span></div>
+          <div class="fp-item"><code>llm.terms</code><span>关键词提取</span></div>
+          <div class="fp-item"><code>llm.social</code><span>社交元数据</span></div>
+        </div>
+      </div>
+
+      <div class="fp-group reveal">
+        <h4 class="fp-group-title"><span class="fp-tag tag-tts">TTS</span> 语音合成</h4>
+        <div class="fp-items">
+          <div class="fp-item"><code>tts.synthesize</code><span>TTS 完整合成</span></div>
+          <div class="fp-item"><code>subtitle.generate</code><span>音频→SRT 字幕</span></div>
+          <div class="fp-item"><code>audio.concat</code><span>音频合并</span></div>
+        </div>
+      </div>
+
+      <div class="fp-group reveal">
+        <h4 class="fp-group-title"><span class="fp-tag tag-stock">素材</span> 采集与生成</h4>
+        <div class="fp-items">
+          <div class="fp-item"><code>material.generate</code><span>素材生成</span></div>
+          <div class="fp-item"><code>material.search</code><span>素材搜索</span></div>
+          <div class="fp-item"><code>material.download</code><span>素材下载</span></div>
+          <div class="fp-item"><code>aivideo.generate</code><span>AI 视频生成</span></div>
+        </div>
+      </div>
+
+      <div class="fp-group reveal">
+        <h4 class="fp-group-title"><span class="fp-tag tag-video">视频</span> 7 项原子能力</h4>
+        <div class="fp-items">
+          <div class="fp-item"><code>video.compose</code><span>完整合成</span></div>
+          <div class="fp-item"><code>video.concat</code><span>拼接</span></div>
+          <div class="fp-item"><code>video.render</code><span>渲染字幕/音频</span></div>
+          <div class="fp-item"><code>video.watermark</code><span>水印添加</span></div>
+          <div class="fp-item"><code>video.join</code><span>连接</span></div>
+          <div class="fp-item"><code>video.transition</code><span>转场特效</span></div>
+          <div class="fp-item"><code>video.clip_resize</code><span>裁剪缩放</span></div>
+          <div class="fp-item"><code>video.info</code><span>视频信息</span></div>
+        </div>
+      </div>
+
+      <div class="fp-group reveal">
+        <h4 class="fp-group-title"><span class="fp-tag tag-dh">数字人</span> 口播三件套</h4>
+        <div class="fp-items">
+          <div class="fp-item"><code>digitalhuman.video</code><span>口播视频生成</span></div>
+          <div class="fp-item"><code>digitalhuman.portrait</code><span>人像处理</span></div>
+          <div class="fp-item"><code>digitalhuman.compose</code><span>视频合成</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Tech Stack ========== -->
+<section id="tech" class="section section-alt">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-tag">技术栈</span>
+      <h2 class="section-title">Rust 驱动的全栈架构</h2>
+      <p class="section-desc">两种运行形态共用同一 Rust 业务层与 Vue 3 前端</p>
+    </div>
+
+    <div class="tech-layout">
+      <div class="tech-diagram reveal">
+        <div class="tech-layer">
+          <div class="tech-layer-label">前端</div>
+          <div class="tech-boxes">
+            <span class="tech-box">Vue 3</span>
+            <span class="tech-box">TypeScript</span>
+            <span class="tech-box">Vite</span>
+            <span class="tech-box">Element Plus</span>
+            <span class="tech-box">Pinia</span>
+            <span class="tech-box">Vue I18n</span>
+          </div>
+        </div>
+        <div class="tech-bridge reveal">
+          <span>HTTP / Tauri invoke 双轨 Transport</span>
+        </div>
+        <div class="tech-layer">
+          <div class="tech-layer-label">后端</div>
+          <div class="tech-boxes">
+            <span class="tech-box tech-rust">Rust</span>
+            <span class="tech-box">Actix-Web 4</span>
+            <span class="tech-box">Tauri v2</span>
+            <span class="tech-box">SQLite WAL</span>
+          </div>
+        </div>
+        <div class="tech-layer">
+          <div class="tech-layer-label">业务层</div>
+          <div class="tech-boxes">
+            <span class="tech-box">soma-core</span>
+            <span class="tech-box">soma-feature</span>
+            <span class="tech-box">soma-tts</span>
+            <span class="tech-box">soma-stock</span>
+            <span class="tech-box">soma-video</span>
+          </div>
+        </div>
+        <div class="tech-layer">
+          <div class="tech-layer-label">外部依赖</div>
+          <div class="tech-boxes">
+            <span class="tech-box">FFmpeg</span>
+            <span class="tech-box">yt-dlp</span>
+            <span class="tech-box">Edge TTS</span>
+            <span class="tech-box">Python 推理</span>
+            <span class="tech-box">ai-llm-kit</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tech-crates reveal">
+        <h4>Workspace 结构</h4>
+        <div class="crate-list">
+          <div class="crate-item"><span class="crate-name">soma-core</span><span class="crate-desc">配置 · 模型 · 签名 · 通知 · 字幕</span><span class="crate-loc">5,215 行</span></div>
+          <div class="crate-item"><span class="crate-name">soma-feature</span><span class="crate-desc">Feature trait · 注册表 · 24 功能点</span><span class="crate-loc">4,416 行</span></div>
+          <div class="crate-item"><span class="crate-name">soma-tts</span><span class="crate-desc">11 种 TTS 引擎 · 声音克隆</span><span class="crate-loc">3,863 行</span></div>
+          <div class="crate-item"><span class="crate-name">soma-stock</span><span class="crate-desc">素材 · AI 视频 · 数字人 · 下载</span><span class="crate-loc">5,104 行</span></div>
+          <div class="crate-item"><span class="crate-name">soma-video</span><span class="crate-desc">FFmpeg · 水印 · 剪映 · 转场</span><span class="crate-loc">2,684 行</span></div>
+          <div class="crate-item"><span class="crate-name">soma-server</span><span class="crate-desc">API · 任务队列 · 流水线 · SQLite</span><span class="crate-loc">11,189 行</span></div>
+          <div class="crate-item"><span class="crate-name">soma-app</span><span class="crate-desc">Tauri v2 桌面应用</span><span class="crate-loc">508 行</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Digital Human ========== -->
+<section id="digital-human" class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-tag">数字人</span>
+      <h2 class="section-title">5 种数字人引擎</h2>
+      <p class="section-desc">从云端 API 到纯 CPU 卡通渲染，满足不同场景与成本需求</p>
+    </div>
+
+    <div class="dh-table reveal">
+      <div class="dh-row dh-header">
+        <div>引擎</div><div>部署形态</div><div>成本</div><div>特点</div>
+      </div>
+      <div class="dh-row reveal">
+        <div><strong>HeyGen</strong></div><div>云端 API</div><div class="cost cost-paid">付费按量</div><div>最高质量，零部署</div>
+      </div>
+      <div class="dh-row reveal">
+        <div><strong>SadTalker</strong></div><div>本地 CPU/GPU</div><div class="cost cost-free">免费</div><div>开源，中等质量</div>
+      </div>
+      <div class="dh-row reveal">
+        <div><strong>EchoMimicV3-Flash</strong></div><div>本地 GPU ≥12G</div><div class="cost cost-free">免费</div><div>高质量表情，需 GPU</div>
+      </div>
+      <div class="dh-row reveal">
+        <div><strong>HeyGem</strong></div><div>Docker 三容器</div><div class="cost cost-free">免费</div><div>开源自部署，ASR+TTS+Avatar</div>
+      </div>
+      <div class="dh-row reveal">
+        <div><strong>Live2D</strong></div><div>纯 CPU</div><div class="cost cost-zero">零成本</div><div>卡通风格，无需 GPU</div>
+      </div>
+    </div>
+
+    <div class="tts-engines reveal">
+      <h4>11 种 TTS 语音引擎</h4>
+      <div class="tts-chips">
+        <span class="tts-chip">Edge TTS<em>免费</em></span>
+        <span class="tts-chip">Azure<em>5h/月</em></span>
+        <span class="tts-chip">SiliconFlow</span>
+        <span class="tts-chip">ElevenLabs</span>
+        <span class="tts-chip">Gemini</span>
+        <span class="tts-chip">MiMo</span>
+        <span class="tts-chip">火山引擎</span>
+        <span class="tts-chip">科大讯飞</span>
+        <span class="tts-chip">Fish-Speech S2</span>
+        <span class="tts-chip">HeyGem</span>
+        <span class="tts-chip tts-chip-hl">声音克隆<em>GPT-SoVITS / CosyVoice / Fish-Speech</em></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Quick Start ========== -->
+<section id="start" class="section section-alt">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-tag">快速上手</span>
+      <h2 class="section-title">5 步启动</h2>
+      <p class="section-desc">支持 Web 服务器模式与 Tauri 桌面应用模式</p>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card reveal">
+        <div class="step-card-num">1</div>
+        <h4>环境准备</h4>
+        <p>Rust (Edition 2021) + Node.js 18+ + FFmpeg 4.0+</p>
+        <pre class="inline-code">brew install ffmpeg  <span class="c-gray"># macOS</span></pre>
+      </div>
+      <div class="step-card reveal">
+        <div class="step-card-num">2</div>
+        <h4>获取项目</h4>
+        <p>克隆仓库并复制配置模板</p>
+        <pre class="inline-code">git clone &lt;repo&gt; && cd soma
+cp conf/config.toml.example conf/config.toml</pre>
+      </div>
+      <div class="step-card reveal">
+        <div class="step-card-num">3</div>
+        <h4>申请 API Key</h4>
+        <p>至少配一个 LLM Key + 一个素材库 Key</p>
+        <div class="key-badges">
+          <span class="key-badge">DeepSeek</span>
+          <span class="key-badge">Ollama 免费</span>
+          <span class="key-badge">Pexels 免费</span>
+        </div>
+      </div>
+      <div class="step-card reveal">
+        <div class="step-card-num">4</div>
+        <h4>编辑配置</h4>
+        <p>编辑 conf/config.toml，填入 API Key</p>
+        <pre class="inline-code">[app]
+llm_provider = "deepseek"
+deepseek_api_key = "sk-xxx"
+pexels_api_keys = ["你的 Key"]</pre>
+      </div>
+      <div class="step-card reveal">
+        <div class="step-card-num">5</div>
+        <h4>启动服务</h4>
+        <p>Web 模式或桌面应用模式</p>
+        <pre class="inline-code">make install && make dev      <span class="c-gray"># Web</span>
+make install-tauri && make dev-tauri  <span class="c-gray"># 桌面</span></pre>
+      </div>
+    </div>
+
+    <div class="start-modes reveal">
+      <div class="start-mode">
+        <h4>🌐 Web 服务器模式</h4>
+        <p>Actix-Web 后端 (8090) + Vue 前端 (5273)，支持远程访问</p>
+        <code>make dev</code>
+      </div>
+      <div class="start-mode">
+        <h4>🖥️ 桌面应用模式</h4>
+        <p>Tauri v2 独立窗口，无需启动后端，首启自动迁移配置</p>
+        <code>make dev-tauri</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Footer ========== -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="logo-mark">S</span>
+        <span class="logo-text">Soma</span>
+        <p>AI 驱动的短视频自动生成工具</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h5>功能</h5>
+          <a href="#features">短视频生成</a>
+          <a href="#features">工具箱</a>
+          <a href="#digital-human">数字人口播</a>
+        </div>
+        <div class="footer-col">
+          <h5>开发者</h5>
+          <a href="#start">快速上手</a>
+          <a href="#tech">技术栈</a>
+          <a href="#feature-points">功能点</a>
+        </div>
+        <div class="footer-col">
+          <h5>配置</h5>
+          <a href="#">配置指南</a>
+          <a href="#">API 文档</a>
+          <a href="#">技术文档</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>MIT License · v0.1.2 · Rust + Vue 3 + Tauri v2</span>
+      <span class="footer-meta">33,000+ 行代码 · 24 功能点 · 11 TTS 引擎 · 5 数字人引擎</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
