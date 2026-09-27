@@ -56,9 +56,6 @@
               <el-icon :size="22"><component :is="group.meta.icon" /></el-icon>
             </div>
             <div class="wb-card-name">{{ f.name }}</div>
-            <el-tooltip :content="f.id" placement="top" :show-after="500">
-              <div class="wb-card-id">{{ f.id }}</div>
-            </el-tooltip>
             <div class="wb-card-desc">{{ f.description }}</div>
             <div class="wb-card-foot">
               <el-tag size="small" type="info" effect="plain" round>
@@ -1587,22 +1584,6 @@ async function copyText(text: string) {
 .wb-card-name {
   font-size: 15.5px;
   font-weight: 650;
-}
-
-.wb-card-id {
-  font-family: 'JetBrains Mono', 'Menlo', monospace;
-  font-size: 10px;
-  color: var(--soma-text-faint);
-  opacity: 0;
-  cursor: default;
-  transition: opacity 0.25s;
-  max-height: 0;
-  overflow: hidden;
-}
-
-.wb-card:hover .wb-card-id {
-  opacity: 0.7;
-  max-height: 20px;
 }
 
 .wb-card-desc {
