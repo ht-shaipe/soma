@@ -106,7 +106,10 @@ onMounted(async () => {
 
 <style scoped>
 .env-banner {
-  margin: 0 20px;
+  /* EP .el-alert 自带 width:100%，与 margin 叠加会横向溢出（右缘超出视口）；
+     width:auto 交还给 flex 拉伸，边距对齐下方页面内容的 28px 内边距 */
+  margin: 0 28px;
+  width: auto;
   border-radius: 12px;
 }
 
