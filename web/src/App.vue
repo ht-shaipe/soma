@@ -110,11 +110,26 @@ onMounted(async () => {
   border-radius: 12px;
 }
 
+/* EP 的 .el-alert__content 是 display:table 收缩布局（宽度贴内容），
+   自定义多行内容时会把标题/列表/按钮挤在窄列里，需改为撑满 */
+.env-banner :deep(.el-alert__content) {
+  display: block;
+  flex: 1;
+  width: auto;
+  padding: 0 8px;
+}
+
+.env-banner :deep(.el-alert__title) {
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .env-banner-body {
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
-  margin-top: 4px;
 }
 
 .env-banner-item {
@@ -122,6 +137,7 @@ onMounted(async () => {
   align-items: baseline;
   gap: 8px;
   font-size: 13px;
+  line-height: 1.5;
 }
 
 .env-banner-name {
@@ -131,5 +147,10 @@ onMounted(async () => {
 
 .env-banner-hint {
   opacity: 0.85;
+}
+
+/* 按钮保持固有宽度，不被纵向 flex 拉伸 */
+.env-banner-body :deep(.el-button) {
+  margin-top: 4px;
 }
 </style>
