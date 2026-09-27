@@ -15,6 +15,8 @@ const router = createRouter({
       component: () => import('@/views/ToolboxView.vue'),
       meta: { titleKey: 'nav.toolbox', subtitleKey: 'toolbox.subtitle' },
     },
+    // 工作台已并入工具箱：旧地址重定向，避免书签/历史链接白屏
+    { path: '/workbench', redirect: '/toolbox' },
     {
       path: '/image-story',
       name: 'image-story',
