@@ -333,6 +333,19 @@ impl TypedFeature for MaterialSearchFeature {
         let pixabay_keys = conf.app.pixabay_api_keys.clone().unwrap_or_default();
         let coverr_keys = conf.app.coverr_api_keys.clone().unwrap_or_default();
 
+        // 无 Key（含 [""] 空串占位）时给出明确引导，而非静默返回空候选列表
+        let no_key = match source {
+            "pixabay" => pixabay_keys.iter().all(|k| k.trim().is_empty()),
+            "coverr" => coverr_keys.iter().all(|k| k.trim().is_empty()),
+            _ => pexels_keys.iter().all(|k| k.trim().is_empty()),
+        };
+        if no_key {
+            return Err(SomaError::Config(format!(
+                "素材源 {} 的 API Key 未配置，请在 系统设置 → 素材源 API Key 中填写",
+                source
+            )));
+        }
+
         let materials = block_on_async(soma_stock::search_videos(
             source,
             &input.keyword,

@@ -130,7 +130,7 @@ pub async fn generate_script(
         .await
         .map_err(|e| SomaError::Llm(format!("LLM chat failed: {:?}", e)))?;
 
-    let content = extract_content_from_response(&result);
+    let content = extract_content_from_response(&result)?;
     let content = clean_llm_output(&content);
     Ok(content)
 }
@@ -189,7 +189,7 @@ pub async fn generate_terms(
         .await
         .map_err(|e| SomaError::Llm(format!("LLM terms failed: {:?}", e)))?;
 
-    let content = extract_content_from_response(&result);
+    let content = extract_content_from_response(&result)?;
     let content = clean_llm_output(&content);
     let terms = parse_terms_output(&content, amount);
     Ok(terms)
@@ -290,7 +290,7 @@ pub async fn generate_narration(
         .await
         .map_err(|e| SomaError::Llm(format!("LLM narration failed: {:?}", e)))?;
 
-    let content = extract_content_from_response(&result);
+    let content = extract_content_from_response(&result)?;
     let narration = clean_llm_output(&content);
     Ok(narration.trim().to_string())
 }
@@ -362,7 +362,7 @@ pub async fn generate_intent(
         .await
         .map_err(|e| SomaError::Llm(format!("LLM intent failed: {:?}", e)))?;
 
-    let content = extract_content_from_response(&result);
+    let content = extract_content_from_response(&result)?;
     let content = clean_llm_output(&content);
     parse_intent_output(&content, subject, language, aspect_ratio)
 }
@@ -463,7 +463,7 @@ pub async fn generate_storyboard(
         .await
         .map_err(|e| SomaError::Llm(format!("LLM storyboard failed: {:?}", e)))?;
 
-    let content = extract_content_from_response(&result);
+    let content = extract_content_from_response(&result)?;
     let content = clean_llm_output(&content);
     parse_storyboard_output(&content, script, clip_duration)
 }
@@ -638,7 +638,7 @@ pub async fn generate_social_metadata(
         .await
         .map_err(|e| SomaError::Llm(format!("LLM social metadata failed: {:?}", e)))?;
 
-    let content = extract_content_from_response(&result);
+    let content = extract_content_from_response(&result)?;
     let content = clean_llm_output(&content);
 
     let json_str = strip_code_fence(&content);
@@ -1002,19 +1002,37 @@ fn get_provider_config(
 /// - `result`: LLM 响应的 tube::Value
 ///
 /// 返回：提取的文本内容
-fn extract_content_from_response(result: &tube::Value) -> String {
+fn extract_content_from_response(result: &tube::Value) -> Result<String, SomaError> {
     if let Some(choices) = result.get("choices") {
         if let Some(arr) = choices.as_array() {
             if let Some(first) = arr.first() {
                 if let Some(msg) = first.get("message") {
                     if let Some(content) = msg.get("content") {
-                        return content.to_string();
+                        return Ok(content.to_string());
                     }
                 }
             }
         }
     }
-    result.to_string()
+    // 服务商错误负载（无 choices，形如 {"code": 4xxxx, "msg": ...}）：
+    // 此前会被原样当作内容返回，造成"功能成功但产物是错误 JSON"的假阳性
+    if let Some(code) = result.get("code").and_then(|v| v.as_i64()) {
+        if code != 0 && code != 200 {
+            let msg = result
+                .get("msg")
+                .or_else(|| result.get("message"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_else(|| "未知错误".to_string());
+            return Err(SomaError::Llm(format!(
+                "LLM 服务商返回错误（code {code}）: {msg}"
+            )));
+        }
+    }
+    let text = result.to_string();
+    if text.trim().is_empty() || text == "null" {
+        return Err(SomaError::Llm("LLM 响应为空".into()));
+    }
+    Ok(text)
 }
 
 /// 将 serde_json::Value 转换为 tube::Value
