@@ -26,6 +26,7 @@ pub enum SubtitleFormat {
 }
 
 impl SubtitleFormat {
+    /// 从文件扩展名解析字幕格式（srt / ass / vtt）
     pub fn from_ext(ext: &str) -> Self {
         match ext.to_lowercase().trim_start_matches('.') {
             "ass" => SubtitleFormat::Ass,

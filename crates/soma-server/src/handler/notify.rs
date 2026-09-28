@@ -6,6 +6,7 @@ use soma_core::notify::{self, NotifyChannel, NotifyMessage};
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 通知推送模块分发入口：`notify.send`（Bark / 钉钉 / Telegram）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "send" => send(param).await,

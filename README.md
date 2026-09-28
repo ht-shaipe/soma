@@ -430,7 +430,7 @@ CMD ["soma"]
 | `platform` | douyin_detail / douyin_posts | 抖音 Web API 直连（a_bogus 签名，需浏览器 Cookie） |
 | `dataexport` | export / import / preview | 数据导出（CSV / JSON / JSONL） |
 | `watermark` | detect / remove | 静态水印检测与去除（多帧梯度分析，蒙版预览，remove 支持自动检测） |
-| `system` | preflight | 环境预检（FFmpeg / yt-dlp / edge-tts / 存储 / 密钥共 7 项） |
+| `system` | preflight | 环境预检（FFmpeg / ffprobe / edge-tts / 存储 / 密钥共 7 项关键 + Python 3 / GPU 2 项可选） |
 
 > 请求示例（裸调用 TTS 功能点，真实可用）：
 > ```bash

@@ -6,6 +6,7 @@ use soma_core::export::{self, DataExporter, ExportFormat, ExportRow};
 use tube::{Map, Result, Value};
 use tube_web::RequestParameter;
 
+/// 数据导出模块分发入口：`dataexport.preview`（预览）/ `export`（导出文件）/ `import`（导入）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "export" => export_data(param).await,

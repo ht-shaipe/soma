@@ -30,6 +30,7 @@ use soma_feature::features::subtitle::SubtitleGenerateOutput;
 use soma_feature::features::tts::TtsSynthesizeOutput;
 use soma_feature::progress::{FeatureProgress, FnReporter, NoopProgress};
 
+/// 流水线主入口：按 6 步编排执行视频生成任务（需求理解→文案→分镜→素材→配音字幕→合成），支持 `stop_at` 任意步骤断点
 pub fn run_task(task_id: &str, params: &VideoParams, stop_at: &str) -> Result<(), SomaError> {
     let conf = Config::get();
     let task_dir = soma_core::utils::task_dir(task_id);

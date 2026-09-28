@@ -7,6 +7,7 @@ use soma_stock::douyin::{self, DouyinClient};
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 平台直连模块分发入口：`platform.douyin_detail` / `douyin_posts`（a_bogus 签名，需浏览器 Cookie）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "douyin_detail" => douyin_detail(param).await,

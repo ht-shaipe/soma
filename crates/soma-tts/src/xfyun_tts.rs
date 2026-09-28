@@ -23,6 +23,7 @@ pub struct XfyunTts {
 }
 
 impl XfyunTts {
+    /// 构造科大讯飞 TTS 客户端（WebSocket 鉴权）
     pub fn new(app_id: &str, api_key: &str, api_secret: &str) -> Self {
         Self {
             app_id: app_id.to_string(),

@@ -16,6 +16,7 @@ pub struct HeyGemTts {
 }
 
 impl HeyGemTts {
+    /// 构造 HeyGem TTS 客户端（本地 Docker 部署）
     pub fn new(
         config: HeyGemConfig,
         reference_audio: &str,

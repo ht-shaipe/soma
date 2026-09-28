@@ -337,6 +337,7 @@ import type { LlmProviderOption } from '@/types'
 const configStore = useConfigStore()
 const { t } = useI18n()
 
+// ── LLM 供应商分组与内置模型建议（下拉可自填） ──
 const providerGroups = ref([
   {
     label: 'OpenAI Compatible',
@@ -375,6 +376,8 @@ const providerGroups = ref([
   },
 ])
 
+// ── 表单状态：与 configStore 双向同步的各分区字段 ──
+// LLM
 const llmProvider = ref(configStore.config.llm.provider)
 const llmApiKey = ref(configStore.config.llm.api_key)
 const llmBaseUrl = ref(configStore.config.llm.base_url)
@@ -400,6 +403,7 @@ const llmModelSuggestions = computed(() => {
 const llmSecretKey = ref(configStore.config.llm.secret_key || '')
 const llmAccountId = ref(configStore.config.llm.account_id || '')
 
+// TTS
 const ttsProvider = ref(configStore.config.tts.provider)
 const azureSpeechKey = ref(configStore.config.tts.azure_speech_key || '')
 const azureSpeechRegion = ref(configStore.config.tts.azure_speech_region || '')
@@ -412,10 +416,12 @@ const fishspeechApiKey = ref(configStore.config.tts.fishspeech_api_key || '')
 const fishspeechReferenceId = ref(configStore.config.tts.fishspeech_reference_id || '')
 const narrationEmotionTags = ref(configStore.config.app.narration_emotion_tags || false)
 
+// 素材源
 const pexelsApiKey = ref(configStore.config.stock.pexels_api_key)
 const pixabayApiKey = ref(configStore.config.stock.pixabay_api_key)
 const coverrApiKey = ref(configStore.config.stock.coverr_api_key)
 
+// AI 视频生成
 const zhipuVideoApiKey = ref(configStore.config.aivideo?.zhipu_video_api_key || '')
 const zhipuVideoModel = ref(configStore.config.aivideo?.zhipu_video_model || 'cogvideox-flash')
 const klingAccessKey = ref(configStore.config.aivideo?.kling_access_key || '')
@@ -425,6 +431,7 @@ const minimaxVideoApiKey = ref(configStore.config.aivideo?.minimax_video_api_key
 const minimaxVideoModel = ref(configStore.config.aivideo?.minimax_video_model || 'MiniMax-Hailuo-2.3')
 const videoGenTimeout = ref(configStore.config.aivideo?.video_gen_timeout || 300)
 
+// 系统
 const ffmpegPath = ref(configStore.config.ffmpeg.path)
 const ffmpegThreads = ref(configStore.config.ffmpeg.threads)
 const storagePath = ref(configStore.config.app.storage_path)
@@ -470,6 +477,7 @@ watch(() => configStore.config, () => {
   refreshBaseline()
 }, { flush: 'post' })
 
+// ── 分区配置状态圆点（锚点导航徽标） ──
 const currentProviderInfo = computed(() => {
   for (const group of providerGroups.value) {
     const found = group.providers.find(p => p.value === llmProvider.value)

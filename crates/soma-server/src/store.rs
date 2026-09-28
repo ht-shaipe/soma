@@ -65,6 +65,7 @@ impl Default for InMemoryTaskStore {
 }
 
 impl InMemoryTaskStore {
+    /// 创建内存任务存储（进程内缓存，供测试或无持久化场景）
     pub fn new() -> Self {
         Self {
             store: Mutex::new(HashMap::new()),
@@ -227,6 +228,7 @@ pub struct SqliteTaskStore {
 }
 
 impl SqliteTaskStore {
+    /// 打开或创建 SQLite 任务存储（WAL 模式）
     pub fn new(db_path: &str) -> Result<Self, String> {
         let conn = rusqlite::Connection::open(db_path)
             .map_err(|e| format!("SQLite 打开失败 {}: {}", db_path, e))?;
@@ -751,6 +753,7 @@ mod redis_store {
     }
 
     impl RedisTaskStore {
+        /// 连接 Redis 任务存储（分布式部署场景）
         pub fn new(url: &str) -> Result<Self, String> {
             let client = redis::Client::open(url).map_err(|e| format!("Redis 连接失败: {}", e))?;
             Ok(Self { client })

@@ -17,6 +17,7 @@ pub struct GeminiTts {
 }
 
 impl GeminiTts {
+    /// 构造 Gemini TTS 客户端
     pub fn new(api_key: &str, base_url: &str, model_name: &str) -> Self {
         Self {
             api_key: api_key.to_string(),

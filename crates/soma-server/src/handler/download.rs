@@ -6,6 +6,7 @@ use soma_stock::ytdlp;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 视频下载模块分发入口：`download.check`（yt-dlp 可用性）/ `info` / `download` / `batch` / `extract_urls`（链接提取）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "check" => check(param).await,

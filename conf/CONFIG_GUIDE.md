@@ -61,6 +61,25 @@
 | **OneAPI** | `oneapi` | `oneapi_api_key` | gpt-4o-mini | https://github.com/songquanpeng/one-api | 开源自建网关，MIT 协议 |
 | **LiteLLM** | `litellm` | `oneapi_api_key` | gpt-4o-mini | https://github.com/BerriAI/litellm | 开源代理，100+ LLM |
 
+### 自定义 OpenAI 兼容网关（openai_base_url）
+
+任意暴露 OpenAI `/v1/chat/completions` 接口的服务都可作为 LLM 提供商——
+本地推理网关（LM Studio / Ollama 的 OpenAI 兼容层）、OneAPI / new-api 自建站、
+公司内部代理等。配置四件套：
+
+```toml
+[app]
+llm_provider = "openai"
+openai_api_key = "你的网关 Key"              # 网关未启用鉴权时也需非空占位
+openai_base_url = "http://localhost:10168/v1"  # 网关地址（含 /v1；缺省自动补 /v1）
+openai_model_name = "auto"                     # 网关侧模型名，支持 "auto" 自动路由
+```
+
+> 说明：
+> - `openai_base_url` 不配置时默认打向 `https://api.openai.com/v1`
+> - 该字段此前仅字幕翻译生效，现已在主 LLM 链路（需求理解 / 文案 / 分镜 / 关键词 / 社交元数据 / 旁白）全量生效
+> - 聚合网关的模型名可为 `auto` 由网关路由；推理类模型响应较慢（含思维链）属正常
+
 ---
 
 ## 三、TTS 语音合成配置

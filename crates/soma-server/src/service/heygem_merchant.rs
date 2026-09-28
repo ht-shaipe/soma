@@ -16,6 +16,7 @@ pub struct MerchantAssetStore {
 }
 
 impl MerchantAssetStore {
+    /// 构造 HeyGem 商户资产客户端（素材目录注入）
     pub fn new(assets_dir: &str) -> Self {
         Self {
             assets_dir: PathBuf::from(assets_dir),

@@ -11,6 +11,7 @@ use futures::StreamExt;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 语音模块分发入口：`voices.list` / `list_cloned` / `delete_cloned`（克隆音色管理）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "list" => list_voices(param).await,

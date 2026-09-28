@@ -15,6 +15,7 @@ pub enum ExportFormat {
 }
 
 impl ExportFormat {
+    /// 从文件扩展名解析导出格式（csv / json / jsonl），无法识别时默认 CSV
     pub fn from_ext(ext: &str) -> Self {
         match ext.to_lowercase().trim_start_matches('.') {
             "json" => ExportFormat::Json,
@@ -37,10 +38,12 @@ impl Default for ExportRow {
 }
 
 impl ExportRow {
+    /// 创建空行构建器
     pub fn new() -> Self {
         Self { fields: Vec::new() }
     }
 
+    /// 链式添加一个字段（键值对），返回自身以便连续调用
     pub fn add(mut self, key: &str, value: &str) -> Self {
         self.fields.push((key.to_string(), value.to_string()));
         self
@@ -60,6 +63,7 @@ impl Default for DataExporter {
 }
 
 impl DataExporter {
+    /// 创建空导出器
     pub fn new() -> Self {
         Self {
             rows: Vec::new(),

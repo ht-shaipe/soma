@@ -21,6 +21,7 @@ fn ffmpeg_binaries() -> watermark::FfmpegBinaries {
 }
 use tube_web::RequestParameter;
 
+/// 视频去水印模块分发入口：`watermark.detect`（检测 + 预览）/ `remove`（蒙版修复重编码）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "detect" => detect(param).await,

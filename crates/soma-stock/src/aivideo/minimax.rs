@@ -16,6 +16,7 @@ pub struct MinimaxVideo {
 }
 
 impl MinimaxVideo {
+    /// 构造 MiniMax 海螺视频生成客户端
     pub fn new(api_key: &str, model: &str) -> Self {
         Self {
             multi_modal: MiniMax::new(api_key).multi_modal(),

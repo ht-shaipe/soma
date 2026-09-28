@@ -31,6 +31,7 @@ pub struct Config {
 }
 
 impl Config {
+    /// 从指定路径加载 TOML 配置，并记录路径供 [`Config::save`] 写回
     pub fn load(conf_path: &str) -> std::result::Result<Config, soma_core::SomaError> {
         if let Ok(mut cache) = CONF_PATH_CACHE.lock() {
             *cache = conf_path.to_string();
@@ -39,18 +40,22 @@ impl Config {
         Ok(Config { app: app_config })
     }
 
+    /// 覆盖全局配置缓存（启动初始化与配置保存后调用）
     pub fn set(val: Config) {
         lock_config_cache().insert("soma".to_owned(), val);
     }
 
+    /// 读取全局配置快照（缓存不存在时返回默认配置）
     pub fn get() -> Config {
         lock_config_cache().get("soma").cloned().unwrap_or_default()
     }
 
+    /// 获取当前配置文件路径（[`Config::load`] 时记录）
     pub fn get_conf_path() -> String {
         lock_conf_path().clone()
     }
 
+    /// 将当前配置序列化为 TOML 写回加载时的路径
     pub fn save() -> std::result::Result<(), String> {
         let conf = Self::get();
         let conf_path = Self::get_conf_path();

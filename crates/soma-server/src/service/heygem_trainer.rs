@@ -25,6 +25,7 @@ pub struct HeyGemTrainer {
 }
 
 impl HeyGemTrainer {
+    /// 构造 HeyGem 声音克隆训练器（配置 / 资产库 / FFmpeg 注入）
     pub fn new(
         config: HeyGemConfig,
         asset_store: MerchantAssetStore,

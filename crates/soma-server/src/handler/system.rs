@@ -8,6 +8,7 @@ use std::process::Command;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 系统模块分发入口：`system.preflight`（依赖与配置体检，M2.5）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "preflight" => preflight().await,

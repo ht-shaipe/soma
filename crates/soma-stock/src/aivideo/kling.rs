@@ -16,6 +16,7 @@ pub struct KlingVideo {
 }
 
 impl KlingVideo {
+    /// 构造可灵视频生成客户端（AK / SK 鉴权）
     pub fn new(access_key: &str, secret_key: &str, model: &str) -> Self {
         Self {
             multi_modal: Kling::new(access_key, secret_key).multi_modal(),

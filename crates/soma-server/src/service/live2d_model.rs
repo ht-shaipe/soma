@@ -16,6 +16,7 @@ pub struct Live2DModelStore {
 }
 
 impl Live2DModelStore {
+    /// 构造 Live2D 模型管理器（模型目录注入）
     pub fn new(models_dir: &str) -> Self {
         let dir = PathBuf::from(models_dir);
         if !dir.exists() {

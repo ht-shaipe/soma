@@ -6,6 +6,7 @@ use soma_core::subtitle;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 字幕模块分发入口：`subtitle.parse` / `convert` / `merge` / `translate` / `correct`
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "parse" => parse(param).await,

@@ -77,6 +77,7 @@ async fn list_materials(param: &RequestParameter) -> Result<Value> {
     }))
 }
 
+/// 人像照片模块分发入口：`portraits.list` / `portraits.delete`
 pub async fn distribute_portraits(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "list" => list_portraits().await,

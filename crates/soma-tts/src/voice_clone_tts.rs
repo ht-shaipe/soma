@@ -74,6 +74,7 @@ pub enum CloneModel {
 
 impl CloneModel {
     #[allow(clippy::should_implement_trait)]
+    /// 按名称解析克隆模型（gpt_sovits / cosyvoice / fish_speech），未知名称返回配置错误
     pub fn from_str(s: &str) -> Result<Self, SomaError> {
         match s {
             "gpt_sovits" => Ok(Self::GptSovits),
@@ -86,6 +87,7 @@ impl CloneModel {
         }
     }
 
+    /// 转换为配置文件使用的字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::GptSovits => "gpt_sovits",
@@ -283,6 +285,7 @@ impl VoiceCloneEnvChecker {
         }
     }
 
+    /// 执行声音克隆环境健康检查（SSH 连通性 / 依赖 / 模型），返回健康报告
     pub fn check(&self) -> HealthReport {
         let mut missing = Vec::new();
 
@@ -505,6 +508,7 @@ impl VoiceCloneEnvChecker {
 
 // ── 参考音频校验 ─────────────────────────────────────────
 
+/// 校验参考音频可用性（文件存在且时长满足要求）
 pub fn validate_reference_audio(reference_audio: &str) -> Result<(), SomaError> {
     let path = soma_core::utils::validate_local_path(reference_audio, true)?;
 

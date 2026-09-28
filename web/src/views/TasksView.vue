@@ -185,6 +185,7 @@ import TaskStatusTag from '@/components/TaskStatusTag.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+// 任务中心：三类任务（视频 / 数字人 / 图片故事）页签化展示与轮询刷新
 const taskStore = useTaskStore()
 const router = useRouter()
 const { t } = useI18n()

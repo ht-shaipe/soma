@@ -11,6 +11,7 @@ use soma_feature::{FeatureRequest, FeatureStatus, NoopProgress};
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 功能点统一分发入口：`features.list`（注册表与 Schema）/ `run`（裸调用）/ `history`（运行历史）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "list" => list(),

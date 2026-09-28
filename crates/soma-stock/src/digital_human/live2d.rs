@@ -68,6 +68,7 @@ pub struct Live2DEnvChecker {
 }
 
 impl Live2DEnvChecker {
+    /// 构造 Live2D 卡通数字人提供商（纯 CPU 渲染）
     pub fn new(config: Live2DConfig) -> Self {
         Self { config }
     }

@@ -20,6 +20,7 @@ pub struct VolcengineTts {
 }
 
 impl VolcengineTts {
+    /// 构造火山引擎 TTS 客户端（WebSocket 流式合成）
     pub fn new(app_id: &str, access_token: &str, cluster: &str) -> Self {
         Self {
             app_id: app_id.to_string(),

@@ -193,6 +193,7 @@ fn panic_msg(panic_val: Box<dyn std::any::Any + Send>) -> String {
 }
 
 impl TaskQueue {
+    /// 初始化全局任务队列（并发 / 排队上限由配置注入）
     pub fn new(max_concurrent: usize, max_queued: usize) -> Self {
         Self {
             max_concurrent,

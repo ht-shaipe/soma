@@ -40,6 +40,7 @@ pub fn init_sqlite_store(db_path: &str) {
     }
 }
 
+/// 更新任务状态与进度（传 None 表示保持不变），同步 SQLite 持久化
 pub fn update_task(task_id: &str, state: Option<i32>, progress: Option<u32>) {
     let state_val = state;
     let progress_val = progress;
@@ -51,6 +52,7 @@ pub fn update_task(task_id: &str, state: Option<i32>, progress: Option<u32>) {
     );
 }
 
+/// 批量更新任务的数据字段（脚本 / 分镜 / 旁白等）
 pub fn update_task_data(task_id: &str, data: &TaskUpdateData) {
     let d = data.clone();
     lock_store().update(
@@ -103,10 +105,12 @@ pub fn update_task_data(task_id: &str, data: &TaskUpdateData) {
     );
 }
 
+/// 按 ID 查询任务（内存缓存未命中时回源 SQLite）
 pub fn get_task(task_id: &str) -> Option<TaskInfo> {
     lock_store().get(task_id)
 }
 
+/// 分页获取全部任务（按更新时间倒序），返回 (任务列表, 总数)
 pub fn get_all_tasks(page: usize, page_size: usize) -> (Vec<TaskInfo>, usize) {
     let mut tasks = lock_store().get_all();
     tasks.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
@@ -120,20 +124,24 @@ pub fn get_all_tasks(page: usize, page_size: usize) -> (Vec<TaskInfo>, usize) {
     }
 }
 
+/// 删除任务（内存与 SQLite 同步），返回任务是否存在
 pub fn delete_task(task_id: &str) -> bool {
     lock_store().delete(task_id)
 }
 
+/// 创建任务记录（Processing 状态，随后入队执行）
 pub fn create_task_entry(task_id: &str, params: VideoParams) {
     let task = TaskInfo::new(task_id.to_string(), params);
     lock_store().create(task);
 }
 
+/// 创建草稿任务记录（Draft 状态，尚未入队）
 pub fn create_draft_task_entry(task_id: &str, params: VideoParams) {
     let task = TaskInfo::with_status(task_id.to_string(), params, TaskStatus::Draft);
     lock_store().create(task);
 }
 
+/// 整体替换任务参数（草稿编辑保存）
 pub fn update_task_params(task_id: &str, params: &VideoParams) {
     let p = params.clone();
     lock_store().update(
@@ -276,6 +284,7 @@ pub fn update_task_params(task_id: &str, params: &VideoParams) {
     );
 }
 
+/// 从 JSON 增量更新任务参数（前端配置回填）
 pub fn update_task_params_from_json(task_id: &str, json: &serde_json::Value) {
     let j = json.clone();
     lock_store().update(
@@ -427,6 +436,7 @@ pub fn update_task_params_from_json(task_id: &str, json: &serde_json::Value) {
     );
 }
 
+/// 仅更新任务状态枚举（进度不变）
 pub fn set_task_state(task_id: &str, state: TaskStatus) {
     let state_val = state.as_i32();
     lock_store().update(

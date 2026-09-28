@@ -13,6 +13,7 @@ pub struct HeyGemProvider {
 }
 
 impl HeyGemProvider {
+    /// 构造 HeyGem 数字人提供商
     pub fn new(config: HeyGemConfig) -> Self {
         Self { config }
     }
@@ -174,6 +175,7 @@ pub struct HeyGemHealthChecker {
 }
 
 impl HeyGemHealthChecker {
+    /// 构造 HeyGem 环境健康检查器
     pub fn new(config: HeyGemConfig) -> Self {
         Self { config }
     }

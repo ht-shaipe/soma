@@ -3,6 +3,7 @@ use crate::Config;
 use tube::{Result, Value};
 use tube_web::RequestParameter;
 
+/// 上传模块分发入口：`upload.upload` / `status`（Upload-Post 跨平台发布）
 pub async fn distribute(param: &RequestParameter) -> Result<Value> {
     match param.method.to_lowercase().as_str() {
         "upload" => upload(param).await,

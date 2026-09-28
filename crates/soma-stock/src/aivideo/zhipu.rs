@@ -16,6 +16,7 @@ pub struct ZhipuVideo {
 }
 
 impl ZhipuVideo {
+    /// 构造智谱 CogVideoX 视频生成客户端
     pub fn new(api_key: &str, model: &str) -> Self {
         Self {
             multi_modal: ZhipuAI::new(api_key).multi_modal(),

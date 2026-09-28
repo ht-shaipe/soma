@@ -22,6 +22,7 @@ impl Default for Pipeline {
 }
 
 impl Pipeline {
+    /// 创建流水线实例
     pub fn new() -> Self {
         Self
     }
